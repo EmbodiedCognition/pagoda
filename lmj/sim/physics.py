@@ -23,7 +23,8 @@
 import numpy as np
 import numpy.random as rng
 import ode
-import OpenGL as gl
+import OpenGL.GL as gl
+import OpenGL.GLUT as glut
 
 from . import world
 
@@ -164,56 +165,41 @@ class Body(object):
                           R[1], R[4], R[7], 0.,
                           R[2], R[5], R[8], 0.,
                           x, y, z, 1.])
-        gl.glScale(*self.scale)
         self._draw()
         gl.glPopMatrix()
 
 
 class Box(Body):
-    @property
-    def scale(self):
-        return self.shape['lengths']
-
     def init_mass(self, m):
         m.setBox(self.density, *self.shape['lengths'])
 
     def _draw(self):
+        gl.glScale(*self.shape['lengths'])
         glut.glutSolidCube(1)
 
 
 class Sphere(Body):
-    @property
-    def scale(self):
-        r = self.shape['radius']
-        return r, r, r
-
     def init_mass(self, m):
         m.setSphere(self.density, self.shape['radius'])
 
     def _draw(self):
+        r = self.shape['radius']
+        gl.glScale(r, r, r)
         glut.glutSolidSphere(1, 31, 31)
 
 
 class Cylinder(Body):
-    @property
-    def scale(self):
-        r = self.shape['radius']
-        return r, r, self.shape['length']
-
     def init_mass(self, m):
         m.setCylinder(self.density, 3, self.shape['radius'], self.shape['length'])
 
     def _draw(self):
+        r = self.shape['radius']
+        gl.glScale(r, r, self.shape['length'])
         gl.glTranslate(0, 0, -0.5)
         glut.glutSolidCylinder(1, 1, 31, 31)
 
 
 class Capsule(Body):
-    @property
-    def scale(self):
-        r = self.shape['radius']
-        return r, r, self.shape['length']
-
     def init_mass(self, m):
         m.setCappedCylinder(self.density, 3, self.shape['radius'], self.shape['length'])
 
@@ -221,17 +207,11 @@ class Capsule(Body):
         r = self.shape['radius']
         l = self.shape['length']
 
-        gl.glTranslate(0, 0, -0.5)
-        glut.glutSolidCylinder(1, 1, 31, 31)
-        gl.glTranslate(0, 0, 0.5)
-
-        gl.glPushMatrix()
-        gl.glScale(1. / r, 1. / r, 1. / l)
         gl.glTranslate(0, 0, -l / 2.)
+        glut.glutSolidCylinder(r, l, 31, 31)
         glut.glutSolidSphere(r, 31, 31)
         gl.glTranslate(0, 0, l)
         glut.glutSolidSphere(r, 31, 31)
-        gl.glPopMatrix()
 
 
 class Joint(object):
