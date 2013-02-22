@@ -39,23 +39,20 @@ def make_quaternion(theta, *axis):
 class Body(object):
     '''This class wraps things that participate in the ODE physics simulation.
 
-    The primary attribute of this class is "body" -- an actual PyODE Body
-    object. In addition, there is a color (for drawing the object), a PyODE Geom
-    object (for detecting collisions -- not sure if this is really necessary to
-    keep around though), and several utility methods for doing things
-    like drawing. This class also provides lots of Python-specific properties
-    (which call the equivalent ODE getters and setters) for things like
-    position, rotation, etc.
+    The primary attribute of this class is "body" -- a PyODE Body object. In
+    addition, there is a color (for drawing the object), a PyODE Geom object
+    (for detecting collisions -- not sure if this is really necessary to keep
+    around though), and several utility methods for doing things like drawing.
+    This class also provides lots of Python-specific properties that call the
+    equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, world, space, color=None, density=1., **shape):
-        self.density = density
+    def __init__(self, world, space, color=None, density=1000., **shape):
+        self.color = color or rng.rand(3)
         self.shape = shape
 
-        self.color = color or rng.rand(3)
-
         m = ode.Mass()
-        self.init_mass(m)
+        self.init_mass(m, density)
         self.body = ode.Body(world)
         self.body.setMass(m)
 
@@ -170,8 +167,8 @@ class Body(object):
 
 
 class Box(Body):
-    def init_mass(self, m):
-        m.setBox(self.density, *self.shape['lengths'])
+    def init_mass(self, m, density):
+        m.setBox(density, *self.shape['lengths'])
 
     def _draw(self):
         gl.glScale(*self.shape['lengths'])
@@ -179,8 +176,8 @@ class Box(Body):
 
 
 class Sphere(Body):
-    def init_mass(self, m):
-        m.setSphere(self.density, self.shape['radius'])
+    def init_mass(self, m, density):
+        m.setSphere(density, self.shape['radius'])
 
     def _draw(self):
         r = self.shape['radius']
@@ -189,8 +186,8 @@ class Sphere(Body):
 
 
 class Cylinder(Body):
-    def init_mass(self, m):
-        m.setCylinder(self.density, 3, self.shape['radius'], self.shape['length'])
+    def init_mass(self, m, density):
+        m.setCylinder(density, 3, self.shape['radius'], self.shape['length'])
 
     def _draw(self):
         r = self.shape['radius']
@@ -200,8 +197,8 @@ class Cylinder(Body):
 
 
 class Capsule(Body):
-    def init_mass(self, m):
-        m.setCappedCylinder(self.density, 3, self.shape['radius'], self.shape['length'])
+    def init_mass(self, m, density):
+        m.setCappedCylinder(density, 3, self.shape['radius'], self.shape['length'])
 
     def _draw(self):
         r = self.shape['radius']
