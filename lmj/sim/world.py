@@ -1,4 +1,4 @@
-# Copyright (c) 2012 Leif Johnson <leif@leifjohnson.net>
+# Copyright (c) 2013 Leif Johnson <leif@leifjohnson.net>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -18,7 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-'''Generic simulation world base class.'''
+'''Generic simulation world and visualization base classes.'''
 
 import glumpy
 import OpenGL.GL as gl
