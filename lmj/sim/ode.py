@@ -25,6 +25,7 @@ import numpy.random as rng
 import ode
 import OpenGL as gl
 
+from . import world
 
 def make_quaternion(theta, *axis):
     x, y, z = axis
