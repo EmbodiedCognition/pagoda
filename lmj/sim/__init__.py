@@ -21,9 +21,6 @@
 '''Yet another OpenGL-and-physics simulator framework !'''
 
 from . import ode
-from . import viewer
-from . import world
-
-from .world import Viewer, World
-
+from .log import enable_default_logging, get_logger, call, args
 from .ode import make_quaternion
+from .world import Viewer, World
