@@ -3,7 +3,6 @@
 
 import curses
 import logging
-import plac
 import sys
 
 
@@ -68,10 +67,3 @@ def enable_default_logging():
     handler.setFormatter(TTY_Formatter(sys.stdout))
     logging.root.addHandler(handler)
     return handler
-
-
-def call(main):
-    enable_default_logging()
-    plac.call(main)
-
-args = plac.annotations

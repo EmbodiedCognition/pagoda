@@ -21,6 +21,15 @@
 '''Yet another OpenGL-and-physics simulator framework !'''
 
 from . import ode
-from .log import enable_default_logging, get_logger, call, args
+from .log import enable_default_logging, get_logger
 from .ode import make_quaternion
 from .world import Viewer, World
+
+import plac
+
+def call(main):
+    '''Enable logging and start up a main method.'''
+    enable_default_logging()
+    plac.call(main)
+
+args = plac.annotations
