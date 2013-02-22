@@ -24,6 +24,7 @@ import glumpy
 import OpenGL.GL as gl
 import OpenGL.GLU as glu
 import OpenGL.GLUT as glut
+import sys
 
 
 class World(object):
