@@ -20,9 +20,9 @@
 
 '''Yet another OpenGL-and-physics simulator framework !'''
 
-from . import physics
 from .log import enable_default_logging, get_logger
-from .world import Viewer, World
+from .physics import World
+from .viewer import Viewer
 
 import plac
 

@@ -26,15 +26,6 @@ import ode
 import OpenGL.GL as gl
 import OpenGL.GLUT as glut
 
-from . import world
-
-def make_quaternion(theta, *axis):
-    x, y, z = axis
-    r = np.sqrt(x * x + y * y + z * z)
-    st = np.sin(theta / 2.)
-    ct = np.cos(theta / 2.)
-    return [x * st / r, y * st / r, z * st / r, ct]
-
 
 class Body(object):
     '''This class wraps things that participate in the ODE physics simulation.
@@ -167,56 +158,75 @@ class Body(object):
 
 
 class Box(Body):
+    @property
+    def lengths(self):
+        return self.shape['lengths']
+
     def init_mass(self, m, density):
-        m.setBox(density, *self.shape['lengths'])
+        m.setBox(density, *self.lengths)
 
     def _draw(self):
-        gl.glScale(*self.shape['lengths'])
+        gl.glScale(*self.lengths)
         glut.glutSolidCube(1)
 
 
 class Sphere(Body):
+    @property
+    def radius(self):
+        return self.shape['radius']
+
     def init_mass(self, m, density):
-        m.setSphere(density, self.shape['radius'])
+        m.setSphere(density, self.radius)
 
     def _draw(self):
-        r = self.shape['radius']
-        gl.glScale(r, r, r)
-        glut.glutSolidSphere(1, 31, 31)
+        glut.glutSolidSphere(self.radius, 31, 31)
 
 
 class Cylinder(Body):
+    @property
+    def radius(self):
+        return self.shape['radius']
+
+    @property
+    def length(self):
+        return self.shape['length']
+
     def init_mass(self, m, density):
-        m.setCylinder(density, 3, self.shape['radius'], self.shape['length'])
+        m.setCylinder(density, 3, self.radius, self.length)
 
     def _draw(self):
-        r = self.shape['radius']
-        gl.glScale(r, r, self.shape['length'])
-        gl.glTranslate(0, 0, -0.5)
-        glut.glutSolidCylinder(1, 1, 31, 31)
+        gl.glTranslate(0, 0, -self.length / 2.)
+        glut.glutSolidCylinder(self.radius, self.length, 31, 31)
 
 
 class Capsule(Body):
+    @property
+    def radius(self):
+        return self.shape['radius']
+
+    @property
+    def length(self):
+        return self.shape['length']
+
     def init_mass(self, m, density):
-        m.setCappedCylinder(density, 3, self.shape['radius'], self.shape['length'])
+        m.setCappedCylinder(density, 3, self.radius, self.length)
 
     def _draw(self):
-        r = self.shape['radius']
-        l = self.shape['length']
-
-        gl.glTranslate(0, 0, -l / 2.)
-        glut.glutSolidCylinder(r, l, 31, 31)
-        glut.glutSolidSphere(r, 31, 31)
-        gl.glTranslate(0, 0, l)
-        glut.glutSolidSphere(r, 31, 31)
+        gl.glTranslate(0, 0, -self.length / 2.)
+        glut.glutSolidCylinder(self.radius, self.length, 31, 31)
+        glut.glutSolidSphere(self.radius, 31, 31)
+        gl.glTranslate(0, 0, self.length)
+        glut.glutSolidSphere(self.radius, 31, 31)
 
 
 class Joint(object):
     '''This class wraps the ODE Joint class with some Python properties.'''
 
-    def __init__(self, world, body_a, body_b=None):
-        self.joint = getattr(ode, self.__class__.__name__)(world)
+    def __init__(self, world, body_a, body_b=None, **kwargs):
+        self.joint = getattr(ode, '%sJoint' % self.__class__.__name__)(world)
         self.joint.attach(body_a, body_b)
+        for k, v in kwargs.iteritems():
+            setattr(self, k, v)
 
     @property
     def feedback(self):
@@ -360,7 +370,7 @@ class Ball(Joint):
         return self.joint.setParam(ode.ParamFMax3, force)
 
 
-class World(world.World):
+class World(object):
     '''This class wraps the ODE World class with some convenience methods.'''
 
     def __init__(self,
@@ -371,8 +381,7 @@ class World(world.World):
                  erp=0.8,
                  cfm=1e-5,
                  max_angular_speed=20):
-        super(World, self).__init__(dt)
-
+        self.dt = dt
         self.elasticity = elasticity
         self.friction = friction
 
@@ -384,11 +393,19 @@ class World(world.World):
         # TODO: not yet in pyode :(
         #self.world.setMaxAngularSpeed(max_angular_speed)
 
-        self.space = ode.Space()
+        self.space = ode.HashSpace()
 
         self.floor = ode.GeomPlane(self.space, (0, 1, 0), 0)
         self.contactgroup = ode.JointGroup()
         self.bodies = []
+
+    @staticmethod
+    def make_quaternion(theta, *axis):
+        x, y, z = axis
+        r = np.sqrt(x * x + y * y + z * z)
+        st = np.sin(theta / 2.)
+        ct = np.cos(theta / 2.)
+        return [x * st / r, y * st / r, z * st / r, ct]
 
     @property
     def center_of_mass(self):
@@ -406,9 +423,13 @@ class World(world.World):
         self.bodies.append(b)
         return b
 
-    def join(self, joint, body_a, body_b=None):
+    def join(self, joint, body_a, body_b=None, **kwargs):
         '''Create a new joint that connects two bodies together.'''
-        return globals()[joint.capitalize()](self.world, body_a, body_b)
+        ba = body_a.body
+        bb = None
+        if body_b:
+            bb = body_b.body
+        return globals()[joint.capitalize()](self.world, ba, bb, **kwargs)
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
@@ -425,3 +446,14 @@ class World(world.World):
             c.setMu(self.friction)
             ode.ContactJoint(self.world, self.contactgroup, c).attach(
                 geom_a.getBody(), geom_b.getBody())
+
+    def draw(self):
+        '''Draw all bodies in the world.'''
+        for b in self.bodies:
+            b.draw()
+
+    def needs_reset(self):
+        return False
+
+    def reset(self):
+        pass

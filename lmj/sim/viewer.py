@@ -18,30 +18,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-'''Generic simulation world and visualization base classes.'''
+'''OpenGL world viewer.'''
 
 import glumpy
 import OpenGL.GL as gl
 import OpenGL.GLU as glu
 import OpenGL.GLUT as glut
 import sys
-
-
-class World(object):
-    def __init__(self, dt):
-        self.dt = dt
-
-    def needs_reset(self):
-        return False
-
-    def reset(self):
-        pass
-
-    def draw(self):
-        pass
-
-    def step(self):
-        raise NotImplementedError
 
 
 class Viewer(glumpy.Figure):
