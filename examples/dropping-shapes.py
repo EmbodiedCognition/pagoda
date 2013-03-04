@@ -30,7 +30,7 @@ import sys
 class World(lmj.sim.World):
     def reset(self):
         for b in self.bodies:
-            b.position = np.array([0, 20, 0]) + 3 * rng.randn(3)
+            b.position = np.array([0, 0, 10]) + 3 * rng.randn(3)
             b.quaternion = self.make_quaternion(np.pi * rng.rand(), 0, 1, 1)
 
 

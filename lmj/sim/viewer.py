@@ -28,13 +28,14 @@ import sys
 
 
 class Viewer(glumpy.Figure):
-    def __init__(self, world):
+    def __init__(self, world, distance=30):
         super(Viewer, self).__init__()
         self.world = world
         self.elapsed = 0
         self.lens = self.add_frame()
-        self.trackball = glumpy.Trackball(-30, 0, 1, 70)
+        self.trackball = glumpy.Trackball(65, 30, 1, distance)
         self.mouse_down = False
+        self.paused = True
 
     def noop(self, *args, **kwargs):
         pass
@@ -44,12 +45,19 @@ class Viewer(glumpy.Figure):
     on_mouse_motion = noop
 
     def on_mouse_scroll(self, x, y, dx, dy):
-        self.trackball.zoom_to(x, y, dx, 70 * [1, -1][dy < 0])
+        paused = self.paused
+        self.paused = True
+        self.trackball.zoom_to(x, y, dx, 20 * [1, -1][dy < 0])
         self.redraw()
+        self.paused = paused
 
     def on_mouse_drag(self, x, y, dx, dy, button):
+        paused = self.paused
+        self.paused = True
         self.trackball.drag_to(x, y, dx, dy)
+        print self.trackball.theta, self.trackball.phi
         self.redraw()
+        self.paused = paused
 
     def on_init(self):
         self.on_resize(640, 480)
@@ -66,11 +74,11 @@ class Viewer(glumpy.Figure):
 
         gl.glEnable(gl.GL_LIGHTING)
         gl.glEnable(gl.GL_LIGHT0)
-        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [0, 0, 1, 0.5])
+        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [2, 2, 5, 0.5])
         gl.glLight(gl.GL_LIGHT0, gl.GL_DIFFUSE, [1, 1, 1, 1])
         gl.glLight(gl.GL_LIGHT0, gl.GL_SPECULAR, [1, 1, 1, 1])
         gl.glEnable(gl.GL_LIGHT1)
-        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [1, 1, 1, 0.5])
+        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [-2, 4, 5, 0.5])
         gl.glLight(gl.GL_LIGHT0, gl.GL_DIFFUSE, [1, 1, 1, 1])
         gl.glLight(gl.GL_LIGHT0, gl.GL_SPECULAR, [1, 1, 1, 1])
 
@@ -93,6 +101,8 @@ class Viewer(glumpy.Figure):
     def on_key_press(self, key, modifiers):
         if key == glumpy.window.key.ESCAPE:
             sys.exit()
+        if key == glumpy.window.key.SPACE:
+            self.paused = False if self.paused else True
         else:
             self.world.reset()
         self.redraw()
@@ -102,12 +112,12 @@ class Viewer(glumpy.Figure):
         self.trackball.push()
 
         gl.glBegin(gl.GL_QUADS)
-        gl.glColor(0.3, 0.3, 0.3)
-        gl.glNormal(0, 1, 0)
-        gl.glVertex(-5, 0,  5)
-        gl.glVertex( 5, 0,  5)
-        gl.glVertex( 5, 0, -5)
-        gl.glVertex(-5, 0, -5)
+        gl.glColor(0.3, 0.4, 0.5)
+        gl.glNormal(0, 0, 1)
+        gl.glVertex(-5,  5, 0)
+        gl.glVertex( 5,  5, 0)
+        gl.glVertex( 5, -5, 0)
+        gl.glVertex(-5, -5, 0)
         gl.glEnd()
 
         self.world.draw()
@@ -115,6 +125,8 @@ class Viewer(glumpy.Figure):
         self.trackball.pop()
 
     def on_idle(self, dt):
+        if self.paused:
+            return
         self.elapsed += dt
         while self.elapsed > self.world.dt:
             self.elapsed -= self.world.dt

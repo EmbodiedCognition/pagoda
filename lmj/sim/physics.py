@@ -377,7 +377,7 @@ class World(object):
                  dt=1. / 60,
                  elasticity=0.2,
                  friction=5000,
-                 gravity=(0, -9.81, 0),
+                 gravity=(0, 0, -9.81),
                  erp=0.8,
                  cfm=1e-5,
                  max_angular_speed=20):
@@ -395,7 +395,7 @@ class World(object):
 
         self.space = ode.HashSpace()
 
-        self.floor = ode.GeomPlane(self.space, (0, 1, 0), 0)
+        self.floor = ode.GeomPlane(self.space, (0, 0, 1), 0)
         self.contactgroup = ode.JointGroup()
         self.bodies = []
 
