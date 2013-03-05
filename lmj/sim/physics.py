@@ -359,7 +359,7 @@ class World(base.World):
     def __init__(self,
                  dt=1. / 60,
                  elasticity=0.2,
-                 friction=5000,
+                 friction=200,
                  gravity=(0, 0, -9.81),
                  erp=0.8,
                  cfm=1e-5,
@@ -461,13 +461,15 @@ class World(base.World):
 
     def on_collision(self, args, geom_a, geom_b):
         '''Callback function for the collide() method.'''
+        if ode.areConnected(geom_a.getBody(), geom_b.getBody()):
+            return
         for c in ode.collide(geom_a, geom_b):
             c.setBounce(self.elasticity)
             c.setMu(self.friction)
             ode.ContactJoint(self.world, self.contactgroup, c).attach(
                 geom_a.getBody(), geom_b.getBody())
 
-    def draw(self):
+    def draw(self, n=59):
         '''Draw all bodies in the world.'''
         for name, body in self._bodies.iteritems():
             gl.glColor(*self._colors[name])
@@ -482,17 +484,17 @@ class World(base.World):
                 gl.glScale(*body.lengths)
                 glut.glutSolidCube(1)
             if isinstance(body, Sphere):
-                glut.glutSolidSphere(body.radius, 31, 31)
+                glut.glutSolidSphere(body.radius, n, n)
             if isinstance(body, Cylinder):
                 l = body.length
                 gl.glTranslate(0, 0, -l / 2.)
-                glut.glutSolidCylinder(body.radius, l, 31, 31)
+                glut.glutSolidCylinder(body.radius, l, n, n)
             if isinstance(body, Capsule):
                 r = body.radius
                 l = body.length
                 gl.glTranslate(0, 0, -l / 2.)
-                glut.glutSolidCylinder(r, l, 31, 31)
-                glut.glutSolidSphere(r, 31, 31)
+                glut.glutSolidCylinder(r, l, n, n)
+                glut.glutSolidSphere(r, n, n)
                 gl.glTranslate(0, 0, l)
-                glut.glutSolidSphere(r, 31, 31)
+                glut.glutSolidSphere(r, n, n)
             gl.glPopMatrix()
