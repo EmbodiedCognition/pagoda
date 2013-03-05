@@ -18,17 +18,24 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-'''Yet another simulator framework !'''
+'''Base classes for simulations.'''
 
-from .log import enable_default_logging, get_logger
-from . import physics
-from . import viewer
 
-import plac
+class World(object):
+    '''World is a small base class for simulation worlds.'''
 
-def call(main):
-    '''Enable logging and start up a main method.'''
-    enable_default_logging()
-    plac.call(main)
+    def needs_reset(self):
+        '''Return True iff the world needs to be reset.'''
+        return False
 
-args = plac.annotations
+    def reset(self):
+        '''Reset the world state.'''
+        pass
+
+    def trace(self):
+        '''Return a string containing world state for later analysis.'''
+        return None
+
+    def step(self):
+        '''Advance the world simulation by one time step.'''
+        raise NotImplementedError
