@@ -42,12 +42,13 @@ class World(lmj.sim.physics.World):
     )
 def main(n=10, frame_rate=60., friction=5000, elasticity=0.1):
     w = World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
+    g = lambda n, k=0.1, size=1: np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
     for _ in range(n):
         s, kw = sorted(dict(
-            box=dict(lengths=rng.gamma(3, 0.1, size=3)),
-            capsule=dict(radius=rng.gamma(3, 0.1), length=rng.gamma(7, 0.1)),
-            cylinder=dict(radius=rng.gamma(2, 0.1), length=rng.gamma(7, 0.1)),
-            sphere=dict(radius=rng.gamma(2, 0.1)),
+            box=dict(lengths=g(3, size=3)),
+            capsule=dict(radius=g(3), length=g(7)),
+            cylinder=dict(radius=g(2), length=g(7)),
+            sphere=dict(radius=g(2)),
             ).iteritems())[rng.randint(4)]
         w.create_body(s, **kw)
     w.reset()
