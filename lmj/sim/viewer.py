@@ -21,21 +21,37 @@
 '''OpenGL world viewer.'''
 
 import glumpy
+import numpy as np
 import OpenGL.GL as gl
 import OpenGL.GLU as glu
 import OpenGL.GLUT as glut
 import sys
 
+from . import base
 
-class Viewer(glumpy.Figure):
-    def __init__(self, world, distance=30):
-        super(Viewer, self).__init__()
+
+class Null(object):
+    def __init__(self, world):
         self.world = world
+
+    def run(self):
+        while self.world.step():
+            self.world.trace()
+            if self.world.needs_reset():
+                self.world.reset()
+
+
+class GL(glumpy.Figure):
+    def __init__(self, world, trace=False, paused=False, distance=30):
+        super(GL, self).__init__()
+        self.world = world
+        self.trace = trace
+        self.paused = paused
         self.elapsed = 0
         self.lens = self.add_frame()
         self.trackball = glumpy.Trackball(65, 30, 1, distance)
-        self.mouse_down = False
-        self.paused = True
+        self._x = 0
+        self._y = 0
 
     def noop(self, *args, **kwargs):
         pass
@@ -54,13 +70,16 @@ class Viewer(glumpy.Figure):
     def on_mouse_drag(self, x, y, dx, dy, button):
         paused = self.paused
         self.paused = True
-        self.trackball.drag_to(x, y, dx, dy)
-        print self.trackball.theta, self.trackball.phi
+        if button == 1:  # pan_to
+            self._x += 0.1 * dx
+            self._y += 0.1 * dy
+        else:
+            self.trackball.drag_to(x, y, dx, dy)
         self.redraw()
         self.paused = paused
 
     def on_init(self):
-        self.on_resize(640, 480)
+        self.on_resize(800, 600)
 
         gl.glEnable(gl.GL_BLEND)
         gl.glEnable(gl.GL_LINE_SMOOTH)
@@ -95,7 +114,6 @@ class Viewer(glumpy.Figure):
 
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glLoadIdentity()
-        gl.glTranslate(0, 0, -3)
         gl.glMultMatrixf(self.trackball.matrix)
 
     def on_key_press(self, key, modifiers):
@@ -108,16 +126,31 @@ class Viewer(glumpy.Figure):
         self.redraw()
 
     def on_draw(self):
-        self.clear(0., 0., 0.)
-        self.trackball.push()
+        self.clear(0, 0, 0)
 
+        # modified slightly from glumpy.trackball.Trackball.push
+        _, _, w, h = gl.glGetIntegerv(gl.GL_VIEWPORT)
+        top = np.tan(35 * np.pi / 360) * 0.1 * self.trackball.zoom
+        right = w * top / float(h)
+        gl.glMatrixMode(gl.GL_PROJECTION)
+        gl.glPushMatrix()
+        gl.glLoadIdentity()
+        gl.glFrustum(-right, right, -top, top, 0.1, 100)
+
+        gl.glMatrixMode(gl.GL_MODELVIEW)
+        gl.glPushMatrix()
+        gl.glLoadIdentity()
+        gl.glTranslate(self._x, self._y, -self.trackball.distance)
+        gl.glMultMatrixf(self.trackball.matrix)
+
+        # draw a square on the ground plane.
         gl.glBegin(gl.GL_QUADS)
-        gl.glColor(0.3, 0.4, 0.5)
+        gl.glColor(0.2, 0.3, 0.4)
         gl.glNormal(0, 0, 1)
-        gl.glVertex(-5,  5, 0)
-        gl.glVertex( 5,  5, 0)
-        gl.glVertex( 5, -5, 0)
-        gl.glVertex(-5, -5, 0)
+        gl.glVertex(-10,  10, 0)
+        gl.glVertex( 10,  10, 0)
+        gl.glVertex( 10, -10, 0)
+        gl.glVertex(-10, -10, 0)
         gl.glEnd()
 
         self.world.draw()
@@ -130,10 +163,13 @@ class Viewer(glumpy.Figure):
         self.elapsed += dt
         while self.elapsed > self.world.dt:
             self.elapsed -= self.world.dt
-            self.world.step()
+            if not self.world.step():
+                sys.exit()
+            if self.trace:
+                self.world.trace()
             if self.world.needs_reset():
                 self.world.reset()
             self.redraw()
 
-    def show(self):
-        glumpy.show()
+    def run(self):
+        self.show()
