@@ -26,20 +26,21 @@ import ode
 import OpenGL.GL as gl
 import OpenGL.GLUT as glut
 
+from . import base
+
 
 class Body(object):
     '''This class wraps things that participate in the ODE physics simulation.
 
     The primary attribute of this class is "body" -- a PyODE Body object. In
-    addition, there is a color (for drawing the object), a PyODE Geom object
-    (for detecting collisions -- not sure if this is really necessary to keep
-    around though), and several utility methods for doing things like drawing.
-    This class also provides lots of Python-specific properties that call the
-    equivalent ODE getters and setters for things like position, rotation, etc.
+    addition, there is a PyODE Geom object (for detecting collisions -- not sure
+    if this is really necessary to keep around though). This class also provides
+    lots of Python-specific properties that call the equivalent ODE getters and
+    setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, world, space, color=None, density=1000., **shape):
-        self.color = color or rng.rand(3)
+    def __init__(self, name, world, space, density=1000., **shape):
+        self.name = name
         self.shape = shape
 
         m = ode.Mass()
@@ -49,6 +50,9 @@ class Body(object):
 
         self.geom = getattr(ode, 'Geom%s' % self.__class__.__name__)(space, **shape)
         self.geom.setBody(self.body)
+
+    def __str__(self):
+        return '%s: %s at %s' % (self.name, self.__class__.__name__, self.position)
 
     @property
     def mass(self):
@@ -144,18 +148,6 @@ class Body(object):
         else:
             self.body.addTorque(torque)
 
-    def draw(self):
-        gl.glColor(*self.color)
-        x, y, z = self.position
-        R = self.rotation
-        gl.glPushMatrix()
-        gl.glMultMatrixf([R[0], R[3], R[6], 0.,
-                          R[1], R[4], R[7], 0.,
-                          R[2], R[5], R[8], 0.,
-                          x, y, z, 1.])
-        self._draw()
-        gl.glPopMatrix()
-
 
 class Box(Body):
     @property
@@ -165,10 +157,6 @@ class Box(Body):
     def init_mass(self, m, density):
         m.setBox(density, *self.lengths)
 
-    def _draw(self):
-        gl.glScale(*self.lengths)
-        glut.glutSolidCube(1)
-
 
 class Sphere(Body):
     @property
@@ -177,9 +165,6 @@ class Sphere(Body):
 
     def init_mass(self, m, density):
         m.setSphere(density, self.radius)
-
-    def _draw(self):
-        glut.glutSolidSphere(self.radius, 31, 31)
 
 
 class Cylinder(Body):
@@ -194,10 +179,6 @@ class Cylinder(Body):
     def init_mass(self, m, density):
         m.setCylinder(density, 3, self.radius, self.length)
 
-    def _draw(self):
-        gl.glTranslate(0, 0, -self.length / 2.)
-        glut.glutSolidCylinder(self.radius, self.length, 31, 31)
-
 
 class Capsule(Body):
     @property
@@ -211,22 +192,24 @@ class Capsule(Body):
     def init_mass(self, m, density):
         m.setCappedCylinder(density, 3, self.radius, self.length)
 
-    def _draw(self):
-        gl.glTranslate(0, 0, -self.length / 2.)
-        glut.glutSolidCylinder(self.radius, self.length, 31, 31)
-        glut.glutSolidSphere(self.radius, 31, 31)
-        gl.glTranslate(0, 0, self.length)
-        glut.glutSolidSphere(self.radius, 31, 31)
-
 
 class Joint(object):
     '''This class wraps the ODE Joint class with some Python properties.'''
 
-    def __init__(self, world, body_a, body_b=None, **kwargs):
+    def __init__(self, name, world, body_a, body_b=None, **kwargs):
+        self.name = name
+        self.body_a = body_a
+        self.body_b = body_b
         self.joint = getattr(ode, '%sJoint' % self.__class__.__name__)(world)
-        self.joint.attach(body_a, body_b)
+        self.joint.attach(body_a.body, body_b.body if body_b else None)
         for k, v in kwargs.iteritems():
             setattr(self, k, v)
+
+    def __str__(self):
+        return '%s: %s (%s <-> %s) at %s' % (
+            self.name, self.__class__.__name__,
+            self.body_a.name, self.body_b.name if self.body_b else None,
+            self.anchor)
 
     @property
     def feedback(self):
@@ -370,8 +353,8 @@ class Ball(Joint):
         return self.joint.setParam(ode.ParamFMax3, force)
 
 
-class World(object):
-    '''This class wraps the ODE World class with some convenience methods.'''
+class World(base.World):
+    '''A wrapper for an ODE World object, for running in a simulator.'''
 
     def __init__(self,
                  dt=1. / 60,
@@ -381,6 +364,7 @@ class World(object):
                  erp=0.8,
                  cfm=1e-5,
                  max_angular_speed=20):
+        self.frame = 0
         self.dt = dt
         self.elasticity = elasticity
         self.friction = friction
@@ -397,7 +381,9 @@ class World(object):
 
         self.floor = ode.GeomPlane(self.space, (0, 0, 1), 0)
         self.contactgroup = ode.JointGroup()
-        self.bodies = []
+        self._colors = {}
+        self._bodies = {}
+        self._joints = {}
 
     @staticmethod
     def make_quaternion(theta, *axis):
@@ -406,6 +392,11 @@ class World(object):
         st = np.sin(theta / 2.)
         ct = np.cos(theta / 2.)
         return [x * st / r, y * st / r, z * st / r, ct]
+
+    @property
+    def bodies(self):
+        for k in sorted(self._bodies):
+            yield self._bodies[k]
 
     @property
     def center_of_mass(self):
@@ -417,27 +408,56 @@ class World(object):
             t += m.mass
         return x / t
 
-    def create_body(self, shape, **kwargs):
+    def get_body(self, name):
+        return self._bodies[name]
+
+    def get_joint(self, name):
+        return self._joints[name]
+
+    def create_body(self, shape, name=None, color=None, **kwargs):
         '''Create a new body.'''
-        b = globals()[shape.capitalize()](self.world, self.space, **kwargs)
-        self.bodies.append(b)
+        if name is None:
+            for i in range(1 + len(self._bodies)):
+                name = '%s%d' % (shape.lower(), i)
+                if name not in self._bodies:
+                    break
+        b = globals()[shape.capitalize()](name, self.world, self.space, **kwargs)
+        self._colors[name] = color or rng.random(3)
+        self._bodies[name] = b
         return b
 
-    def join(self, joint, body_a, body_b=None, **kwargs):
+    def join(self, shape, body_a, body_b=None, name=None, **kwargs):
         '''Create a new joint that connects two bodies together.'''
-        ba = body_a.body
-        bb = None
-        if body_b:
+        ba = bb = None
+        if isinstance(body_a, str):
+            ba = self.get_body(body_a)
+        else:
+            ba = body_a.body
+        if isinstance(body_b, str):
+            bb = self.get_body(body_b)
+        elif body_b is not None:
             bb = body_b.body
-        return globals()[joint.capitalize()](self.world, ba, bb, **kwargs)
+        if name is None:
+            name = '%s:%s:%s' % (ba.name, shape.lower(), bb.name if bb else '')
+        j = globals()[shape.capitalize()](name, self.world, ba, bb, **kwargs)
+        self._joints[name] = j
+        return j
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
+        self.frame += 1
         dt = self.dt / substeps
         for _ in range(substeps):
             self.space.collide(None, self.on_collision)
             self.world.step(dt)
             self.contactgroup.empty()
+        return True
+
+    def trace(self):
+        '''Trace world bodies and joints.'''
+        for body in self.bodies:
+            x, y, z = body.position
+            print '%d %s %.3f %.3f %.3f' % (self.frame, body.name, x, y, z)
 
     def on_collision(self, args, geom_a, geom_b):
         '''Callback function for the collide() method.'''
@@ -449,11 +469,30 @@ class World(object):
 
     def draw(self):
         '''Draw all bodies in the world.'''
-        for b in self.bodies:
-            b.draw()
-
-    def needs_reset(self):
-        return False
-
-    def reset(self):
-        pass
+        for name, body in self._bodies.iteritems():
+            gl.glColor(*self._colors[name])
+            x, y, z = body.position
+            r = body.rotation
+            gl.glPushMatrix()
+            gl.glMultMatrixf([r[0], r[3], r[6], 0.,
+                              r[1], r[4], r[7], 0.,
+                              r[2], r[5], r[8], 0.,
+                              x, y, z, 1.])
+            if isinstance(body, Box):
+                gl.glScale(*body.lengths)
+                glut.glutSolidCube(1)
+            if isinstance(body, Sphere):
+                glut.glutSolidSphere(body.radius, 31, 31)
+            if isinstance(body, Cylinder):
+                l = body.length
+                gl.glTranslate(0, 0, -l / 2.)
+                glut.glutSolidCylinder(body.radius, l, 31, 31)
+            if isinstance(body, Capsule):
+                r = body.radius
+                l = body.length
+                gl.glTranslate(0, 0, -l / 2.)
+                glut.glutSolidCylinder(r, l, 31, 31)
+                glut.glutSolidSphere(r, 31, 31)
+                gl.glTranslate(0, 0, l)
+                glut.glutSolidSphere(r, 31, 31)
+            gl.glPopMatrix()
