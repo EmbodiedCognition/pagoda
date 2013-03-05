@@ -27,7 +27,7 @@ import ode
 import sys
 
 
-class World(lmj.sim.World):
+class World(lmj.sim.physics.World):
     def reset(self):
         for b in self.bodies:
             b.position = np.array([0, 0, 10]) + 3 * rng.randn(3)
@@ -51,7 +51,7 @@ def main(n=10, frame_rate=60., friction=5000, elasticity=0.1):
             ).iteritems())[rng.randint(4)]
         w.create_body(s, **kw)
     w.reset()
-    lmj.sim.Viewer(w).show()
+    lmj.sim.viewer.GL(w).run()
 
 
 if __name__ == '__main__':
