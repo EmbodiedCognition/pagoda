@@ -20,6 +20,8 @@
 
 '''Convenience wrappers for ODE objects.'''
 
+from __future__ import division, print_function
+
 import numpy as np
 import numpy.random as rng
 import ode
@@ -39,9 +41,10 @@ class Body(object):
     setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, density=1000., **shape):
+    def __init__(self, name, world, space, feedback=True, density=1000., **shape):
         self.name = name
         self.shape = shape
+        self.feedback = feedback
 
         m = ode.Mass()
         self.init_mass(m, density)
@@ -118,6 +121,16 @@ class Body(object):
     @torque.setter
     def torque(self, torque):
         self.body.setTorque(torque)
+
+    def trace(self):
+        if not self.feedback:
+            return ''
+        x, y, z = self.position
+        a, b, c, d = self.quaternion
+        lx, ly, lz = self.linear_velocity
+        ax, ay, az = self.angular_velocity
+        return '%s p %f %f %f q %f %f %f %f l %f %f %f a %f %f %f' % (
+            self.name, x, y, z, a, b, c, d, lx, ly, lz, ax, ay, az)
 
     def body_to_world(self, position):
         return self.body.getRelPointPos(position)
@@ -239,6 +252,10 @@ class Joint(object):
     def hi_stop(self):
         return self.joint.getParam(ode.ParamHiStop)
 
+    @feedback.setter
+    def feedback(self, enable):
+        return self.joint.setFeedback(enable)
+
     @anchor.setter
     def anchor(self, anchor):
         return self.joint.setAnchor(anchor)
@@ -262,6 +279,15 @@ class Joint(object):
     @hi_stop.setter
     def hi_stop(self, hi_stop):
         return self.joint.setParam(ode.ParamHiStop, hi_stop)
+
+    def trace(self):
+        z = self.feedback
+        if not z:
+            return ''
+        parts = [self.name]
+        for n, (x, y, z) in zip('f1 t1 f2 t2'.split(), z):
+            parts.append('%s %f %f %f' % (n, x, y, z))
+        return ' '.join(parts)
 
 
 class Fixed(Joint):
@@ -399,6 +425,11 @@ class World(base.World):
             yield self._bodies[k]
 
     @property
+    def joints(self):
+        for k in sorted(self._joints):
+            yield self._joints[k]
+
+    @property
     def center_of_mass(self):
         x = np.zeros(3.)
         t = 0.
@@ -414,32 +445,31 @@ class World(base.World):
     def get_joint(self, name):
         return self._joints[name]
 
-    def create_body(self, shape, name=None, color=None, **kwargs):
+    def create_body(self, shape, name=None, color=None, feedback=True, **kwargs):
         '''Create a new body.'''
         if name is None:
             for i in range(1 + len(self._bodies)):
                 name = '%s%d' % (shape.lower(), i)
                 if name not in self._bodies:
                     break
-        b = globals()[shape.capitalize()](name, self.world, self.space, **kwargs)
-        self._colors[name] = color or rng.random(3)
+        b = globals()[shape.capitalize()](
+            name, self.world, self.space, feedback=feedback, **kwargs)
+        self._colors[name] = color if color is not None else rng.random(3)
         self._bodies[name] = b
         return b
 
-    def join(self, shape, body_a, body_b=None, name=None, **kwargs):
+    def join(self, shape, body_a, body_b=None, name=None, feedback=True, **kwargs):
         '''Create a new joint that connects two bodies together.'''
-        ba = bb = None
+        ba = body_a
         if isinstance(body_a, str):
             ba = self.get_body(body_a)
-        else:
-            ba = body_a.body
+        bb = body_b
         if isinstance(body_b, str):
             bb = self.get_body(body_b)
-        elif body_b is not None:
-            bb = body_b.body
         if name is None:
             name = '%s:%s:%s' % (ba.name, shape.lower(), bb.name if bb else '')
-        j = globals()[shape.capitalize()](name, self.world, ba, bb, **kwargs)
+        j = globals()[shape.capitalize()](
+            name, self.world, ba, bb, feedback=feedback, **kwargs)
         self._joints[name] = j
         return j
 
@@ -453,11 +483,21 @@ class World(base.World):
             self.contactgroup.empty()
         return True
 
-    def trace(self):
+    def trace(self, handle):
         '''Trace world bodies and joints.'''
-        for body in self.bodies:
-            x, y, z = body.position
-            print '%d %s %.3f %.3f %.3f' % (self.frame, body.name, x, y, z)
+        bodies = ' '.join(b.trace() for b in self.bodies)
+        joints = ' '.join(j.trace() for j in self.joints)
+        print('%d %s %s' % (self.frame, bodies, joints), file=handle)
+
+    def are_connected(self, body_a, body_b):
+        '''Return True iff the given bodies are currently connected.'''
+        ba = body_a
+        if isinstance(body_a, str):
+            ba = self.get_body(body_a)
+        bb = body_b
+        if isinstance(body_b, str):
+            bb = self.get_body(body_b)
+        return bool(ode.areConnected(ba.body, bb.body))
 
     def on_collision(self, args, geom_a, geom_b):
         '''Callback function for the collide() method.'''
@@ -469,10 +509,10 @@ class World(base.World):
             ode.ContactJoint(self.world, self.contactgroup, c).attach(
                 geom_a.getBody(), geom_b.getBody())
 
-    def draw(self, n=59):
+    def draw(self, color=None, n=59):
         '''Draw all bodies in the world.'''
         for name, body in self._bodies.iteritems():
-            gl.glColor(*self._colors[name])
+            gl.glColor(*(color or self._colors[name]))
             x, y, z = body.position
             r = body.rotation
             gl.glPushMatrix()
