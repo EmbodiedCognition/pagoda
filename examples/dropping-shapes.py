@@ -23,8 +23,6 @@
 import lmj.sim
 import numpy as np
 import numpy.random as rng
-import ode
-import sys
 
 
 class World(lmj.sim.physics.World):
