@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name='lmj.sim',
-    version='0.0.1',
+    version='0.0.2',
     namespace_packages=['lmj'],
     packages=setuptools.find_packages(),
     author='Leif Johnson',
@@ -17,7 +17,7 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['numpy', 'glumpy', 'PyOpenGL', 'plac', 'PyODE'],
+    install_requires=['lmj.cli', 'numpy', 'glumpy', 'PyOpenGL', 'PyODE'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

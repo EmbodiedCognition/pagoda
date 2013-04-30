@@ -20,15 +20,7 @@
 
 '''Yet another simulator framework !'''
 
-from .log import enable_default_logging, get_logger
+from lmj.cli import call, args, get_logger
+
 from . import physics
 from . import viewer
-
-import plac
-
-def call(main):
-    '''Enable logging and start up a main method.'''
-    enable_default_logging()
-    plac.call(main)
-
-args = plac.annotations
