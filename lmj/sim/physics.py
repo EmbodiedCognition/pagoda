@@ -129,7 +129,7 @@ class Body(object):
         a, b, c, d = self.quaternion
         lx, ly, lz = self.linear_velocity
         ax, ay, az = self.angular_velocity
-        return '%s p %f %f %f q %f %f %f %f l %f %f %f a %f %f %f' % (
+        return '%s p %f %f %f q %f %f %f %f lv %f %f %f av %f %f %f' % (
             self.name, x, y, z, a, b, c, d, lx, ly, lz, ax, ay, az)
 
     def body_to_world(self, position):
@@ -209,12 +209,36 @@ class Capsule(Body):
 class Joint(object):
     '''This class wraps the ODE Joint class with some Python properties.'''
 
-    def __init__(self, name, world, body_a, body_b=None, **kwargs):
+    def __init__(self, name, world, body_a, body_b=None, feedback=False, **kwargs):
         self.name = name
         self.body_a = body_a
         self.body_b = body_b
+
+        # attach an ode joint to these two bodies to constrain their movements
+        # and measure forces experienced at the joint.
         self.joint = getattr(ode, '%sJoint' % self.__class__.__name__)(world)
         self.joint.attach(body_a.body, body_b.body if body_b else None)
+        if feedback:
+            self.joint.setFeedback(True)
+
+        # if needed, attach an amotor to apply angular forces to the joint.
+        self.amotor = None
+        if self.ADOF > 0:
+            self.amotor = ode.AMotor(world)
+            self.amotor.attach(body_a.body, body_b.body if body_b else None)
+            self.amotor.setNumAxes(self.ADOF)
+            self.amotor.setMode(ode.AMotorUser)
+            for i, ax in enumerate(self.axes):
+                self.amotor.setAxis(i, 1, ax)
+
+        # if needed, attach an lmotor to apply linear forces to the joint.
+        self.lmotor = None
+        if self.LDOF == 1:
+            self.lmotor = ode.LMotor(world)
+            self.lmotor.attach(body_a.body, body_b.body if body_b else None)
+            self.lmotor.setNumAxes(1)
+            self.lmotor.setAxis(i, 1, kwargs['linear_axis'])
+
         for k, v in kwargs.iteritems():
             setattr(self, k, v)
 
@@ -223,6 +247,23 @@ class Joint(object):
             self.name, self.__class__.__name__,
             self.body_a.name, self.body_b.name if self.body_b else None,
             self.anchor)
+
+    def _get_params(self, target, param):
+        '''Get the given param from each of the DOFs for this joint.'''
+        for s in self.axis_suffixes:
+            yield target.getParam(getattr(ode, 'Param%s%s' % (param, s)))
+
+    def _set_params(self, target, param, values):
+        '''Set the given param for each of the DOFs for this joint.'''
+        if not isinstance(values, (list, tuple)):
+            values = (values, )
+        assert self.ADOF == len(values)
+        for s, value in zip(self.axis_suffixes, values):
+            target.setParam(getattr(ode, 'Param%s%s' % (param, s)), value)
+
+    @property
+    def axis_suffixes(self):
+        return ['', '2', '3'][:self.ADOF]
 
     @property
     def feedback(self):
@@ -233,72 +274,29 @@ class Joint(object):
         return self.joint.getAnchor()
 
     @property
-    def axis(self):
-        return self.joint.getAxis()
+    def target_velocities(self):
+        return self._get_params(self.amotor, 'Vel')
 
     @property
-    def velocity(self):
-        return self.joint.getParam(ode.ParamVel)
+    def max_forces(self):
+        return self._get_params(self.amotor, 'FMax')
 
     @property
-    def max_force(self):
-        return self.joint.getParam(ode.ParamFMax)
+    def lo_stops(self):
+        return self._get_params(self.joint, 'LoStop')
 
     @property
-    def lo_stop(self):
-        return self.joint.getParam(ode.ParamLoStop)
+    def hi_stops(self):
+        return self._get_params(self.joint, 'HiStop')
 
     @property
-    def hi_stop(self):
-        return self.joint.getParam(ode.ParamHiStop)
+    def angles(self):
+        return map(self.amotor.getAngle, range(self.ADOF))
 
-    @feedback.setter
-    def feedback(self, enable):
-        return self.joint.setFeedback(enable)
+    @property
+    def angle_rates(self):
+        return map(self.amotor.getAngleRate, range(self.ADOF))
 
-    @anchor.setter
-    def anchor(self, anchor):
-        return self.joint.setAnchor(anchor)
-
-    @axis.setter
-    def axis(self, axis):
-        return self.joint.setAxis(axis)
-
-    @velocity.setter
-    def velocity(self, velocity):
-        return self.joint.setParam(ode.ParamVel, velocity)
-
-    @max_force.setter
-    def max_force(self, force):
-        return self.joint.setParam(ode.ParamFMax, force)
-
-    @lo_stop.setter
-    def lo_stop(self, lo_stop):
-        return self.joint.setParam(ode.ParamLoStop, lo_stop)
-
-    @hi_stop.setter
-    def hi_stop(self, hi_stop):
-        return self.joint.setParam(ode.ParamHiStop, hi_stop)
-
-    def trace(self):
-        z = self.feedback
-        if not z:
-            return ''
-        parts = [self.name]
-        for n, (x, y, z) in zip('f1 t1 f2 t2'.split(), z):
-            parts.append('%s %f %f %f' % (n, x, y, z))
-        return ' '.join(parts)
-
-
-class Fixed(Joint):
-    pass
-
-
-class Hinge(Joint):
-    pass
-
-
-class Slider(Joint):
     @property
     def position(self):
         return self.joint.getPosition()
@@ -307,76 +305,82 @@ class Slider(Joint):
     def position_rate(self):
         return self.joint.getPositionRate()
 
+    @anchor.setter
+    def anchor(self, anchor):
+        self.joint.setAnchor(anchor)
+
+    @target_velocities.setter
+    def target_velocities(self, velocities):
+        self._set_params(self.amotor, 'Vel', velocities)
+
+    @max_forces.setter
+    def max_forces(self, forces):
+        self._set_params(self.amotor, 'FMax', forces)
+
+    @lo_stops.setter
+    def lo_stops(self, lo_stops):
+        self._set_params(self.joint, 'LoStop', lo_stops)
+
+    @hi_stops.setter
+    def hi_stops(self, hi_stops):
+        self._set_params(self.joint, 'HiStop', hi_stops)
+
+    def trace(self):
+        feedback = self.feedback
+        if not feedback:
+            return ''
+        parts = [self.name]
+        for n, (x, y, z) in zip(('f1', 't1', 'f2', 't2'), feedback):
+            parts.append('%s %f %f %f' % (n, x, y, z))
+        return ' '.join(parts)
+
+
+class Fixed(Joint):
+    ADOF = 0
+    LDOF = 0
+
+
+class Slider(Joint):
+    ADOF = 0
+    LDOF = 1
+
+
+class Hinge(Joint):
+    ADOF = 1
+    LDOF = 0
+
+    @property
+    def axes(self):
+        return self.joint.getAxis(),
+
+
+class Piston(Joint):
+    ADOF = 1
+    LDOF = 1
+
+    @property
+    def axes(self):
+        return self.joint.getAxis(),
+
 
 class Universal(Joint):
+    ADOF = 2
+    LDOF = 0
+
     @property
     def axes(self):
         return self.joint.getAxis1(), self.joint.getAxis2()
 
-    @axes.setter
-    def axes(self, axis1, axis2):
-        self.joint.setAxis1(axis1)
-        self.joint.setAxis2(axis2)
-
-    @property
-    def velocity_2(self):
-        return self.joint.getParam(ode.ParamVel2)
-
-    @property
-    def max_force_2(self):
-        return self.joint.getParam(ode.ParamFMax2)
-
-    @velocity_2.setter
-    def velocity_2(self, velocity):
-        return self.joint.setParam(ode.ParamVel2, velocity)
-
-    @max_force_2.setter
-    def max_force_2(self, force):
-        return self.joint.setParam(ode.ParamFMax2, force)
-
 
 class Ball(Joint):
+    ADOF = 3
+    LDOF = 0
+
     @property
     def axes(self):
-        return self.joint.getAxis1(), self.joint.getAxis2(), self.joint.getAxis3()
-
-    @property
-    def velocity_2(self):
-        return self.joint.getParam(ode.ParamVel2)
-
-    @property
-    def velocity_3(self):
-        return self.joint.getParam(ode.ParamVel3)
-
-    @property
-    def max_force_2(self):
-        return self.joint.getParam(ode.ParamFMax2)
-
-    @property
-    def max_force_3(self):
-        return self.joint.getParam(ode.ParamFMax3)
-
-    @axes.setter
-    def axes(self, axis1, axis2, axis3):
-        self.joint.setAxis1(axis1)
-        self.joint.setAxis2(axis2)
-        self.joint.setAxis2(axis3)
-
-    @velocity_2.setter
-    def velocity_2(self, velocity):
-        return self.joint.setParam(ode.ParamVel2, velocity)
-
-    @velocity_3.setter
-    def velocity_3(self, velocity):
-        return self.joint.setParam(ode.ParamVel3, velocity)
-
-    @max_force_2.setter
-    def max_force_2(self, force):
-        return self.joint.setParam(ode.ParamFMax2, force)
-
-    @max_force_3.setter
-    def max_force_3(self, force):
-        return self.joint.setParam(ode.ParamFMax3, force)
+        return (self.amotor.getAxis(0),
+                self.amotor.getAxis(1),
+                self.amotor.getAxis(2))
 
 
 class World(base.World):
@@ -478,9 +482,9 @@ class World(base.World):
         self.frame += 1
         dt = self.dt / substeps
         for _ in range(substeps):
+            self.contactgroup.empty()
             self.space.collide(None, self.on_collision)
             self.world.step(dt)
-            self.contactgroup.empty()
         return True
 
     def trace(self, handle):
