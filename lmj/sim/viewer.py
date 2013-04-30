@@ -221,7 +221,7 @@ class GL(glumpy.Figure):
                 self.world.trace(self.trace)
             if self.twirl:
                 p = self.trackball.phi
-                self.trackball.phi = (p + 0.07) % 360
+                self.trackball.phi = (p + 0.2) % 360
             if self.world.needs_reset():
                 self.world.reset()
             self.redraw()
