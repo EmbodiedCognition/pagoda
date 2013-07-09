@@ -95,12 +95,7 @@ class Body(object):
 
     @rotation.setter
     def rotation(self, rotation):
-        try:
-            self.body.setRotation(rotation)
-        except:
-            ct = np.cos(rotation)
-            st = np.sin(rotation)
-            self.body.setRotation([ct, 0., -st, 0., 1., 0., st, 0., ct])
+        self.body.setRotation(rotation)
 
     @quaternion.setter
     def quaternion(self, quaternion):
