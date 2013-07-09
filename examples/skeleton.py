@@ -22,8 +22,6 @@
 
 import lmj.cli
 import lmj.sim
-import numpy as np
-import numpy.random as rng
 
 
 @lmj.cli.annotate(
