@@ -21,19 +21,21 @@
 # SOFTWARE.
 
 import lmj.cli
-import lmj.sim
+import lmj.sim as ls
 
 
 @lmj.cli.annotate(
     asf='load skeleton data from this file',
+    amc='load motion data from this file',
     frame_rate=('frame rate of the simulation', 'option', None, float),
     friction=('coefficient of friction', 'option', None, float),
     elasticity=('elasticity constant for collisions', 'option', None, float),
     )
-def main(asf, frame_rate=60., friction=5000, elasticity=0.1):
-    w = lmj.sim.physics.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
-    lmj.sim.skeleton.parse(asf).create_bodies(w)
-    lmj.sim.viewer.GL(w, paused=True).run()
+def main(asf, amc, frame_rate=60., friction=5000, elasticity=0.1):
+    w = ls.skeleton.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
+    w.add_skeleton(asf)
+    w.add_motion(amc)
+    ls.viewer.GL(w, paused=True).run()
 
 
 if __name__ == '__main__':

@@ -18,9 +18,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-'''ASF (skeleton file) parser.'''
-
-from __future__ import print_function
+'''ASF (skeleton file) and AMC (motion file) parsers.'''
 
 import json
 import lmj.cli
@@ -35,7 +33,35 @@ logging = lmj.cli.get_logger(__name__)
 TAU = 2 * np.pi
 
 
-class ASF(object):
+class World(physics.World):
+    '''This world manages skeletons from ASF and motion from AMC files.'''
+
+    def __init__(self, *args, **kwargs):
+        super(World, self).__init__(*args, **kwargs)
+        self.skeletons = {}
+        self.motions = {}
+        self.frame = 0
+
+    def add_skeleton(self, asf, name=None, translate=(0, 1, 0)):
+        skeleton = parse_asf(asf)
+        skeleton.create_bodies(self, translate=translate)
+        self.skeletons[name or skeleton.name] = skeleton
+
+    def add_motion(self, amc, name=None):
+        self.motions[name] = parse_amc(amc)
+
+    def reset(self):
+        self.frame = 0
+
+    def step(self, substeps=2):
+        '''Step the world forward by one frame.'''
+        result = super(World, self).step(substeps=substeps)
+        return result
+
+
+class Skeleton(object):
+    '''This class handles configuration data from AMC files.'''
+
     def __init__(self):
         self.name = None
         self.version = None
@@ -122,6 +148,8 @@ class ASF(object):
 
 
 class Bone(object):
+    '''A bone is an individual link in a skeleton.'''
+
     def __init__(self):
         self.id = None
         self.name = ''
@@ -175,6 +203,12 @@ class Bone(object):
 
 
 class Tokenizer(list):
+    '''Tokenize a string by splitting on whitespace.
+
+    Removes shell-style comments from the input. Keeps track of line and token
+    number. Maintains some minimal state information for parsing nested blocks.
+    '''
+
     class EOS(IndexError): pass
     class MissingEndKeyword(ValueError): pass
 
@@ -211,7 +245,7 @@ class Tokenizer(list):
 
     def error(self):
         i, j, t = self[self.index]
-        print('Error at line %d, token %d: %r' % (i + 1, j + 1, t))
+        return 'error at line %d, token %d: %r' % (i + 1, j + 1, t)
 
     def begin(self):
         self.begun = True
@@ -261,7 +295,7 @@ def _parse_hierarchy(tok, asf):
         while tok.line_no == line_no:
             targets.append(tok.next())
         asf.hierarchy[source] = tuple(targets)
-        logging.info('hierarchy: %s -> %s', source, ', '.join(targets))
+        logging.debug('hierarchy: %s -> %s', source, ', '.join(targets))
         token = tok.next()
 
 def _parse_bonedata(tok, asf):
@@ -273,7 +307,7 @@ def _parse_bonedata(tok, asf):
             bone.axis *= TAU / 360
             bone.limits *= TAU / 360
         asf.bones[bone.id] = asf.bones[bone.name] = bone
-        logging.info('bone %s: %dmm', bone.name, 1000 * bone.length)
+        logging.debug('bone %s: %dmm', bone.name, 1000 * bone.length)
 
 def _parse_bone(tok):
     assert tok.next() == 'begin'
@@ -300,7 +334,8 @@ def _parse_bone(tok):
             bone.dof = tuple(bone.dof)
         if token == 'limits':
             while tok.peek().startswith('('):
-                lo = float(tok.next().lstrip('('))
+                token = tok.next().lstrip('(').strip()
+                lo = float(token) if token else float(tok.next())
                 hi = float(tok.next().rstrip(')'))
                 bone.limits.append((lo, hi))
         token = tok.next()
@@ -317,13 +352,14 @@ PARSERS = dict(
     hierarchy=_parse_hierarchy,
     )
 
-def parse(data):
+def parse_asf(data):
     '''Parse an ASF skeleton definition file.
 
-    Results are returned as an ASF object.
+    Results are returned as a Skeleton object.
     '''
-    asf = ASF()
+    asf = Skeleton()
     if os.path.exists(data):
+        logging.info('%s: loading skeleton data', data)
         data = open(data)
     if isinstance(data, file):
         data = data.read()
@@ -339,7 +375,51 @@ def parse(data):
             assert token.startswith(':')
             PARSERS[token[1:].lower()](tok, asf)
         except Exception, e:
-            tok.error()
+            logging.critical(tok.error())
             raise
         tok.end()
+    logging.info('parsed skeleton with %d bones', len(asf.bones))
     return asf
+
+
+def parse_amc(data):
+    '''Parse an AMC motion capture data file.
+
+    Results are returned as a list of frames. Each frame is a dictionary mapping
+    a bone name to a list of the DOFs for that bone in that frame.
+    '''
+    if os.path.exists(data):
+        logging.info('%s: loading motion data', data)
+        data = open(data)
+    if isinstance(data, file):
+        data = data.read()
+    degrees = False
+    frames = []
+    frame = {}
+    for i, line in enumerate(data.splitlines()):
+        line = line.split('#')[0].strip()
+        if not line:
+            continue
+        try:
+            if line.startswith(':'):
+                assert len(frames) == 0
+                line = line[1:].lower()
+                if line.startswith('deg'):
+                    degrees = True
+                continue
+            if line.isdigit():
+                if frame:
+                    assert int(line) == len(frames) + 2
+                    frames.append(frame)
+                    frame = {}
+                continue
+            name, dofs = line.split(None, 1)
+            dofs = np.array(map(float, dofs.split()))
+            if degrees:
+                dofs *= TAU / 360
+            frame[name] = dofs
+        except Exception, e:
+            logging.critical('error at line %d, frame %d: %r', i + 1, len(frames), line)
+            raise
+    logging.info('parsed %d frames of motion data', len(frames))
+    return frames
