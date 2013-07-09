@@ -20,7 +20,5 @@
 
 '''Yet another simulator framework !'''
 
-from lmj.cli import call, args, get_logger
-
 from . import physics
 from . import viewer

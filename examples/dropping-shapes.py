@@ -20,6 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import lmj.cli
 import lmj.sim
 import numpy as np
 import numpy.random as rng
@@ -32,7 +33,7 @@ class World(lmj.sim.physics.World):
             b.quaternion = self.make_quaternion(np.pi * rng.rand(), 0, 1, 1)
 
 
-@lmj.sim.args(
+@lmj.cli.annotate(
     n=('number of bodies in the simulation', 'option', None, int),
     frame_rate=('frame rate of the simulation', 'option', None, float),
     friction=('coefficient of friction', 'option', None, float),
@@ -54,4 +55,4 @@ def main(n=10, frame_rate=60., friction=5000, elasticity=0.1):
 
 
 if __name__ == '__main__':
-    lmj.sim.call(main)
+    lmj.cli.call(main)
