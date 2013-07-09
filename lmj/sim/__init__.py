@@ -21,4 +21,5 @@
 '''Yet another simulator framework !'''
 
 from . import physics
+from . import skeleton
 from . import viewer
