@@ -71,39 +71,12 @@ class Skeleton(object):
         self.bones = {}
         self.hierarchy = {}
 
+        self._bodies = {}
+
     @property
     def scale(self):
         '''Return a factor to convert length-scaled inches to mm.'''
         return 2.54 / (100. * self.units['length'])
-
-    def yaml_lines(self):
-        yield 'name: ' + self.name
-        yield 'version: ' + self.version
-        yield 'documentation: ' + self.documentation
-        yield 'root:'
-        for key, value in self.root.iteritems():
-            if key in ('position', 'orientation', 'order'):
-                yield '  %s:' % key
-                for v in value:
-                    yield '    - %s' % v
-            else:
-                yield '  %s: %s' % (key, value)
-        yield 'units:'
-        for key, value in self.units.iteritems():
-            yield '  %s: %s' % (key, value)
-        yield 'bones:'
-        for bone in self.bones.itervalues():
-            yield '  -'
-            for line in bone.yaml_lines():
-                yield '    ' + line
-        yield 'hierarchy:'
-        for key, values in self.hierarchy.iteritems():
-            yield '  %s:' % key
-            for v in values:
-                yield '    - %s' % v
-
-    def to_yaml(self):
-        return '\n'.join(self.yaml_lines())
 
     def to_json(self):
         h = lambda x: x.__dict__ if isinstance(x, Bone) else x
@@ -143,6 +116,8 @@ class Skeleton(object):
                 swizzle = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
                 body.rotation = np.dot(swizzle, rot).flatten()
 
+            self._bodies[name] = body
+
     def create_joints(self, world):
         raise NotImplementedError
 
@@ -174,26 +149,6 @@ class Bone(object):
             if ax == 'Z':
                 z = np.dot([[ct, -st,  0], [st, ct,   0], [  0,  0,  1]], z)
         return z
-
-    def yaml_lines(self):
-        yield 'id: %s' % self.id
-        yield 'name: %s' % self.name
-        yield 'direction:'
-        for d in self.direction:
-            yield '  - %s' % d
-        yield 'length: %f' % self.length
-        yield 'order: %s' % self.order
-        yield 'axis:'
-        for a in self.axis:
-            yield '  - %f' % a
-        yield 'dof:'
-        for d in self.dof:
-            yield '  - %s' % d
-        yield 'limits:'
-        for l, h in self.limits:
-            yield '  -'
-            yield '    low: %d' % l
-            yield '    high: %d' % h
 
     def create_body(self, world, rank=0):
         return world.create_body('box',
@@ -385,41 +340,41 @@ def parse_asf(data):
 def parse_amc(data):
     '''Parse an AMC motion capture data file.
 
-    Results are returned as a list of frames. Each frame is a dictionary mapping
-    a bone name to a list of the DOFs for that bone in that frame.
+    Generates a sequence of frames. Each frame is a dictionary mapping a bone
+    name to a list of the DOF configurations for that bone.
     '''
     if os.path.exists(data):
         logging.info('%s: loading motion data', data)
         data = open(data)
-    if isinstance(data, file):
-        data = data.read()
-    degrees = False
-    frames = []
+    if isinstance(data, str):
+        data = data.splitlines()
+    convert_degrees = False
+    count = 0
     frame = {}
-    for i, line in enumerate(data.splitlines()):
+    for i, line in enumerate(data):
         line = line.split('#')[0].strip()
         if not line:
             continue
         try:
             if line.startswith(':'):
-                assert len(frames) == 0
+                assert count == 0
                 line = line[1:].lower()
                 if line.startswith('deg'):
-                    degrees = True
+                    convert_degrees = True
                 continue
             if line.isdigit():
                 if frame:
-                    assert int(line) == len(frames) + 2
-                    frames.append(frame)
+                    assert int(line) == count + 2
+                    yield frame
+                    count += 1
                     frame = {}
                 continue
             name, dofs = line.split(None, 1)
             dofs = np.array(map(float, dofs.split()))
-            if degrees:
+            if convert_degrees:
                 dofs *= TAU / 360
             frame[name] = dofs
         except Exception, e:
-            logging.critical('error at line %d, frame %d: %r', i + 1, len(frames), line)
+            logging.critical('error at line %d, frame %d: %r', i + 1, count, line)
             raise
-    logging.info('parsed %d frames of motion data', len(frames))
-    return frames
+    logging.info('parsed %d frames of motion data', count)
