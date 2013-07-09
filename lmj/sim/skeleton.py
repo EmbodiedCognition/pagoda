@@ -18,9 +18,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-'''ASF parser.'''
+'''ASF (skeleton file) parser.'''
+
+from __future__ import print_function
 
 import json
+import lmj.cli
+import numpy as np
+import os
+import re
+
+from . import physics
+
+logging = lmj.cli.get_logger(__name__)
+
+TAU = 2 * np.pi
 
 
 class ASF(object):
@@ -32,6 +44,11 @@ class ASF(object):
         self.root = {}
         self.bones = {}
         self.hierarchy = {}
+
+    @property
+    def scale(self):
+        '''Return a factor to convert length-scaled inches to mm.'''
+        return 2.54 / (100. * self.units['length'])
 
     def yaml_lines(self):
         yield 'name: ' + self.name
@@ -66,6 +83,43 @@ class ASF(object):
         h = lambda x: x.__dict__ if isinstance(x, Bone) else x
         return json.dumps(self.__dict__, default=h)
 
+    def create_bodies(self, world, translate=(0, 1, 0)):
+        '''Traverse the bone hierarchy and create physics bodies.'''
+        stack = [('root', 0, self.root['position'] + translate)]
+        while stack:
+            name, depth, end = stack.pop()
+
+            for child in self.hierarchy.get(name, ()):
+                b = self.bones[child]
+                stack.append((child, depth + 1, end + b.direction * b.length))
+
+            if name not in self.bones:
+                continue
+
+            bone = self.bones[name]
+            body = bone.create_body(world, depth / 9.)
+
+            # move the center of the body to the halfway point between
+            # the parent (joint) and child (joint).
+            x, y, z = end - bone.direction * bone.length / 2
+
+            # swizzle y and z -- asf uses y as up, but we use z as up.
+            body.position = x, z, y
+
+            # compute an orthonormal (rotation) matrix using the ground and
+            # the body. this is mind-bending but seems to work.
+            u = bone.direction
+            v = np.cross(u, [0, 1, 0])
+            l = np.linalg.norm(v)
+            if l > 0:
+                v /= l
+                rot = np.vstack([np.cross(u, v), v, u]).T
+                swizzle = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
+                body.rotation = np.dot(swizzle, rot).flatten()
+
+    def create_joints(self, world):
+        raise NotImplementedError
+
 
 class Bone(object):
     def __init__(self):
@@ -74,8 +128,24 @@ class Bone(object):
         self.direction = []
         self.length = -1
         self.axis = []
+        self.order = 'XYZ'
         self.dof = []
         self.limits = []
+
+    @property
+    def rotation(self):
+        z = np.eye(3)
+        for ax in self.order:
+            theta = self.axis['XYZ'.index(ax)]
+            ct = np.cos(theta)
+            st = np.sin(theta)
+            if ax == 'X':
+                z = np.dot([[ 1,   0,  0], [ 0, ct, -st], [  0, st, ct]], z)
+            if ax == 'Y':
+                z = np.dot([[ct,   0, st], [ 0,  1,   0], [-st,  0, ct]], z)
+            if ax == 'Z':
+                z = np.dot([[ct, -st,  0], [st, ct,   0], [  0,  0,  1]], z)
+        return z
 
     def yaml_lines(self):
         yield 'id: %s' % self.id
@@ -84,6 +154,7 @@ class Bone(object):
         for d in self.direction:
             yield '  - %s' % d
         yield 'length: %f' % self.length
+        yield 'order: %s' % self.order
         yield 'axis:'
         for a in self.axis:
             yield '  - %f' % a
@@ -96,18 +167,21 @@ class Bone(object):
             yield '    low: %d' % l
             yield '    high: %d' % h
 
+    def create_body(self, world, rank=0):
+        return world.create_body('box',
+                                 name=self.name,
+                                 color=(rank, 0.7, 0.3),
+                                 lengths=(0.05, 0.03, self.length))
 
-class Tokenizer(object):
+
+class Tokenizer(list):
     class EOS(IndexError): pass
     class MissingEndKeyword(ValueError): pass
 
     def __init__(self, data):
-        if isinstance(data, file):
-            data = data.read()
-        self.tokens = []
         for i, l in enumerate(data.splitlines()):
             for j, t in enumerate(l.split('#')[0].strip().split()):
-                self.tokens.append((i, j, t))
+                self.append((i, j, t))
         self.index = 0
         self.begun = False
 
@@ -117,9 +191,9 @@ class Tokenizer(object):
         return i + 1
 
     def next(self, token_only=True):
-        if self.index == len(self.tokens):
+        if self.index == len(self):
             raise Tokenizer.EOS()
-        i, j, t = self.tokens[self.index]
+        i, j, t = self[self.index]
         if self.begun and t.startswith(':'):
             raise Tokenizer.MissingEndKeyword()
         self.index += 1
@@ -128,17 +202,16 @@ class Tokenizer(object):
         return i, j, t
 
     def peek(self, ahead=0, token_only=True):
-        if self.index + ahead >= len(self.tokens):
+        if self.index + ahead >= len(self):
             return -1, -1, None
-        i, j, t = self.tokens[self.index + ahead]
+        i, j, t = self[self.index + ahead]
         if token_only:
             return t
         return i, j, t
 
-    def error(self, exc):
-        i, j, t = self.tokens[self.index]
+    def error(self):
+        i, j, t = self[self.index]
         print('Error at line %d, token %d: %r' % (i + 1, j + 1, t))
-        raise exc
 
     def begin(self):
         self.begun = True
@@ -147,35 +220,38 @@ class Tokenizer(object):
         self.begun = False
 
 
-def parse_version(tok, asf):
+def _parse_version(tok, asf):
     asf.version = tok.next()
 
-def parse_name(tok, asf):
+def _parse_name(tok, asf):
     asf.name = tok.next()
 
-def parse_units(tok, asf):
+def _parse_units(tok, asf):
     while not tok.peek().startswith(':'):
         key = tok.next()
-        asf.units[key] = tok.next()
+        value = tok.next()
+        if key in 'length mass':
+            value = float(value)
+        asf.units[key] = value
 
-def parse_documentation(tok, asf):
+def _parse_documentation(tok, asf):
     doc = []
     while not tok.peek().startswith(':'):
         doc.append(tok.next())
     asf.documentation = ' '.join(doc)
 
-def parse_root(tok, asf):
+def _parse_root(tok, asf):
     while not tok.peek().startswith(':'):
         key = tok.next()
         if key == 'position' or key == 'orientation':
-            value = tuple(float(tok.next()) for _ in range(3))
+            value = np.array([float(tok.next()) for _ in range(3)]) * asf.scale
         elif key == 'order':
             value = tuple(tok.next() for _ in range(6))
         else:
             value = tok.next()
         asf.root[key] = value
 
-def parse_hierarchy(tok, asf):
+def _parse_hierarchy(tok, asf):
     assert tok.next() == 'begin'
     token = tok.next()
     while token != 'end':
@@ -185,16 +261,23 @@ def parse_hierarchy(tok, asf):
         while tok.line_no == line_no:
             targets.append(tok.next())
         asf.hierarchy[source] = tuple(targets)
+        logging.info('hierarchy: %s -> %s', source, ', '.join(targets))
         token = tok.next()
 
-def parse_bonedata(tok, asf):
+def _parse_bonedata(tok, asf):
     while not tok.peek().startswith(':'):
-        bone = parse_bone(tok, asf.root['axis'])
+        bone = _parse_bone(tok)
+        bone.length *= asf.scale
+        # convert degrees to radians if needed.
+        if asf.units['angle'].lower().startswith('deg'):
+            bone.axis *= TAU / 360
+            bone.limits *= TAU / 360
         asf.bones[bone.id] = asf.bones[bone.name] = bone
+        logging.info('bone %s: %dmm', bone.name, 1000 * bone.length)
 
-def parse_bone(tok, axis):
-    bone = Bone()
+def _parse_bone(tok):
     assert tok.next() == 'begin'
+    bone = Bone()
     token = tok.next()
     while token != 'end':
         if token == 'id':
@@ -202,15 +285,15 @@ def parse_bone(tok, axis):
         if token == 'name':
             bone.name = tok.next()
         if token == 'direction':
-            bone.direction = tuple(float(tok.next()) for _ in range(3))
+            bone.direction = np.array([float(tok.next()) for _ in range(3)])
         if token == 'length':
             bone.length = float(tok.next())
         if token == 'axis':
-            token = tok.next()
-            while token != 'end' and token != axis:
-                bone.axis.append(float(token))
-                token = tok.next()
-            bone.axis = tuple(bone.axis)
+            while re.match(r'^[-+eEgG.\d]+$', tok.peek()):
+                bone.axis.append(float(tok.next()))
+            bone.axis = np.array(bone.axis)
+            if re.match(r'^[XYZ]+$', tok.peek().upper()):
+                bone.order = tok.next().upper()
         if token == 'dof':
             while tok.peek() in 'rx ry rz':
                 bone.dof.append(tok.next())
@@ -220,18 +303,18 @@ def parse_bone(tok, axis):
                 lo = float(tok.next().lstrip('('))
                 hi = float(tok.next().rstrip(')'))
                 bone.limits.append((lo, hi))
-            bone.limits = tuple(bone.limits)
         token = tok.next()
+    bone.limits = np.array(bone.limits)
     return bone
 
 PARSERS = dict(
-    version=parse_version,
-    name=parse_name,
-    units=parse_units,
-    documentation=parse_documentation,
-    root=parse_root,
-    bonedata=parse_bonedata,
-    hierarchy=parse_hierarchy,
+    version=_parse_version,
+    name=_parse_name,
+    units=_parse_units,
+    documentation=_parse_documentation,
+    root=_parse_root,
+    bonedata=_parse_bonedata,
+    hierarchy=_parse_hierarchy,
     )
 
 def parse(data):
@@ -240,6 +323,10 @@ def parse(data):
     Results are returned as an ASF object.
     '''
     asf = ASF()
+    if os.path.exists(data):
+        data = open(data)
+    if isinstance(data, file):
+        data = data.read()
     tok = Tokenizer(data)
     while True:
         token = None
@@ -252,6 +339,7 @@ def parse(data):
             assert token.startswith(':')
             PARSERS[token[1:].lower()](tok, asf)
         except Exception, e:
-            tok.error(e)
+            tok.error()
+            raise
         tok.end()
     return asf
