@@ -59,151 +59,128 @@ class World(physics.World):
         # joints and attaching them from the head down
         self.get_body('head').position = 0, 0, 2
 
-        body1 = self.get_body('body')
-        body2 = self.get_body('neck')
-        pos2 = body2.position
-        pp1 = body1.relative_position(0, -0.2, -0.85, )
-        pp2 = body2.relative_position(0, 0, 0.95, )
-        body2.position = pp1 - pp2 + pos2
+        def reposition(body1, body2, offset1, offset2):
+            body1 = self.get_body(body1)
+            body2 = self.get_body(body2)
+            pp1 = body1.body_to_world(offset1 * body1.dimensions / 2)
+            pp2 = body2.body_to_world(offset2 * body2.dimensions / 2)
+            body2.position = np.array(pp1) - pp2 + body2.position
+            return pp1
 
-        joint = self.join('ball', 'head', 'neck', anchor=pp1,
-                          angular_axis1=(1, 0, 0),
-                          angular_axis1_mode=1,
-                          angular_axis3=(0, 1, 0),
-                          angular_axis3_mode=2,
-        )
-        joint.lo_stops = -TAU / 6, -TAU / 8, -TAU / 10
-        joint.hi_stops = TAU / 8, TAU / 8, TAU / 10
+        def create_ball(body1, body2,
+                        offset1, offset2,
+                        lo_stops, hi_stops,
+                        axis1=(1, 0, 0),
+                        axis3=(0, 1, 0)):
+            anchor = reposition(body1, body2, offset1, offset2)
+            joint = self.join('ball', body1, body2, anchor=anchor,
+                angular_axis1=axis1, angular_axis1_mode=1,
+                angular_axis3=axis3, angular_axis3_mode=2)
+            joint.lo_stops = -TAU * np.array(lo_stops)
+            joint.hi_stops = TAU * np.array(hi_stops)
 
-  createBall( THROAT_JOINT,NECK_BODY,UP_TORSO_BODY,
-    0,0,-.95,
-    .9,-.2, 0,
-    1,0,0,
-    0,1,0,
-    -M_PI/4,M_PI/9,
-    -M_PI/4,M_PI/4,
-    -M_PI/9,M_PI/9)
+        def create_uni(body1, body2,
+                       offset1, offset2,
+                       lo_stops, hi_stops,
+                       axis1=(1, 0, 0),
+                       axis2=(0, 1, 0)):
+            anchor = reposition(body1, body2, offset1, offset2)
+            joint = self.join('ball', body1, body2, anchor=anchor,
+                angular_axis1=axis1, angular_axis2=axis2)
+            joint.lo_stops = -TAU * np.array(lo_stops)
+            joint.hi_stops = TAU * np.array(hi_stops)
 
-  createBall( R_COLLAR_JOINT,UP_TORSO_BODY,R_COLLAR_BODY,
-    .75,0,-.35,
-    0,0,1,
-    1,0,0,
-    0,1,0,
-    -M_PI/6,M_PI/6,
-    -M_PI/4,M_PI/4,
-    -M_PI/6,M_PI/4)
+        create_ball('head', 'neck',
+                    offset1=(0, -0.2, -0.85),
+                    offset2=(0, 0, 0.95),
+                    lo_stops=(1./6, 1./8, 1./10),
+                    hi_stops=(1./8, 1./8, 1./10))
+        create_ball('neck', 'u-torso',
+                    offset1=(0, 0, -0.95),
+                    offset2=(0.9, -0.2, 0),
+                    lo_stops=(1./8, 1./8, 1./18),
+                    hi_stops=(1./18, 1./8, 1./18))
+        create_ball('u-torso', 'l-torso',
+                    offset1=(-0.95, -0.1, 0),
+                    offset2=(0, 0, 0.90),
+                    lo_stops=(1./8, 1./8, 1./6),
+                    hi_stops=(1./12, 1./8, 1./12))
+        create_ball('l-torso', 'waist',
+                    offset1=(0, 0, -0.9),
+                    offset2=(0.5, 0, 0),
+                    lo_stops=(1./8, 1./6, 1./12),
+                    hi_stops=(1./12, 1./6, 1./12))
 
-  createBall( R_SHOULDER_JOINT,R_COLLAR_BODY,RUP_ARM_BODY,
-    0,0,-.9,
-    0,0,.85,
-    1,0,0,
-    0,1,0,
-    -5*M_PI/9,5*M_PI/9,
-    -M_PI/3,M_PI/3,
-    -M_PI/4,2*M_PI/3)
+        create_ball('u-torso', 'r-collar',
+                    offset1=(0.75, 0, -0.35),
+                    offset2=(0, 0, 1),
+                    lo_stops=(1./12, 1./8, 1./12),
+                    hi_stops=(1./12, 1./8, 1./8))
+        create_ball('r-collar', 'ru-arm',
+                    offset1=(0, 0, -0.9),
+                    offset2=(0, 0, 0.85),
+                    lo_stops=(5./18, 1./6, 1./8),
+                    hi_stops=(5./18, 1./6, 1./3))
+        create_uni('ru-arm', 'rl-arm',
+                   offset1=(0, 0, -0.95),
+                   offset2=(0, 0, 0.95),
+                   axis2=(0, 0, 1),
+                   lo_stops=(2./5, 1./4),
+                   hi_stops=(0.01, 1./4))
+        create_uni('rl-arm', 'r-hand',
+                   offset1=(0, 0, -0.95),
+                   offset2=(0, 0, 1),
+                   lo_stops=(1./10, 1./4),
+                   hi_stops=(1./10, 1./4))
 
-  createUni( R_ELBOW_JOINT,RUP_ARM_BODY,RLO_ARM_BODY,
-    0,0,-.95,
-    0,0,.95,
-    1,0,0,
-    0,0,1,
-    -4*M_PI/5,0.01,
-    -M_PI/2,M_PI/2)
-  createUni( R_WRIST_JOINT,RLO_ARM_BODY,R_HAND_BODY,
-    0,0,-.95,
-    0,0,1,
-    1,0,0,
-    0,1,0,
-    -M_PI/5,M_PI/5,
-    -M_PI/2,M_PI/2)
+        create_ball('u-torso', 'l-collar',
+                    offset1=(0.75, 0, 0.35),
+                    offset2=(0, 0, 1),
+                    lo_stops=(1./12, 1./8, 1./8),
+                    hi_stops=(1./12, 1./8, 1./12))
+        create_ball('l-collar', 'lu-arm',
+                    offset1=(0, 0, -0.9),
+                    offset2=(0, 0, 0.85),
+                    lo_stops=(5./18, 1./6, 1./3),
+                    hi_stops=(5./18, 1./6, 1./8))
+        create_uni('lu-arm', 'll-arm',
+                   offset1=(0, 0, -0.95),
+                   offset2=(0, 0, 0.95),
+                   axis2=(0, 0, 1),
+                   lo_stops=(2./5, 1./4),
+                   hi_stops=(0.01, 1./4))
+        create_uni('ll-arm', 'l-hand',
+                   offset1=(0, 0, -0.95),
+                   offset2=(0, 0, 1),
+                   lo_stops=(1./10, 1./4),
+                   hi_stops=(1./10, 1./4))
 
-  createBall( L_COLLAR_JOINT,UP_TORSO_BODY,L_COLLAR_BODY,
-    .75,0,.35,
-    0,0,1,
-    1,0,0,
-    0,1,0,
-    -M_PI/6,M_PI/6,
-    -M_PI/4,M_PI/4,
-    -M_PI/4,M_PI/6)
-
-  createBall( L_SHOULDER_JOINT,L_COLLAR_BODY,LUP_ARM_BODY,
-    0,0,-.9,
-    0,0,.85,
-    1,0,0,
-    0,1,0,
-    -5*M_PI/9,5*M_PI/9,
-    -M_PI/3,M_PI/3,
-    -2*M_PI/3,M_PI/4)
-
-  createUni( L_ELBOW_JOINT,LUP_ARM_BODY,LLO_ARM_BODY,
-    0,0,-.95,
-    0,0,.95,
-    1,0,0,
-    0,0,1,
-    -4*M_PI/5,0.01,
-    -M_PI/2,M_PI/2)
-  createUni( L_WRIST_JOINT,LLO_ARM_BODY,L_HAND_BODY,
-    0,0,-.95,
-    0,0,1,
-    1,0,0,
-    0,1,0,
-    -M_PI/5,M_PI/5,
-    -M_PI/2,M_PI/2)
-
-  createBall( SPINE_JOINT,UP_TORSO_BODY,LO_TORSO_BODY,
-    -.95,-.1,0,
-    0,0,.90,
-    1,0,0,
-    0,1,0,
-    - M_PI/4, M_PI/6,
-    - M_PI/4, M_PI/4,
-    - M_PI/6, M_PI/6)
-
-  createBall( WAIST_JOINT,LO_TORSO_BODY,WAIST_BODY,
-    0,0,-.9,
-    0.5,0,0,
-    1,0,0,
-    0,1,0,
-    - M_PI/4, M_PI/6,
-    - M_PI/3, M_PI/3,
-    - M_PI/6, M_PI/6)
-
-  createBall( R_HIP_JOINT,WAIST_BODY,RUP_LEG_BODY,
-    0,0,-.6,
-    0,0,.95,
-    1,0,0,
-    0,1,0,
-    -2*M_PI/3,M_PI/3,
-    -M_PI/3,M_PI/3,
-    -M_PI/6,2*M_PI/3)
-
-  createUni( R_KNEE_JOINT,RUP_LEG_BODY,RLO_LEG_BODY,
-    0,0,-.95,
-    0,0,.95,
-    1,0,0,
-    0,0,1,
-    -0.01,4*M_PI/5,
-    -M_PI/5,M_PI/5)
-
-  createUni( R_ANKLE_JOINT,RLO_LEG_BODY,R_HEEL_BODY,
-            0,0,-.95,
-            0,0,1,
-            1,0,0,
-            0,1,0,
-            -M_PI/3,M_PI/3,
-            -M_PI/3,M_PI/3)
-
-  createHinge(R_FOOT_JOINT,R_HEEL_BODY,R_TARSAL_BODY,
-    0,1.5,-1,
-    -1,0,0,
-    0,1,0,
-    -M_PI/16,M_PI/16)
-
-#  createHinge(R_TOE_JOINT,R_TARSAL_BODY,R_TOE_BODY,
-#    0,0,0,
-#    0,-2,0,
-#    1,0,0,
-#    -M_PI/8,M_PI/8)
+        create_ball('waist', 'ru-leg',
+                    offset1=(0, 0, -0.6),
+                    offset2=(0,0, 0.95),
+                    lo_stops=(1./3, 1./6, 1./12),
+                    hi_stops=(1./6, 1./6, 1./3))
+        create_uni('ru-leg', 'rl-leg',
+                   offset1=(0, 0, -0.95),
+                   offset2=(0, 0, 0.95),
+                   axis2=(0, 0, 1),
+                   lo_stops=(-0.01, 1./10),
+                   hi_stops=(2./5, 1./10))
+        create_uni('rl-leg', 'r-heel',
+                   offset1=(0, 0, -0.95),
+                   offset2=(0, 0, 1),
+                   lo_stops=(1./6, 1./6),
+                   hi_stops=(1./6, 1./6))
+        create_hinge('r-heel', 'r-tarsal',
+                     offset1=(0, 1.5, -1),
+                     offset2=(-1, 0, 0),
+                     lo_stops=(1./32, ),
+                     hi_stops=(1./32, ))
+        #create_hinge('r-tarsal', 'r-toe',
+        #    0,0,0,
+        #    0,-2,0,
+        #    1,0,0,
+        #    -M_PI/8,M_PI/8)
 
   createBall( L_HIP_JOINT,WAIST_BODY,LUP_LEG_BODY,
     0,0,.6,
