@@ -30,6 +30,8 @@ import OpenGL.GLUT as glut
 
 from . import base
 
+TAU = 2 * np.pi
+
 
 class Body(object):
     '''This class wraps things that participate in the ODE physics simulation.
@@ -135,32 +137,28 @@ class Body(object):
 
     def add_force(self, force, relative=False, position=None, relative_position=None):
         if relative_position is not None:
-            if relative:
-                self.body.addRelForceAtRelPos(force, relative_position)
-            else:
-                self.body.addForceAtRelPos(force, relative_position)
+            op = self.body.addRelForceAtRelPos if relative else self.body.addForceAtRelPos
+            op(force, relative_position)
         elif position is not None:
-            if relative:
-                self.body.addRelForceAtPos(force, position)
-            else:
-                self.body.addForceAtPos(force, position)
+            op = self.body.addRelForceAtPos if relative else self.body.addForceAtPos
+            op(force, position)
         else:
-            if relative:
-                self.body.addRelForce(force)
-            else:
-                self.body.addForce(force)
+            op = self.body.addRelForce if relative else self.body.addForce
+            op(force)
 
     def add_torque(self, torque, relative=False):
-        if relative:
-            self.body.addRelTorque(torque)
-        else:
-            self.body.addTorque(torque)
+        op = self.body.addRelTorque if relative else self.body.addTorque
+        op(torque)
 
 
 class Box(Body):
     @property
     def lengths(self):
         return self.shape['lengths']
+
+    @property
+    def dimensions(self):
+        return np.array(self.lengths)
 
     def init_mass(self, m, density):
         m.setBox(density, *self.lengths)
@@ -170,6 +168,11 @@ class Sphere(Body):
     @property
     def radius(self):
         return self.shape['radius']
+
+    @property
+    def dimensions(self):
+        d = 2 * self.radius
+        return np.array([d, d, d])
 
     def init_mass(self, m, density):
         m.setSphere(density, self.radius)
@@ -184,6 +187,11 @@ class Cylinder(Body):
     def length(self):
         return self.shape['length']
 
+    @property
+    def dimensions(self):
+        d = 2 * self.radius
+        return np.array([d, d, self.length])
+
     def init_mass(self, m, density):
         m.setCylinder(density, 3, self.radius, self.length)
 
@@ -197,8 +205,22 @@ class Capsule(Body):
     def length(self):
         return self.shape['length']
 
+    @property
+    def dimensions(self):
+        d = 2 * self.radius
+        return np.array([d, d, d + self.length])
+
     def init_mass(self, m, density):
         m.setCappedCylinder(density, 3, self.radius, self.length)
+
+
+# Create a lookup table for things derived from the Body class. Should probably
+# do this using a metaclass, but this is less head-warpy.
+BODIES = {}
+for name, cls in globals().iteritems():
+    if issubclass(cls, Body):
+        name = name.lower()
+        BODIES[name] = BODIES[name[:3]] = cls
 
 
 class Joint(object):
@@ -216,25 +238,34 @@ class Joint(object):
         if feedback:
             self.joint.setFeedback(True)
 
-        # if needed, attach an amotor to apply angular forces to the joint.
+        # attach an amotor to apply angular forces to the joint.
         self.amotor = None
         if self.ADOF > 0:
             self.amotor = ode.AMotor(world)
             self.amotor.attach(body_a.body, body_b.body if body_b else None)
+            self.amotor.setMode(ode.AMotorEuler)
             self.amotor.setNumAxes(self.ADOF)
-            self.amotor.setMode(ode.AMotorUser)
-            for i, ax in enumerate(self.axes):
-                self.amotor.setAxis(i, 1, ax)
+            for i in range(self.ADOF):
+                ax = kwargs.get('angular_axis{}'.format(i+1))
+                if ax is not None:
+                    mode = kwargs.get('angular_axis{}_mode'.format(i+1), 1)
+                    self.amotor.setAxis(i, mode, ax)
 
-        # if needed, attach an lmotor to apply linear forces to the joint.
+        # attach an lmotor to apply linear forces to the joint.
         self.lmotor = None
-        if self.LDOF == 1:
+        if self.LDOF > 0:
             self.lmotor = ode.LMotor(world)
             self.lmotor.attach(body_a.body, body_b.body if body_b else None)
-            self.lmotor.setNumAxes(1)
-            self.lmotor.setAxis(i, 1, kwargs['linear_axis'])
+            self.lmotor.setNumAxes(self.LDOF)
+            for i in range(self.LDOF):
+                ax = kwargs.get('linear_axis{}'.format(i+1))
+                if ax is not None:
+                    mode = kwargs.get('linear_axis{}_mode'.format(i+1), 1)
+                    self.lmotor.setAxis(i, mode, ax)
 
         for k, v in kwargs.iteritems():
+            if k.startswith('angular_axis') or k.startswith('linear_axis'):
+                continue
             setattr(self, k, v)
 
     def __str__(self):
@@ -299,10 +330,6 @@ class Joint(object):
     @property
     def position_rate(self):
         return self.joint.getPositionRate()
-
-    @anchor.setter
-    def anchor(self, anchor):
-        self.joint.setAnchor(anchor)
 
     @target_velocities.setter
     def target_velocities(self, velocities):
@@ -371,11 +398,49 @@ class Ball(Joint):
     ADOF = 3
     LDOF = 0
 
+    def __init__(self, name, world, body_a, body_b=None, feedback=False, **kwargs):
+        super(Ball, self).__init__(
+            name, world, body_a, body_b=body_b, feedback=feedback, **kwargs)
+
+        # attach an auxiliary amotor to apply angular joint limits.
+        self.alimits = ode.AMotor(world)
+        self.alimits.attach(body_a.body, body_b.body if body_b else None)
+        self.alimits.setMode(ode.AMotorEuler)
+        self.alimits.setNumAxes(self.ADOF)
+        self.alimits.setAxis(0, 1, self.amotor.getAxis(0))
+        self.alimits.setAxis(1, 1, self.amotor.getAxis(1))
+        self.alimits.setAxis(2, 2, self.amotor.getAxis(2))
+
     @property
     def axes(self):
         return (self.amotor.getAxis(0),
                 self.amotor.getAxis(1),
                 self.amotor.getAxis(2))
+
+    @property
+    def lo_stops(self):
+        return self._get_params(self.alimits, 'LoStop')
+
+    @property
+    def hi_stops(self):
+        return self._get_params(self.alimits, 'HiStop')
+
+    @lo_stops.setter
+    def lo_stops(self, lo_stops):
+        self._set_params(self.alimits, 'LoStop', lo_stops)
+
+    @hi_stops.setter
+    def hi_stops(self, hi_stops):
+        self._set_params(self.alimits, 'HiStop', hi_stops)
+
+
+# Create a lookup table for things derived from the Body class. Should probably
+# do this using a metaclass, but this is less head-warpy.
+JOINTS = {}
+for name, cls in globals().iteritems():
+    if issubclass(cls, Joint):
+        name = name.lower()
+        JOINTS[name] = JOINTS[name[:3]] = cls
 
 
 class World(base.World):
@@ -446,16 +511,16 @@ class World(base.World):
 
     def create_body(self, shape, name=None, color=None, feedback=True, **kwargs):
         '''Create a new body.'''
+        shape = shape.lower()
         if name is None:
             for i in range(1 + len(self._bodies)):
-                name = '%s%d' % (shape.lower(), i)
+                name = '%s%d' % (shape, i)
                 if name not in self._bodies:
                     break
-        b = globals()[shape.capitalize()](
-            name, self.world, self.space, feedback=feedback, **kwargs)
+        body = BODIES[shape](name, self.world, self.space, feedback=feedback, **kwargs)
         self._colors[name] = color if color is not None else rng.random(3)
-        self._bodies[name] = b
-        return b
+        self._bodies[name] = body
+        return body
 
     def join(self, shape, body_a, body_b=None, name=None, feedback=True, **kwargs):
         '''Create a new joint that connects two bodies together.'''
@@ -465,12 +530,12 @@ class World(base.World):
         bb = body_b
         if isinstance(body_b, str):
             bb = self.get_body(body_b)
+        shape = shape.lower()
         if name is None:
-            name = '%s:%s:%s' % (ba.name, shape.lower(), bb.name if bb else '')
-        j = globals()[shape.capitalize()](
-            name, self.world, ba, bb, feedback=feedback, **kwargs)
-        self._joints[name] = j
-        return j
+            name = '%s:%s:%s' % (ba.name, shape, bb.name if bb else '')
+        joint = JOINTS[shape](name, self.world, ba, bb, feedback=feedback, **kwargs)
+        return self._joints[name] = joint
+        return joint
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
