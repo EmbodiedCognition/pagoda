@@ -40,12 +40,19 @@ class World(physics.World):
         super(World, self).__init__(*args, **kwargs)
         self.skeletons = {}
         self.motions = {}
+        self.frames = {}
         self.frame = 0
 
     def add_skeleton(self, asf, name=None, translate=(0, 1, 0)):
         skeleton = parse_asf(asf)
         skeleton.create_bodies(self, translate=translate)
-        self.skeletons[name or skeleton.name] = skeleton
+        skeleton.create_joints(self)
+        if name is None:
+            name = skeleton.name
+        self.skeletons[name] = skeleton
+        self.motions[name] = None
+        self.frames[name] = []
+        return name
 
     def add_motion(self, amc, name=None):
         self.motions[name] = parse_amc(amc)
@@ -56,11 +63,17 @@ class World(physics.World):
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
         result = super(World, self).step(substeps=substeps)
+        self.frame += 1
+        for name in self.skeletons:
+            if self.motions[name]:
+                while self.frame >= len(self.frames[name]):
+                    self.frames[name].append(next(self.motions[name]))
+                self.skeletons[name].update_from_motion(self.frames[name][self.frame])
         return result
 
 
 class Skeleton(object):
-    '''This class handles configuration data from AMC files.'''
+    '''This class handles configuration data from ASF files.'''
 
     def __init__(self):
         self.name = None
@@ -89,8 +102,7 @@ class Skeleton(object):
             name, depth, end = stack.pop()
 
             for child in self.hierarchy.get(name, ()):
-                b = self.bones[child]
-                stack.append((child, depth + 1, end + b.direction * b.length))
+                stack.append((child, depth + 1, end + self.bones[child].end))
 
             if name not in self.bones:
                 continue
@@ -119,7 +131,24 @@ class Skeleton(object):
             self._bodies[name] = body
 
     def create_joints(self, world):
-        raise NotImplementedError
+        '''Traverse the bone hierarchy and create physics joints.'''
+        stack = ['root']
+        while stack:
+            name = stack.pop()
+            for child in self.hierarchy.get(name, ()):
+                stack.append(child)
+            if name not in self.bones:
+                continue
+            bone = self.bones[name]
+            body = self._bodies[name]
+            for name in self.hierarchy.get(name, ()):
+                child_bone = self.bones[name]
+                child_body = self._bodies[name]
+                shape = ('', 'hinge', 'universal', 'ball')[len(child_bone.dof)]
+                world.join(shape, body, child_body)
+
+    def update_from_motion(self, frame):
+        pass
 
 
 class Bone(object):
@@ -134,6 +163,10 @@ class Bone(object):
         self.order = 'XYZ'
         self.dof = []
         self.limits = []
+
+    @property
+    def end(self):
+        return self.direction * self.length
 
     @property
     def rotation(self):

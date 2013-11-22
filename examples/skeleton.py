@@ -33,8 +33,7 @@ import lmj.sim as ls
     )
 def main(asf, amc, frame_rate=60., friction=5000, elasticity=0.1):
     w = ls.skeleton.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
-    w.add_skeleton(asf)
-    w.add_motion(amc)
+    w.add_motion(amc, name=w.add_skeleton(asf))
     ls.viewer.GL(w, paused=True).run()
 
 
