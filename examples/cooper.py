@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright (c) 2013 Leif Johnson <leif@leifjohnson.net>
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,9 +20,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-'''Yet another simulator framework !'''
+import lmj.cli
+import lmj.sim as ls
+import sys
 
-from . import cooper
-from . import physics
-from . import skeleton
-from . import viewer
+
+@lmj.cli.annotate(
+    frame_rate=('frame rate of the simulation', 'option', None, float),
+    friction=('coefficient of friction', 'option', None, float),
+    elasticity=('elasticity constant for collisions', 'option', None, float),
+    )
+def main(frame_rate=60., friction=5000, elasticity=0.1):
+    w = ls.cooper.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
+    w.set_random_forces()
+    ls.viewer.GL(w, paused=True).run()
+
+
+if __name__ == '__main__':
+    lmj.cli.call(main)

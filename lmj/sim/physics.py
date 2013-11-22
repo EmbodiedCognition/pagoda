@@ -158,7 +158,7 @@ class Box(Body):
 
     @property
     def dimensions(self):
-        return np.array(self.lengths)
+        return np.asarray(self.lengths)
 
     def init_mass(self, m, density):
         m.setBox(density, *self.lengths)
@@ -172,7 +172,7 @@ class Sphere(Body):
     @property
     def dimensions(self):
         d = 2 * self.radius
-        return np.array([d, d, d])
+        return np.asarray([d, d, d])
 
     def init_mass(self, m, density):
         m.setSphere(density, self.radius)
@@ -190,7 +190,7 @@ class Cylinder(Body):
     @property
     def dimensions(self):
         d = 2 * self.radius
-        return np.array([d, d, self.length])
+        return np.asarray([d, d, self.length])
 
     def init_mass(self, m, density):
         m.setCylinder(density, 3, self.radius, self.length)
@@ -208,7 +208,7 @@ class Capsule(Body):
     @property
     def dimensions(self):
         d = 2 * self.radius
-        return np.array([d, d, d + self.length])
+        return np.asarray([d, d, d + self.length])
 
     def init_mass(self, m, density):
         m.setCappedCylinder(density, 3, self.radius, self.length)
@@ -217,16 +217,21 @@ class Capsule(Body):
 # Create a lookup table for things derived from the Body class. Should probably
 # do this using a metaclass, but this is less head-warpy.
 BODIES = {}
-for name, cls in globals().iteritems():
-    if issubclass(cls, Body):
-        name = name.lower()
-        BODIES[name] = BODIES[name[:3]] = cls
+for cls in Body.__subclasses__():
+    name = cls.__name__.lower()
+    BODIES[name] = BODIES[name[:3]] = cls
 
 
 class Joint(object):
     '''This class wraps the ODE Joint class with some Python properties.'''
 
-    def __init__(self, name, world, body_a, body_b=None, feedback=False, **kwargs):
+    def __init__(self, name, world, body_a, body_b=None,
+                 anchor=None,
+                 feedback=True,
+                 amotor_mode=ode.AMotorUser,
+                 **kwargs):
+        '''
+        '''
         self.name = name
         self.body_a = body_a
         self.body_b = body_b
@@ -235,6 +240,7 @@ class Joint(object):
         # and measure forces experienced at the joint.
         self.joint = getattr(ode, '%sJoint' % self.__class__.__name__)(world)
         self.joint.attach(body_a.body, body_b.body if body_b else None)
+        self.joint.setAnchor(anchor)
         if feedback:
             self.joint.setFeedback(True)
 
@@ -243,13 +249,13 @@ class Joint(object):
         if self.ADOF > 0:
             self.amotor = ode.AMotor(world)
             self.amotor.attach(body_a.body, body_b.body if body_b else None)
-            self.amotor.setMode(ode.AMotorEuler)
+            self.amotor.setMode(amotor_mode)
             self.amotor.setNumAxes(self.ADOF)
             for i in range(self.ADOF):
                 ax = kwargs.get('angular_axis{}'.format(i+1))
                 if ax is not None:
-                    mode = kwargs.get('angular_axis{}_mode'.format(i+1), 1)
-                    self.amotor.setAxis(i, mode, ax)
+                    frame = kwargs.get('angular_axis{}_frame'.format(i+1), 1)
+                    self.amotor.setAxis(i, frame, ax)
 
         # attach an lmotor to apply linear forces to the joint.
         self.lmotor = None
@@ -264,7 +270,7 @@ class Joint(object):
                     self.lmotor.setAxis(i, mode, ax)
 
         for k, v in kwargs.iteritems():
-            if k.startswith('angular_axis') or k.startswith('linear_axis'):
+            if k.startswith('angular_') or k.startswith('linear_'):
                 continue
             setattr(self, k, v)
 
@@ -276,19 +282,19 @@ class Joint(object):
 
     def _get_params(self, target, param):
         '''Get the given param from each of the DOFs for this joint.'''
-        for s in self.axis_suffixes:
+        for s in self.param_suffixes:
             yield target.getParam(getattr(ode, 'Param%s%s' % (param, s)))
 
     def _set_params(self, target, param, values):
         '''Set the given param for each of the DOFs for this joint.'''
-        if not isinstance(values, (list, tuple)):
-            values = (values, )
+        if not isinstance(values, (list, tuple, np.ndarray)):
+            values = [values] * self.ADOF
         assert self.ADOF == len(values)
-        for s, value in zip(self.axis_suffixes, values):
+        for s, value in zip(self.param_suffixes, values):
             target.setParam(getattr(ode, 'Param%s%s' % (param, s)), value)
 
     @property
-    def axis_suffixes(self):
+    def param_suffixes(self):
         return ['', '2', '3'][:self.ADOF]
 
     @property
@@ -306,6 +312,10 @@ class Joint(object):
     @property
     def max_forces(self):
         return self._get_params(self.amotor, 'FMax')
+
+    @property
+    def cfm(self):
+        return self.joint.getParam(ode.ParamCFM)
 
     @property
     def lo_stops(self):
@@ -339,6 +349,10 @@ class Joint(object):
     def max_forces(self, forces):
         self._set_params(self.amotor, 'FMax', forces)
 
+    @cfm.setter
+    def cfm(self, cfm):
+        self.joint.setParam(ode.ParamCFM, cfm)
+
     @lo_stops.setter
     def lo_stops(self, lo_stops):
         self._set_params(self.joint, 'LoStop', lo_stops)
@@ -346,6 +360,10 @@ class Joint(object):
     @hi_stops.setter
     def hi_stops(self, hi_stops):
         self._set_params(self.joint, 'HiStop', hi_stops)
+
+    @angles.setter
+    def angles(self, angles):
+        [self.amotor.setAngle(i, t) for i, t in enumerate(angles)]
 
     def trace(self):
         feedback = self.feedback
@@ -398,14 +416,13 @@ class Ball(Joint):
     ADOF = 3
     LDOF = 0
 
-    def __init__(self, name, world, body_a, body_b=None, feedback=False, **kwargs):
-        super(Ball, self).__init__(
-            name, world, body_a, body_b=body_b, feedback=feedback, **kwargs)
+    def __init__(self, name, world, body_a, body_b=None, **kwargs):
+        super(Ball, self).__init__(name, world, body_a, body_b=body_b, **kwargs)
 
         # attach an auxiliary amotor to apply angular joint limits.
         self.alimits = ode.AMotor(world)
         self.alimits.attach(body_a.body, body_b.body if body_b else None)
-        self.alimits.setMode(ode.AMotorEuler)
+        self.alimits.setMode(self.amotor.getMode())
         self.alimits.setNumAxes(self.ADOF)
         self.alimits.setAxis(0, 1, self.amotor.getAxis(0))
         self.alimits.setAxis(1, 1, self.amotor.getAxis(1))
@@ -413,6 +430,7 @@ class Ball(Joint):
 
     @property
     def axes(self):
+        return ()
         return (self.amotor.getAxis(0),
                 self.amotor.getAxis(1),
                 self.amotor.getAxis(2))
@@ -437,10 +455,18 @@ class Ball(Joint):
 # Create a lookup table for things derived from the Body class. Should probably
 # do this using a metaclass, but this is less head-warpy.
 JOINTS = {}
-for name, cls in globals().iteritems():
-    if issubclass(cls, Joint):
-        name = name.lower()
-        JOINTS[name] = JOINTS[name[:3]] = cls
+for cls in Joint.__subclasses__():
+    name = cls.__name__.lower()
+    JOINTS[name] = JOINTS[name[:3]] = cls
+
+
+def make_quaternion(theta, *axis):
+    '''Given an angle and an axis, create a quaternion.'''
+    x, y, z = axis
+    r = np.sqrt(x * x + y * y + z * z)
+    st = np.sin(theta / 2.)
+    ct = np.cos(theta / 2.)
+    return [x * st / r, y * st / r, z * st / r, ct]
 
 
 class World(base.World):
@@ -463,9 +489,7 @@ class World(base.World):
         self.world.setGravity(gravity)
         self.world.setERP(erp)
         self.world.setCFM(cfm)
-
-        # TODO: not yet in pyode :(
-        #self.world.setMaxAngularSpeed(max_angular_speed)
+        self.world.setMaxAngularSpeed(max_angular_speed)
 
         self.space = ode.HashSpace()
 
@@ -474,14 +498,6 @@ class World(base.World):
         self._colors = {}
         self._bodies = {}
         self._joints = {}
-
-    @staticmethod
-    def make_quaternion(theta, *axis):
-        x, y, z = axis
-        r = np.sqrt(x * x + y * y + z * z)
-        st = np.sin(theta / 2.)
-        ct = np.cos(theta / 2.)
-        return [x * st / r, y * st / r, z * st / r, ct]
 
     @property
     def bodies(self):
@@ -509,7 +525,7 @@ class World(base.World):
     def get_joint(self, name):
         return self._joints[name]
 
-    def create_body(self, shape, name=None, color=None, feedback=True, **kwargs):
+    def create_body(self, shape, name=None, color=None, **kwargs):
         '''Create a new body.'''
         shape = shape.lower()
         if name is None:
@@ -517,12 +533,14 @@ class World(base.World):
                 name = '%s%d' % (shape, i)
                 if name not in self._bodies:
                     break
-        body = BODIES[shape](name, self.world, self.space, feedback=feedback, **kwargs)
-        self._colors[name] = color if color is not None else rng.random(3)
+        body = BODIES[shape](name, self.world, self.space, **kwargs)
+        self._colors[name] = color
+        if color is None:
+            self._colors[name] = tuple(rng.random(3)) + (0.5, )
         self._bodies[name] = body
         return body
 
-    def join(self, shape, body_a, body_b=None, name=None, feedback=True, **kwargs):
+    def join(self, shape, body_a, body_b=None, name=None, **kwargs):
         '''Create a new joint that connects two bodies together.'''
         ba = body_a
         if isinstance(body_a, str):
@@ -533,8 +551,8 @@ class World(base.World):
         shape = shape.lower()
         if name is None:
             name = '%s:%s:%s' % (ba.name, shape, bb.name if bb else '')
-        joint = JOINTS[shape](name, self.world, ba, bb, feedback=feedback, **kwargs)
-        return self._joints[name] = joint
+        joint = JOINTS[shape](name, self.world, ba, bb, **kwargs)
+        self._joints[name] = joint
         return joint
 
     def step(self, substeps=2):
@@ -601,4 +619,20 @@ class World(base.World):
                 glut.glutSolidSphere(r, n, n)
                 gl.glTranslate(0, 0, l)
                 glut.glutSolidSphere(r, n, n)
+            gl.glPopMatrix()
+        for name, joint in self._joints.iteritems():
+            l = 0.2
+            x, y, z = joint.anchor
+            gl.glPushMatrix()
+            gl.glTranslate(x, y, z)
+            for i, (rx, ry, rz) in enumerate(joint.axes):
+                gl.glColor(i / 2., i / 2., i / 2.)
+                gl.glPushMatrix()
+                # http://thjsmith.com/40/cylinder-between-two-points-opengl-c
+                # http://en.wikipedia.org/wiki/Cross_product
+                # (rx, ry, rz) x (0, 0, 1) = (ry, -rx, 0) -- 90deg is a guess ?
+                gl.glRotate(90, ry, -rx, 0)
+                gl.glTranslate(0, 0, -l / 2.)
+                glut.glutSolidCylinder(l / 10, l, n, n)
+                gl.glPopMatrix()
             gl.glPopMatrix()
