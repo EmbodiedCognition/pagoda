@@ -50,74 +50,73 @@ class Body(object):
 
         m = ode.Mass()
         self.init_mass(m, density)
-        self.body = ode.Body(world)
-        self.body.setMass(m)
-
-        self.geom = getattr(ode, 'Geom%s' % self.__class__.__name__)(space, **shape)
-        self.geom.setBody(self.body)
+        self.ode_body = ode.Body(world)
+        self.ode_body.setMass(m)
+        self.ode_geom = getattr(ode, 'Geom%s' % self.__class__.__name__)(space, **shape)
+        self.ode_geom.setBody(self.ode_body)
 
     def __str__(self):
         return '%s: %s at %s' % (self.name, self.__class__.__name__, self.position)
 
     @property
     def mass(self):
-        return self.body.getMass()
+        return self.ode_body.getMass()
 
     @property
     def position(self):
-        return self.body.getPosition()
+        return self.ode_body.getPosition()
 
     @property
     def rotation(self):
-        return self.body.getRotation()
+        return self.ode_body.getRotation()
 
     @property
     def quaternion(self):
-        return self.body.getQuaternion()
+        return self.ode_body.getQuaternion()
 
     @property
     def linear_velocity(self):
-        return self.body.getLinearVel()
+        return self.ode_body.getLinearVel()
 
     @property
     def angular_velocity(self):
-        return self.body.getAngularVel()
+        return self.ode_body.getAngularVel()
 
     @property
     def force(self):
-        return self.body.getForce()
+        return self.ode_body.getForce()
 
     @property
     def torque(self):
-        return self.body.getTorque()
+        return self.ode_body.getTorque()
 
     @position.setter
     def position(self, position):
-        self.body.setPosition(position)
+        self.ode_body.setPosition(position)
 
     @rotation.setter
     def rotation(self, rotation):
-        self.body.setRotation(rotation)
+        self.ode_body.setRotation(rotation)
 
     @quaternion.setter
     def quaternion(self, quaternion):
-        self.body.setQuaternion(quaternion)
+        self.ode_body.setQuaternion(quaternion)
 
     @linear_velocity.setter
     def linear_velocity(self, velocity):
-        self.body.setLinearVel(velocity)
+        self.ode_body.setLinearVel(velocity)
 
     @angular_velocity.setter
     def angular_velocity(self, velocity):
-        self.body.setAngularVel(velocity)
+        self.ode_body.setAngularVel(velocity)
 
     @force.setter
     def force(self, force):
-        self.body.setForce(force)
+        self.ode_body.setForce(force)
 
     @torque.setter
     def torque(self, torque):
-        self.body.setTorque(torque)
+        self.ode_body.setTorque(torque)
 
     def trace(self):
         if not self.feedback:
@@ -126,28 +125,32 @@ class Body(object):
         a, b, c, d = self.quaternion
         lx, ly, lz = self.linear_velocity
         ax, ay, az = self.angular_velocity
-        return '%s p %f %f %f q %f %f %f %f lv %f %f %f av %f %f %f' % (
+        return '{} p {} {} {} q {} {} {} {} lv {} {} {} av {} {} {}'.format(
             self.name, x, y, z, a, b, c, d, lx, ly, lz, ax, ay, az)
 
+    def rotate_to_body(self, x):
+        return np.dot(np.asarray(self.rotation).reshape((3, 3)), x)
+
     def body_to_world(self, position):
-        return self.body.getRelPointPos(position)
+        return self.ode_body.getRelPointPos(position)
 
     def world_to_body(self, position):
-        return self.body.getPosRelPoint(position)
+        return self.ode_body.getPosRelPoint(position)
 
     def add_force(self, force, relative=False, position=None, relative_position=None):
+        b = self.ode_body
         if relative_position is not None:
-            op = self.body.addRelForceAtRelPos if relative else self.body.addForceAtRelPos
+            op = b.addRelForceAtRelPos if relative else b.addForceAtRelPos
             op(force, relative_position)
         elif position is not None:
-            op = self.body.addRelForceAtPos if relative else self.body.addForceAtPos
+            op = b.addRelForceAtPos if relative else b.addForceAtPos
             op(force, position)
         else:
-            op = self.body.addRelForce if relative else self.body.addForce
+            op = b.addRelForce if relative else b.addForce
             op(force)
 
     def add_torque(self, torque, relative=False):
-        op = self.body.addRelTorque if relative else self.body.addTorque
+        op = self.ode_body.addRelTorque if relative else self.ode_body.addTorque
         op(torque)
 
 
@@ -189,7 +192,7 @@ class Cylinder(Body):
 
     @property
     def dimensions(self):
-        d = 2 * self.radius
+        d = self.radius
         return np.asarray([d, d, self.length])
 
     def init_mass(self, m, density):
@@ -214,8 +217,7 @@ class Capsule(Body):
         m.setCappedCylinder(density, 3, self.radius, self.length)
 
 
-# Create a lookup table for things derived from the Body class. Should probably
-# do this using a metaclass, but this is less head-warpy.
+# Create a lookup table for things derived from the Body class.
 BODIES = {}
 for cls in Body.__subclasses__():
     name = cls.__name__.lower()
@@ -238,17 +240,17 @@ class Joint(object):
 
         # attach an ode joint to these two bodies to constrain their movements
         # and measure forces experienced at the joint.
-        self.joint = getattr(ode, '%sJoint' % self.__class__.__name__)(world)
-        self.joint.attach(body_a.body, body_b.body if body_b else None)
-        self.joint.setAnchor(anchor)
+        self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(world)
+        self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.ode_joint.setAnchor(anchor)
         if feedback:
-            self.joint.setFeedback(True)
+            self.ode_joint.setFeedback(True)
 
         # attach an amotor to apply angular forces to the joint.
         self.amotor = None
         if self.ADOF > 0:
             self.amotor = ode.AMotor(world)
-            self.amotor.attach(body_a.body, body_b.body if body_b else None)
+            self.amotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
             self.amotor.setMode(amotor_mode)
             self.amotor.setNumAxes(self.ADOF)
             for i in range(self.ADOF):
@@ -261,12 +263,12 @@ class Joint(object):
         self.lmotor = None
         if self.LDOF > 0:
             self.lmotor = ode.LMotor(world)
-            self.lmotor.attach(body_a.body, body_b.body if body_b else None)
+            self.lmotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
             self.lmotor.setNumAxes(self.LDOF)
             for i in range(self.LDOF):
                 ax = kwargs.get('linear_axis{}'.format(i+1))
                 if ax is not None:
-                    mode = kwargs.get('linear_axis{}_mode'.format(i+1), 1)
+                    mode = kwargs.get('linear_axis{}_frame'.format(i+1), 1)
                     self.lmotor.setAxis(i, mode, ax)
 
         for k, v in kwargs.iteritems():
@@ -275,35 +277,34 @@ class Joint(object):
             setattr(self, k, v)
 
     def __str__(self):
-        return '%s: %s (%s <-> %s) at %s' % (
-            self.name, self.__class__.__name__,
-            self.body_a.name, self.body_b.name if self.body_b else None,
-            self.anchor)
+        return ('{0.name}: {0.__class__.__name__} '
+                '({0.body_a.name} <-> {1}) at {0.anchor}').format(
+                    self, self.body_b.name if self.body_b else None)
 
     def _get_params(self, target, param):
         '''Get the given param from each of the DOFs for this joint.'''
-        for s in self.param_suffixes:
-            yield target.getParam(getattr(ode, 'Param%s%s' % (param, s)))
+        return [target.getParam(getattr(ode, 'Param{}{}'.format(param, s)))
+                for s in ['', '2', '3'][:self.ADOF]]
 
     def _set_params(self, target, param, values):
         '''Set the given param for each of the DOFs for this joint.'''
         if not isinstance(values, (list, tuple, np.ndarray)):
             values = [values] * self.ADOF
         assert self.ADOF == len(values)
-        for s, value in zip(self.param_suffixes, values):
-            target.setParam(getattr(ode, 'Param%s%s' % (param, s)), value)
+        for s, value in zip(['', '2', '3'][:self.ADOF], values):
+            target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
 
     @property
-    def param_suffixes(self):
-        return ['', '2', '3'][:self.ADOF]
+    def axes(self):
+        return [self.amotor.getAxis(i) for i in range(self.ADOF)]
 
     @property
     def feedback(self):
-        return self.joint.getFeedback()
+        return self.ode_joint.getFeedback()
 
     @property
     def anchor(self):
-        return self.joint.getAnchor()
+        return self.ode_joint.getAnchor()
 
     @property
     def target_velocities(self):
@@ -314,32 +315,36 @@ class Joint(object):
         return self._get_params(self.amotor, 'FMax')
 
     @property
+    def motor_cfms(self):
+        return self._get_params(self.amotor, 'CFM')
+
+    @property
     def cfm(self):
-        return self.joint.getParam(ode.ParamCFM)
+        return self.ode_joint.getParam(ode.ParamCFM)
 
     @property
     def lo_stops(self):
-        return self._get_params(self.joint, 'LoStop')
+        return self._get_params(self.ode_joint, 'LoStop')
 
     @property
     def hi_stops(self):
-        return self._get_params(self.joint, 'HiStop')
+        return self._get_params(self.ode_joint, 'HiStop')
 
     @property
     def angles(self):
-        return map(self.amotor.getAngle, range(self.ADOF))
+        return [self.amotor.getAngle(i) for i in range(self.ADOF)]
 
     @property
     def angle_rates(self):
-        return map(self.amotor.getAngleRate, range(self.ADOF))
+        return [self.amotor.getAngleRate(i) for i in range(self.ADOF)]
 
     @property
     def position(self):
-        return self.joint.getPosition()
+        return self.lmotor.getPosition()
 
     @property
     def position_rate(self):
-        return self.joint.getPositionRate()
+        return self.lmotor.getPositionRate()
 
     @target_velocities.setter
     def target_velocities(self, velocities):
@@ -349,17 +354,21 @@ class Joint(object):
     def max_forces(self, forces):
         self._set_params(self.amotor, 'FMax', forces)
 
+    @motor_cfms.setter
+    def motor_cfms(self, cfms):
+        self._set_params(self.amotor, 'CFM', cfms)
+
     @cfm.setter
     def cfm(self, cfm):
-        self.joint.setParam(ode.ParamCFM, cfm)
+        self.ode_joint.setParam(ode.ParamCFM, cfm)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        self._set_params(self.joint, 'LoStop', lo_stops)
+        self._set_params(self.ode_joint, 'LoStop', lo_stops)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        self._set_params(self.joint, 'HiStop', hi_stops)
+        self._set_params(self.ode_joint, 'HiStop', hi_stops)
 
     @angles.setter
     def angles(self, angles):
@@ -371,7 +380,7 @@ class Joint(object):
             return ''
         parts = [self.name]
         for n, (x, y, z) in zip(('f1', 't1', 'f2', 't2'), feedback):
-            parts.append('%s %f %f %f' % (n, x, y, z))
+            parts.append('{} {} {} {}'.format(n, x, y, z))
         return ' '.join(parts)
 
 
@@ -389,27 +398,15 @@ class Hinge(Joint):
     ADOF = 1
     LDOF = 0
 
-    @property
-    def axes(self):
-        return self.joint.getAxis(),
-
 
 class Piston(Joint):
     ADOF = 1
     LDOF = 1
 
-    @property
-    def axes(self):
-        return self.joint.getAxis(),
-
 
 class Universal(Joint):
     ADOF = 2
     LDOF = 0
-
-    @property
-    def axes(self):
-        return self.joint.getAxis1(), self.joint.getAxis2()
 
 
 class Ball(Joint):
@@ -421,19 +418,12 @@ class Ball(Joint):
 
         # attach an auxiliary amotor to apply angular joint limits.
         self.alimits = ode.AMotor(world)
-        self.alimits.attach(body_a.body, body_b.body if body_b else None)
+        self.alimits.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.alimits.setMode(self.amotor.getMode())
         self.alimits.setNumAxes(self.ADOF)
         self.alimits.setAxis(0, 1, self.amotor.getAxis(0))
         self.alimits.setAxis(1, 1, self.amotor.getAxis(1))
         self.alimits.setAxis(2, 2, self.amotor.getAxis(2))
-
-    @property
-    def axes(self):
-        return ()
-        return (self.amotor.getAxis(0),
-                self.amotor.getAxis(1),
-                self.amotor.getAxis(2))
 
     @property
     def lo_stops(self):
@@ -530,7 +520,7 @@ class World(base.World):
         shape = shape.lower()
         if name is None:
             for i in range(1 + len(self._bodies)):
-                name = '%s%d' % (shape, i)
+                name = '{}{}'.format(shape, i)
                 if name not in self._bodies:
                     break
         body = BODIES[shape](name, self.world, self.space, **kwargs)
@@ -550,10 +540,19 @@ class World(base.World):
             bb = self.get_body(body_b)
         shape = shape.lower()
         if name is None:
-            name = '%s:%s:%s' % (ba.name, shape, bb.name if bb else '')
+            name = '{}:{}:{}'.format(ba.name, shape, bb.name if bb else '')
         joint = JOINTS[shape](name, self.world, ba, bb, **kwargs)
         self._joints[name] = joint
         return joint
+
+    def move_next_to(self, body_a, body_b, offset_a, offset_b):
+        ba = self.get_body(body_a)
+        bb = self.get_body(body_b)
+        anchor = ba.body_to_world(offset_a * ba.dimensions / 2)
+        bb.position = (
+            np.asarray(bb.position) + anchor -
+            bb.body_to_world(offset_b * bb.dimensions / 2))
+        return anchor
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
@@ -569,7 +568,7 @@ class World(base.World):
         '''Trace world bodies and joints.'''
         bodies = ' '.join(b.trace() for b in self.bodies)
         joints = ' '.join(j.trace() for j in self.joints)
-        print('%d %s %s' % (self.frame, bodies, joints), file=handle)
+        print('{} {} {}'.format(self.frame, bodies, joints), file=handle)
 
     def are_connected(self, body_a, body_b):
         '''Return True iff the given bodies are currently connected.'''
@@ -579,7 +578,7 @@ class World(base.World):
         bb = body_b
         if isinstance(body_b, str):
             bb = self.get_body(body_b)
-        return bool(ode.areConnected(ba.body, bb.body))
+        return bool(ode.areConnected(ba.ode_body, bb.ode_body))
 
     def on_collision(self, args, geom_a, geom_b):
         '''Callback function for the collide() method.'''
@@ -621,18 +620,22 @@ class World(base.World):
                 glut.glutSolidSphere(r, n, n)
             gl.glPopMatrix()
         for name, joint in self._joints.iteritems():
-            l = 0.2
+            l = 0.3
             x, y, z = joint.anchor
-            gl.glPushMatrix()
-            gl.glTranslate(x, y, z)
             for i, (rx, ry, rz) in enumerate(joint.axes):
-                gl.glColor(i / 2., i / 2., i / 2.)
+                r = (joint.body_a if joint.amotor.getAxisRel(i) == 1 else joint.body_b).rotation
+                gl.glColor((i+1) / 3., 0, 0)
                 gl.glPushMatrix()
+                gl.glMultMatrixf([r[0], r[3], r[6], 0.,
+                                  r[1], r[4], r[7], 0.,
+                                  r[2], r[5], r[8], 0.,
+                                  x, y, z, 1.])
                 # http://thjsmith.com/40/cylinder-between-two-points-opengl-c
                 # http://en.wikipedia.org/wiki/Cross_product
-                # (rx, ry, rz) x (0, 0, 1) = (ry, -rx, 0) -- 90deg is a guess ?
-                gl.glRotate(90, ry, -rx, 0)
+                # (rx, ry, rz) x (0, 0, 1) = (ry, -rx, 0)
+                # theta = acos((rx, ry, rz) * (0, 0, 1)) / |(rx, ry, rz)|
+                rl = np.sqrt(rx * rx + ry * ry + rz * rz)
+                gl.glRotate(np.arccos(rz / rl) * 360 / TAU, ry, -rx, 0)
                 gl.glTranslate(0, 0, -l / 2.)
-                glut.glutSolidCylinder(l / 10, l, n, n)
+                glut.glutSolidCylinder(l / 20, l, n, n)
                 gl.glPopMatrix()
-            gl.glPopMatrix()
