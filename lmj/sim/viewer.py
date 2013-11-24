@@ -121,7 +121,7 @@ class GL(glumpy.Figure):
 
         gl.glMatrixMode(gl.GL_PROJECTION)
         gl.glLoadIdentity()
-        glu.gluPerspective(60, w / h, 2, 300)
+        glu.gluPerspective(60, w / h, .1, 1000)
 
         gl.glMatrixMode(gl.GL_MODELVIEW)
         gl.glLoadIdentity()
@@ -142,7 +142,7 @@ class GL(glumpy.Figure):
         def ground():
             '''Draw a 10-meter square on the ground plane.'''
             gl.glBegin(gl.GL_QUADS)
-            gl.glColor(0.3, 0.3, 0.3, 0.7)
+            gl.glColor(0.3, 0.3, 0.3, 0.5)
             gl.glNormal(0, 0, 1)
             gl.glVertex(-10,  10, 0)
             gl.glVertex( 10,  10, 0)
@@ -198,12 +198,10 @@ class GL(glumpy.Figure):
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glDisable(gl.GL_STENCIL_TEST)
 
-        gl.glEnable(gl.GL_BLEND)
-        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-
         ground()
 
-        gl.glDisable(gl.GL_BLEND)
+        gl.glEnable(gl.GL_BLEND)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
 
         self.world.draw()
 
