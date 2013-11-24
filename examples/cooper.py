@@ -22,6 +22,7 @@
 
 import lmj.cli
 import lmj.sim as ls
+import os
 import sys
 
 
@@ -32,6 +33,7 @@ import sys
     )
 def main(frame_rate=60., friction=5000, elasticity=0.1):
     w = ls.cooper.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
+    w.create_from_file(os.path.join(os.path.dirname(__file__), 'cooper.txt'))
     w.set_random_forces()
     ls.viewer.GL(w, paused=True).run()
 

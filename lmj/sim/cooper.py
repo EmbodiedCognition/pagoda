@@ -1,283 +1,200 @@
 '''Python implementation of forward-dynamics solver by Joseph Cooper.'''
 
+import lmj.cli
 import numpy as np
 import numpy.random as rng
 import ode
+import re
 
 from . import physics
 
-# CapBody
-class World(physics.World):
+logging = lmj.cli.get_logger(__name__)
 
+
+class World(physics.World):
     FMAX = 250
+    CFM = 1e-10
     INTERNAL_CFM = 0
 
-    def __init__(self, *args, **kwargs):
-        super(World, self).__init__(*args, **kwargs)
-
-        self._create_bodies()
-        self._create_joints()
-        #self._create_root_joints()
+    _joint_index = 0
+    _axis_index = 0
+    _step_index = 0
+    _steps = np.linspace(0, physics.TAU, 31)
 
     def set_random_forces(self):
         for body in self._bodies.values():
-            body.add_force(30 * rng.randn(3))
+            body.add_force(self.FMAX * rng.randn(3))
 
-    def _create_bodies(self):
-        # We rotate some capsules when placing them
-        # So we build quaternions representing that
-        # rotation.
+    def reset(self):
+        for b in self._bodies.itervalues():
+            b.position = b.position + np.array([0, 0, 2])
+
+    def create_from_file(self, filename):
+        config = []
+        index = [0]
+        with open(filename) as handle:
+            for i, line in enumerate(handle):
+                for j, token in enumerate(line.split('#')[0].strip().split()):
+                    if token.strip():
+                        config.append((i, j, token))
+
+        def next_token(expect=None, lower=True, dtype=None):
+            if index[0] < len(config):
+                _, _, token = config[index[0]]
+                index[0] += 1
+                if lower:
+                    token = token.lower()
+                if expect and re.match(expect, token) is None:
+                    return error('expected {}'.format(expect))
+                if callable(dtype):
+                    token = dtype(token)
+                return token
+            return None
+
+        def error(msg):
+            lineno, tokenno, token = config[index[0]-1]
+            logging.fatal('%s:%d:%d: error parsing "%s": %s',
+                          filename, lineno+1, tokenno+1, token, msg)
+
+        def array(n=3, dtype=float):
+            return np.array([next_token(expect=r'^-?\d+(\.\d*)?$', dtype=dtype) for _ in range(n)])
+
         tl = physics.make_quaternion(physics.TAU / 4, 0, 1, 0)
         tr = physics.make_quaternion(-physics.TAU / 4, 0, 1, 0)
+        turns = {'turn-left': tl, 'tl': tl, 'turn-right': tr, 'tr': tr}
 
-        # We build all of the body parts first with the desired dimensions
-        # (should probaly be loaded from file)
-        self.create_body('sph', 'head', radius=0.13)
-        self.create_body('box', 'neck', lengths=(0.08, 0.08, 0.08))
-        self.create_body('cap', 'u-torso', radius=0.14, length=0.20).quaternion = tl
-        self.create_body('box', 'l-torso', lengths=(0.35, 0.15, 0.20))
-        self.create_body('cap', 'waist', radius=0.07, length=0.20).quaternion = tl
+        def handle_body():
+            shape = next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
+            name = next_token(lower=False)
+            token = next_token()
+            kwargs = {}
+            while '=' in token:
+                k, v = token.split('=', 1)
+                kwargs[k.strip()] = float(v.strip())
+                token = next_token()
+            logging.info('creating %s %s %s', shape, name, kwargs)
+            body = self.create_body(shape, name, **kwargs)
+            if name == 'head':
+                body.position = 0, 0, 2
+            turn = turns.get(token)
+            if turn is None:
+                return token
+            body.quaternion = turn
+            return next_token()
 
-        self.create_body('cap', 'r-collar', radius=0.06, length=0.09).quaternion = tl
-        self.create_body('cap', 'ru-arm', radius=0.05, length=0.27)
-        self.create_body('cap', 'rl-arm', radius=0.04, length=0.17)
-        self.create_body('sph', 'r-hand', radius=0.045)
-
-        self.create_body('cap', 'l-collar', radius=0.06, length=0.09).quaternion = tr
-        self.create_body('cap', 'lu-arm', radius=0.05, length=0.27)
-        self.create_body('cap', 'll-arm', radius=0.04, length=0.17)
-        self.create_body('sph', 'l-hand', radius=0.045)
-
-        self.create_body('cap', 'ru-leg', radius=0.10, length=0.30)
-        self.create_body('cap', 'rl-leg', radius=0.08, length=0.28)
-        self.create_body('sph', 'r-heel', radius=0.07)
-        self.create_body('cap', 'r-tarsal', radius=0.03, length=0.04).quaternion = tl
-        #self.create_body('cap', 'r-toe', radius=0.03, length=0.03).quaternion = tl
-
-        self.create_body('cap', 'lu-leg', radius=0.10, length=0.30)
-        self.create_body('cap', 'll-leg', radius=0.08, length=0.28)
-        self.create_body('sph', 'l-heel', radius=0.07)
-        self.create_body('cap', 'l-tarsal', radius=0.03, length=0.04).quaternion = tr
-        #self.create_body('cap', 'l-toe', radius=0.03, length=0.03).quaternion = tr
-
-    def _create_joints(self):
-        # Now the body parts are built, we move the head and then begin creating
-        # joints and attaching them from the head down
-        self.get_body('head').position = 0, 0, 2
-
-        def reposition(body1, body2, offset1, offset2):
-            body1 = self.get_body(body1)
-            body2 = self.get_body(body2)
-            pp1 = body1.body_to_world(offset1 * body1.dimensions / 2)
-            pp2 = body2.body_to_world(offset2 * body2.dimensions / 2)
-            body2.position = tuple(np.asarray(body2.position) + pp1 - pp2)
-            return pp1
-
-        def create_ball(body1, body2,
-                        offset1, offset2,
-                        lo_stops, hi_stops,
-                        axis1=(1, 0, 0),
-                        axis2=(0, 1, 0),
-                        axis3=(0, 0, 1)):
-            anchor = reposition(body1, body2, offset1, offset2)
-            joint = self.join('ball', body1, body2, anchor=anchor,
-                angular_mode=ode.AMotorEuler,
-                angular_axis1=axis1, angular_axis1_frame=1,
-                angular_axis2=axis2, angular_axis2_frame=1, #?
-                angular_axis3=axis3, angular_axis3_frame=2)
-            joint.lo_stops = -physics.TAU * np.asarray(lo_stops)
-            joint.hi_stops = physics.TAU * np.asarray(hi_stops)
+        def handle_joint():
+            shape = next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
+            body1 = next_token(lower=False)
+            offset1 = array()
+            body2 = next_token(lower=False)
+            offset2 = array()
+            kwargs = dict(
+                anchor=self.move_next_to(body1, body2, offset1, offset2),
+                angular_axis1=(1, 0, 0),
+                angular_axis1_frame=1,
+                angular_axis2=(0, 1, 0),
+                angular_axis2_frame=1,
+                angular_axis3=(0, 0, 1),
+                angular_axis3_frame=2,
+            )
+            if shape == 'ball':
+                kwargs['amotor_mode'] = ode.AMotorEuler
+            token = next_token()
+            while token:
+                if token in ('body', 'join'):
+                    break
+                key = token
+                value = None
+                if key.startswith('angular_axis'):
+                    value = array()
+                if key == 'lo_stops' or key == 'hi_stops':
+                    value = physics.TAU * array(physics.JOINTS[shape].ADOF) / 360
+                token = next_token()
+            logging.info('joining %s %s %s\n%s', shape, body1, body2,
+                         '\n'.join('{} = {}'.format(k, kwargs[k]) for k in sorted(kwargs)))
+            joint = self.join(shape, body1, body2, **kwargs)
+            joint.motor_cfms = self.CFM
             #joint.max_forces = self.FMAX
-            joint.cfm = self.INTERNAL_CFM
+            return token
 
-        def create_uni(body1, body2,
-                       offset1, offset2,
-                       lo_stops, hi_stops,
-                       axis1=(1, 0, 0),
-                       axis2=(0, 1, 0)):
-            anchor = reposition(body1, body2, offset1, offset2)
-            joint = self.join('universal', body1, body2, anchor=anchor,
-                angular_axis1=axis1, angular_axis1_frame=1,
-                angular_axis2=axis2, angular_axis2_frame=2)
-            joint.lo_stops = -physics.TAU * np.asarray(lo_stops)
-            joint.hi_stops = physics.TAU * np.asarray(hi_stops)
-            joint.max_forces = self.FMAX
-            joint.cfm = self.INTERNAL_CFM
+        token = next_token(expect='^(body|joint)$')
+        while token is not None:
+            if token == 'body':
+                token = handle_body()
+            elif token == 'join':
+                token = handle_joint()
+            else:
+                error('unexpected token')
 
-        def create_hinge(body1, body2,
-                         offset1, offset2,
-                         lo_stops, hi_stops,
-                         axis1=(1, 0, 0)):
-            anchor = reposition(body1, body2, offset1, offset2)
-            joint = self.join('hinge', body1, body2, anchor=anchor,
-                angular_axis1=axis1, angular_axis1_frame=1)
-            joint.lo_stops = -physics.TAU * np.asarray(lo_stops)
-            joint.hi_stops = physics.TAU * np.asarray(hi_stops)
-            joint.max_forces = self.FMAX
-            joint.cfm = self.INTERNAL_CFM
-
-        create_ball('head', 'neck',
-                    offset1=(0, -0.2, -0.85),
-                    offset2=(0, 0, 0.95),
-                    lo_stops=(1./6, 1./8, 1./10),
-                    hi_stops=(1./8, 1./8, 1./10))
-        create_ball('neck', 'u-torso',
-                    offset1=(0, 0, -0.95),
-                    offset2=(0.9, -0.2, 0),
-                    lo_stops=(1./8, 1./8, 1./18),
-                    hi_stops=(1./18, 1./8, 1./18))
-        create_ball('u-torso', 'l-torso',
-                    offset1=(-0.95, -0.1, 0),
-                    offset2=(0, 0, 0.90),
-                    lo_stops=(1./8, 1./8, 1./12),
-                    hi_stops=(1./12, 1./8, 1./12))
-        create_ball('l-torso', 'waist',
-                    offset1=(0, 0, -0.9),
-                    offset2=(0.5, 0, 0),
-                    lo_stops=(1./8, 1./6, 1./12),
-                    hi_stops=(1./12, 1./6, 1./12))
-
-        create_ball('u-torso', 'r-collar',
-                    offset1=(0.75, 0, -0.35),
-                    offset2=(0, 0, 1),
-                    lo_stops=(1./12, 1./8, 1./12),
-                    hi_stops=(1./12, 1./8, 1./8))
-        create_ball('r-collar', 'ru-arm',
-                    offset1=(0, 0, -0.9),
-                    offset2=(0, 0, 0.85),
-                    lo_stops=(5./18, 1./6, 1./8),
-                    hi_stops=(5./18, 1./6, 1./3))
-        create_uni('ru-arm', 'rl-arm',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 0.95),
-                   axis2=(0, 0, 1),
-                   lo_stops=(2./5, 1./4),
-                   hi_stops=(0.01, 1./4))
-        create_uni('rl-arm', 'r-hand',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 1),
-                   lo_stops=(1./10, 1./4),
-                   hi_stops=(1./10, 1./4))
-
-        create_ball('u-torso', 'l-collar',
-                    offset1=(0.75, 0, 0.35),
-                    offset2=(0, 0, 1),
-                    lo_stops=(1./12, 1./8, 1./8),
-                    hi_stops=(1./12, 1./8, 1./12))
-        create_ball('l-collar', 'lu-arm',
-                    offset1=(0, 0, -0.9),
-                    offset2=(0, 0, 0.85),
-                    lo_stops=(5./18, 1./6, 1./3),
-                    hi_stops=(5./18, 1./6, 1./8))
-        create_uni('lu-arm', 'll-arm',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 0.95),
-                   axis2=(0, 0, 1),
-                   lo_stops=(2./5, 1./4),
-                   hi_stops=(0.01, 1./4))
-        create_uni('ll-arm', 'l-hand',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 1),
-                   lo_stops=(1./10, 1./4),
-                   hi_stops=(1./10, 1./4))
-
-        create_ball('waist', 'ru-leg',
-                    offset1=(0, 0, -0.6),
-                    offset2=(0,0, 0.95),
-                    lo_stops=(1./3, 1./6, 1./12),
-                    hi_stops=(1./6, 1./6, 1./3))
-        create_uni('ru-leg', 'rl-leg',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 0.95),
-                   axis2=(0, 0, 1),
-                   lo_stops=(-0.01, 1./10),
-                   hi_stops=(2./5, 1./10))
-        create_uni('rl-leg', 'r-heel',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 1),
-                   lo_stops=(1./6, 1./6),
-                   hi_stops=(1./6, 1./6))
-        create_hinge('r-heel', 'r-tarsal',
-                     offset1=(0, 1.5, -1),
-                     offset2=(-1, 0, 0),
-                     lo_stops=(1./32, ),
-                     hi_stops=(1./32, ))
-        #create_hinge('r-tarsal', 'r-toe',
-        #    0,0,0,
-        #    0,-2,0,
-        #    1,0,0,
-        #    -M_PI/8,M_PI/8)
-
-        create_ball('waist', 'lu-leg',
-                    offset1=(0, 0, 0.6),
-                    offset2=(0, 0, 0.95),
-                    lo_stops=(1./3, 1./6, 1./3),
-                    hi_stops=(1./6, 1./6, 1./12))
-        create_uni('lu-leg', 'll-leg',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 0.95),
-                   axis2=(0, 0, 1),
-                   lo_stops=(-0.01, 1./10),
-                   hi_stops=(2./5, 1./10))
-        create_uni('ll-leg', 'l-heel',
-                   offset1=(0, 0, -0.95),
-                   offset2=(0, 0, 1),
-                   lo_stops=(1./6, 1./6),
-                   hi_stops=(1./6, 1./6))
-        create_hinge('l-heel', 'l-tarsal',
-                     offset1=(0, 1.5, -1),
-                     offset2=(1, 0, 0),
-                     lo_stops=(1./32, ),
-                     hi_stops=(1./32, ))
-        #create_hinge('l-tarsal', 'l-toe',
-        #    0,0,0,
-        #    0,-2,0,
-        #    1,0,0,
-        #    -M_PI/8,M_PI/8)
-
-    def _create_root_joints(self):
-        root = self.get_body('waist')
+        root = self.get_body('head')
 
         lm = self._root_lmotor = ode.LMotor(self.world)
-        lm.attach(root, None)
+        lm.attach(root.ode_body, None)
         lm.setNumAxes(3)
         lm.setAxis(0, 0, (1, 0, 0))
         lm.setAxis(1, 0, (0, 1, 0))
         lm.setAxis(2, 0, (0, 0, 1))
-        lm.setParam(ode.ParamVel1, 0)
+        lm.setParam(ode.ParamVel, 0)
         lm.setParam(ode.ParamVel2, 0)
         lm.setParam(ode.ParamVel3, 0)
-        lm.setParam(ode.ParamCFM1, 1e-10)
-        lm.setParam(ode.ParamCFM2, 1e-10)
-        lm.setParam(ode.ParamCFM3, 1e-10)
-        lm.setParam(ode.ParamFMax1, self.FMAX)
-        lm.setParam(ode.ParamFMax2, self.FMAX)
-        lm.setParam(ode.ParamFMax3, self.FMAX)
+        lm.setParam(ode.ParamCFM, self.CFM)
+        lm.setParam(ode.ParamCFM2, self.CFM)
+        lm.setParam(ode.ParamCFM3, self.CFM)
+        lm.setParam(ode.ParamFMax, 100 * self.FMAX)
+        lm.setParam(ode.ParamFMax2, 100 * self.FMAX)
+        lm.setParam(ode.ParamFMax3, 100 * self.FMAX)
         lm.setFeedback(True)
 
         am = self._root_alimit = ode.AMotor(self.world)
-        am.attach(root, None)
+        am.attach(root.ode_body, None)
         am.setNumAxes(3)
         am.setMode(ode.AMotorEuler)
-        am.setAxis(0, 1, 1, 0, 0)
-        am.setAxis(2, 2, 0, 0, 1)
-        am.setParam(ode.ParamLoStop1, -2 * physics.TAU / 9)
-        am.setParam(ode.ParamHiStop1, 2 * physics.TAU / 9)
+        am.setAxis(0, 1, (1, 0, 0))
+        am.setAxis(2, 2, (0, 0, 1))
+        am.setParam(ode.ParamLoStop, -2 * physics.TAU / 9)
+        am.setParam(ode.ParamHiStop, 2 * physics.TAU / 9)
         am.setFeedback(True)
 
         am = self._root_amotor = ode.AMotor(self.world)
-        am.attach(root, None)
+        am.attach(root.ode_body, None)
         am.setNumAxes(3)
         am.setMode(ode.AMotorEuler)
-        am.setAxis(0, 1, 1, 0, 0)
-        am.setAxis(2, 2, 0, 0, 1)
-        am.setParam(ode.ParamVel1, 0)
+        am.setAxis(0, 1, (1, 0, 0))
+        am.setAxis(2, 2, (0, 0, 1))
+        am.setParam(ode.ParamVel, 0)
         am.setParam(ode.ParamVel2, 0)
         am.setParam(ode.ParamVel3, 0)
-        am.setParam(ode.ParamCFM1, 1e-10)
-        am.setParam(ode.ParamCFM2, 1e-10)
-        am.setParam(ode.ParamCFM3, 1e-10)
-        am.setParam(ode.ParamFMax1, self.FMAX)
+        am.setParam(ode.ParamCFM, self.CFM)
+        am.setParam(ode.ParamCFM2, self.CFM)
+        am.setParam(ode.ParamCFM3, self.CFM)
+        am.setParam(ode.ParamFMax, self.FMAX)
         am.setParam(ode.ParamFMax2, self.FMAX)
         am.setParam(ode.ParamFMax3, self.FMAX)
         am.setFeedback(True)
+
+    def step(self, substeps=2):
+        joint = list(self.joints)[self._joint_index]
+
+        lo_stop = list(joint.lo_stops)[self._axis_index]
+        hi_stop = list(joint.hi_stops)[self._axis_index]
+
+        angles = list(joint.angles)
+        angles[self._axis_index] = lo_stop + self._steps[self._step_index] * (hi_stop - lo_stop)
+        joint.angles = angles
+
+        logging.info('joint %s, axis %s, step %s: %s %s',
+                     self._joint_index, self._axis_index, self._step_index,
+                     joint, joint.angles)
+
+        self._step_index += 1
+        if self._step_index == len(self._steps):
+            self._step_index = 0
+            self._axis_index += 1
+            if self._axis_index == joint.ADOF:
+                self._axis_index = 0
+                self._joint_index = (self._joint_index + 1) % len(self._joints)
+
+        for _ in range(substeps):
+            self.world.step(self.dt / substeps)
+
+        return True

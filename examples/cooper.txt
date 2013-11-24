@@ -1,0 +1,174 @@
+body sph head     radius=0.13
+body sph neck     radius=0.04
+body cap u-torso  radius=0.12 length=0.20 turn-left
+body cap l-torso  radius=0.08 length=0.20 turn-left
+body cap waist    radius=0.07 length=0.20 turn-left
+
+body cap r-collar radius=0.05 length=0.09 turn-left
+body cap ru-arm   radius=0.05 length=0.27
+body cap rl-arm   radius=0.04 length=0.17
+body sph r-hand   radius=0.045
+
+body cap l-collar radius=0.05 length=0.09 turn-right
+body cap lu-arm   radius=0.05 length=0.27
+body cap ll-arm   radius=0.04 length=0.17
+body sph l-hand   radius=0.045
+
+body cap ru-leg   radius=0.09 length=0.30
+body cap rl-leg   radius=0.08 length=0.28
+body sph r-heel   radius=0.07
+body cap r-tarsal radius=0.03 length=0.04 turn-left
+#body cap r-toe    radius=0.03 length=0.03 turn-left
+
+body cap lu-leg   radius=0.09 length=0.30
+body cap ll-leg   radius=0.08 length=0.28
+body sph l-heel   radius=0.07
+body cap l-tarsal radius=0.03 length=0.04 turn-right
+#body cap l-toe    radius=0.03 length=0.03 turn-right
+
+# SPINE
+join ball
+head 0 -0.2 -0.85
+neck 0  0    0.95
+lo_stops -30 -30 -60
+hi_stops  60  30  60
+
+join ball
+neck    0    0   -0.95
+u-torso 0.9 -0.2  0
+lo_stops -10 -30 -30
+hi_stops  30  30  30
+
+join ball
+u-torso -0.95 -0.1 0
+l-torso  0.9   0   0
+lo_stops -10 -30 -10
+hi_stops  10  30  10
+
+join ball
+l-torso -0.9 0 0
+waist    0.5 0 0
+lo_stops -10 -30 -10
+hi_stops  10  30  10
+
+# RIGHT ARM
+join uni
+u-torso  0.75 0 -0.35
+r-collar 0    0  1
+axis1 0 1 0
+axis2 0 0 1
+lo_stops -30 -30
+hi_stops  30  30
+
+join ball
+r-collar 0 0 -0.9
+ru-arm   0 0  0.85
+lo_stops -150 -70 -30
+hi_stops  150  70  150
+
+join uni
+ru-arm 0 0 -0.95
+rl-arm 0 0  0.95
+axis2 0 0 1
+lo_stops -150 -70
+hi_stops    1  70
+
+join hinge
+rl-arm 0 0 -0.95
+r-hand 0 0 1
+lo_stops -70
+hi_stops  70
+
+# LEFT ARM
+join uni
+u-torso  0.75 0 0.35
+l-collar 0    0 1
+axis1 0 1 0
+axis2 0 0 1
+lo_stops -30 -30
+hi_stops  70  70
+
+join ball
+l-collar 0 0 -0.9
+lu-arm   0 0 0.85
+lo_stops -150 -70 -150
+hi_stops  150  70   30
+
+join uni
+lu-arm 0 0 -0.95
+ll-arm 0 0  0.95
+axis2 0 0 1
+lo_stops -150 -70
+hi_stops    1  70
+
+join hinge
+ll-arm 0 0 -0.95
+l-hand 0 0  1
+lo_stops -70
+hi_stops  70
+
+# RIGHT LEG
+join ball
+waist  0 0 -0.6
+ru-leg 0 0  0.95
+lo_stops -150 -70 -30
+hi_stops   70  70 150
+
+join uni
+ru-leg 0 0 -0.95
+rl-leg 0 0  0.95
+axis2 0 0 1
+lo_stops  -1 -30
+hi_stops 150  30
+
+join uni
+rl-leg 0 0 -0.95
+r-heel 0 0 1
+lo_stops -70 -70
+hi_stops  70  70
+
+join hinge
+r-heel    0 1.5 -1
+r-tarsal -1 0    0
+axis1 0 1 0
+lo_stops -10
+hi_stops  10
+
+#join hinge
+#r-tarsal 0  0 0
+#r-toe    0 -2 0
+#lo_stops -20
+#hi_stops  20
+
+# LEFT LEG
+join ball
+waist  0 0 0.6
+lu-leg 0 0 0.95
+lo_stops -120 -60 -120
+hi_stops   60  60   30
+
+join uni
+lu-leg 0 0 -0.95
+ll-leg 0 0  0.95
+axis2 0 0 1
+lo_stops  -1 -30
+hi_stops 150  30
+
+join uni
+ll-leg 0 0 -0.95
+l-heel 0 0  1
+lo_stops -60 -60
+hi_stops  60  60
+
+join hinge
+l-heel   0 1.5 -1
+l-tarsal 1 0    0
+axis1 0 1 0
+lo_stops -10
+hi_stops  10
+
+#join hinge
+#l-tarsal 0  0 0
+#l-toe    0 -2 0
+#lo_stops -20
+#hi_stops  20
