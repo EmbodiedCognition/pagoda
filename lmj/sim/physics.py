@@ -386,59 +386,141 @@ class Universal(Joint):
             self.ode_joint.setAxis2(axes[1])
 
 
+class AMotor(Joint):
+    LDOF = 0
+
+    def __init__(self, name, world, body_a, body_b=None,
+                 axes=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+                 mode=ode.AMotorUser):
+        self.name = name
+        self.world = world
+        self.body_a = body_a
+        self.body_b = body_b
+
+        self.amotor = ode.AMotor(world)
+        self.amotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.amotor.setMode(mode)
+        self.axes = axes
+
+    @property
+    def axes(self):
+        return [self.amotor.getAxis(i) for i in range(self.ADOF)]
+
+    @property
+    def lo_stops(self):
+        return self._get_params(self.amotor, 'LoStop')
+
+    @property
+    def hi_stops(self):
+        return self._get_params(self.amotor, 'HiStop')
+
+    @property
+    def velocities(self):
+        return self._get_params(self.amotor, 'Vel')
+
+    @property
+    def max_forces(self):
+        return self._get_params(self.amotor, 'FMax')
+
+    @property
+    def cfms(self):
+        return self._get_params(self.amotor, 'CFM')
+
+    @property
+    def angles(self):
+        return [self.amotor.getAngle(i) for i in range(self.ADOF)]
+
+    @property
+    def angle_rates(self):
+        return [self.amotor.getAngleRate(i) for i in range(self.ADOF)]
+
+    @axes.setter
+    def axes(self, axes):
+        self.ADOF = len(axes)
+        self.amotor.setNumAxes(len(axes))
+        for i, ax in enumerate(axes):
+            self.amotor.setAxis(i, self.amotor.getAxisRel(i), ax)
+
+    @lo_stops.setter
+    def lo_stops(self, lo_stops):
+        self._set_params(self.amotor, 'LoStop', lo_stops)
+
+    @hi_stops.setter
+    def hi_stops(self, hi_stops):
+        self._set_params(self.amotor, 'HiStop', hi_stops)
+
+    @velocities.setter
+    def velocities(self, velocities):
+        self._set_params(self.amotor, 'Vel', velocities)
+
+    @max_forces.setter
+    def max_forces(self, forces):
+        self._set_params(self.amotor, 'FMax', forces)
+
+    @cfms.setter
+    def cfms(self, cfms):
+        self._set_params(self.amotor, 'CFM', cfms)
+
+
 class Ball(Joint):
     ADOF = 3
     LDOF = 0
 
     def __init__(self, name, world, body_a, body_b=None, **kwargs):
-        # attach an amotor to apply angular forces to the joint.
-        self.amotor = ode.AMotor(world)
-        self.amotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.amotor.setMode(ode.AMotorUser)
-        self.amotor.setNumAxes(3)
-
-        # attach an auxiliary amotor to apply angular joint limits.
-        self.alimits = ode.AMotor(world)
-        self.alimits.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.alimits.setMode(ode.AMotorUser)
-        self.alimits.setNumAxes(3)
-
+        # attach auxiliary amotors to apply forces to the joint and enforce
+        # kinematic rotation limits.
+        self.amotor = AMotor(name + '.motor', world, body_a, body_b)
+        self.alimits = AMotor(name + '.limits', world, body_a, body_b)
         super(Ball, self).__init__(name, world, body_a, body_b=body_b, **kwargs)
 
     @property
     def axes(self):
-        return [self.amotor.getAxis(i) for i in range(3)]
-
-    @property
-    def angles(self):
-        return [self.amotor.getAngle(i) for i in range(3)]
-
-    @property
-    def angle_rates(self):
-        return [self.amotor.getAngleRate(i) for i in range(3)]
+        return self.amotor.axes
 
     @property
     def lo_stops(self):
-        return self._get_params(self.alimits, 'LoStop')
+        return self.alimits.lo_stops
 
     @property
     def hi_stops(self):
-        return self._get_params(self.alimits, 'HiStop')
+        return self.alimits.hi_stops
+
+    @property
+    def velocities(self, velocities):
+        return self.amotor.velocities
+
+    @property
+    def max_forces(self, forces):
+        return self.amotor.max_forces
+
+    @property
+    def cfms(self, cfms):
+        return self.amotor.cfms
 
     @axes.setter
     def axes(self, axes):
-        for i, ax in enumerate(axes):
-            if ax is not None:
-                self.amotor.setAxis(i, 1, ax)
-                self.alimits.setAxis(i, 1, ax)
+        self.amotor.axes = axes
+        self.alimits.axes = axes
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        self._set_params(self.alimits, 'LoStop', lo_stops)
+        self.alimits.lo_stops = lo_stops
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        self._set_params(self.alimits, 'HiStop', hi_stops)
+        self.alimits.hi_stops = hi_stops
+
+    @velocities.setter
+    def velocities(self, velocities):
+        self.amotor.velocities = velocities
+
+    @max_forces.setter
+    def max_forces(self, forces):
+        self.amotor.max_forces = forces
+
+    @cfms.setter
+    def cfms(self, cfms):
+        self.amotor.cfms = cfms
 
 
 # Create a lookup table for things derived from the Body class. Should probably
@@ -480,7 +562,7 @@ class World(base.World):
         self.world.setCFM(cfm)
         self.world.setMaxAngularSpeed(max_angular_speed)
 
-        self.space = ode.HashSpace()
+        self.space = ode.QuadTreeSpace((0, 0, 0), (100, 100, 20), 10)
 
         self.floor = ode.GeomPlane(self.space, (0, 0, 1), 0)
         self.contactgroup = ode.JointGroup()
@@ -545,6 +627,14 @@ class World(base.World):
         return joint
 
     def move_next_to(self, body_a, body_b, offset_a, offset_b):
+        '''Move body_b to be near body_a.
+
+        After moving, offset_a on body_a will be in the same place as offset_b
+        on body_b.
+
+        Returns the location of the shared point, which is often useful to use
+        as a joint anchor.
+        '''
         ba = self.get_body(body_a)
         bb = self.get_body(body_b)
         anchor = ba.body_to_world(offset_a * ba.dimensions / 2)
@@ -552,6 +642,23 @@ class World(base.World):
             np.asarray(bb.position) + anchor -
             bb.body_to_world(offset_b * bb.dimensions / 2))
         return anchor
+
+    def get_body_states(self):
+        '''Return a list of the states of all bodies in the world.'''
+        return [(b.name,
+                 b.position,
+                 b.quaternion,
+                 b.linear_velocity,
+                 b.angular_velocity) for b in self.bodies]
+
+    def set_body_states(self, states):
+        '''Set the states of all bodies in the world.'''
+        for name, pos, rot, lin, ang in states:
+            body = self.get_body(name)
+            body.position = pos
+            body.quaternion = rot
+            body.linear_velocity = lin
+            body.angular_velocity = ang
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
