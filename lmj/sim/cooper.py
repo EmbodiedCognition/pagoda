@@ -1,6 +1,8 @@
 '''Python implementation of forward-dynamics solver by Joseph Cooper.'''
 
+import lmj.c3d
 import lmj.cli
+import lmj.pid
 import numpy as np
 import numpy.random as rng
 import ode
@@ -11,190 +13,278 @@ from . import physics
 logging = lmj.cli.get_logger(__name__)
 
 
+class DataSeries(object):
+    def __init__(self, filename=None, num_frames=0, num_dofs=0):
+        self.data = None
+        if filename:
+            self.load(filename)
+        elif num_frames:
+            self.data = np.zeros((num_frames, num_dofs), float)
+        self.num_frames = len(self.data)
+        self.num_dofs = len(self.data[0])
+
+    def load(self, filename):
+        if filename.endswith('.c3d'):
+            reader = lmj.c3d.Reader(filename)
+            raise NotImplementedError
+        elif filename.endswith('.npy'):
+            self.data = np.load(filename)
+        else:
+            self.data = np.loadtxt(filename)
+
+    def save(self, filename):
+        if filename.endswith('.npy'):
+            np.save(filename, self.data)
+        else:
+            np.savetxt(filename, self.data)
+
+    @classmethod
+    def like(cls, dataset):
+        return cls(num_frames=dataset.num_frames, num_dofs=dataset.num_dofs)
+
+
+class Parser(object):
+    def __init__(self, world, filename):
+        self.world = world
+        self.filename = filename
+
+        self.config = []
+        self.index = 0
+        self.root = None
+
+        with open(filename) as handle:
+            for i, line in enumerate(handle):
+                for j, token in enumerate(line.split('#')[0].strip().split()):
+                    if token.strip():
+                        self.config.append((i, j, token))
+
+    def error(self, msg):
+        lineno, tokenno, token = self.config[self.index - 1]
+        logging.fatal('%s:%d:%d: error parsing "%s": %s',
+                      self.filename, lineno+1, tokenno+1, token, msg)
+
+    def next_token(self, expect=None, lower=True, dtype=None):
+        if self.index < len(self.config):
+            _, _, token = self.config[self.index]
+            self.index += 1
+            if lower:
+                token = token.lower()
+            if expect and re.match(expect, token) is None:
+                return error('expected {}'.format(expect))
+            if callable(dtype):
+                token = dtype(token)
+            return token
+        return None
+
+    def next_float(self):
+        return self.next_token(expect=r'^-?\d+(\.\d*)?$', dtype=float)
+
+    def array(self, n=3):
+        return np.array([self.next_float() for _ in range(n)])
+
+    def handle_body(self):
+        shape = self.next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
+        name = self.next_token(lower=False)
+
+        token = self.next_token()
+        kwargs = {}
+        quaternion = None
+        position = None
+        while token:
+            if token in ('body', 'join'):
+                break
+            key = token
+            if key == 'lengths':
+                kwargs[key] = self.array()
+            if key == 'radius':
+                kwargs[key] = self.next_float()
+            if key == 'length':
+                kwargs[key] = self.next_float()
+            if key == 'quaternion':
+                theta, x, y, z = self.array(4)
+                quaternion = physics.make_quaternion(physics.TAU * theta / 360, x, y, z)
+            if key == 'position':
+                position = self.array()
+            if key == 'root':
+                self.root = name
+            token = self.next_token()
+
+        logging.info('creating %s %s %s', shape, name, kwargs)
+
+        body = self.world.create_body(shape, name, **kwargs)
+        if quaternion is not None:
+            body.quaternion = quaternion
+        if position is not None:
+            body.position = position
+
+        return token
+
+    def handle_joint(self):
+        shape = self.next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
+        body1 = self.next_token(lower=False)
+        offset1 = self.array()
+        body2 = self.next_token(lower=False)
+        offset2 = self.array()
+
+        anchor = self.world.move_next_to(body1, body2, offset1, offset2)
+
+        token = self.next_token()
+        kwargs = dict(axis0=(1, 0, 0), axis1=(0, 1, 0), axis2=(0, 0, 1))
+        while token:
+            if token in ('body', 'join'):
+                break
+
+            key = token
+            value = None
+            if key.startswith('axis'):
+                value = self.array()
+            if key == 'lo_stops' or key == 'hi_stops':
+                value = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
+            kwargs[key] = value
+            token = self.next_token()
+
+        logging.info('joining %s %s %s', shape, body1, body2)
+
+        joint = self.world.join(shape, body1, body2, anchor=anchor)
+        joint.axes = kwargs['axis0'], kwargs['axis1'], kwargs['axis2']
+        if 'lo_stops' in kwargs:
+            joint.lo_stops = kwargs['lo_stops']
+        if 'hi_stops' in kwargs:
+            joint.hi_stops = kwargs['hi_stops']
+        joint.cfms = self.world.CFM
+        joint.max_forces = self.world.FMAX
+        joint.target_angles = [None] * joint.ADOF
+        joint.controllers = [lmj.pid.Controller(kp=0.9) for i in range(joint.ADOF)]
+
+        return token
+
+    def parse(self):
+        token = self.next_token(expect='^(body|joint)$')
+        while token is not None:
+            if token == 'body':
+                token = self.handle_body()
+            elif token == 'join':
+                token = self.handle_joint()
+            else:
+                self.error('unexpected token')
+        return self.root
+
+
 class World(physics.World):
     FMAX = 250
     CFM = 1e-10
     INTERNAL_CFM = 0
 
-    _joint_index = 0
-    _axis_index = 0
-    _step_index = 0
-    _steps = np.linspace(0, physics.TAU, 31)
+    @property
+    def num_dofs(self):
+        return sum(j.ADOF for j in self.joints)
 
     def set_random_forces(self):
-        for body in self._bodies.values():
+        for body in self.bodies:
             body.add_force(self.FMAX * rng.randn(3))
 
     def reset(self):
-        for b in self._bodies.itervalues():
+        for b in self.bodies:
             b.position = b.position + np.array([0, 0, 2])
 
     def create_from_file(self, filename):
-        config = []
-        index = [0]
-        with open(filename) as handle:
-            for i, line in enumerate(handle):
-                for j, token in enumerate(line.split('#')[0].strip().split()):
-                    if token.strip():
-                        config.append((i, j, token))
+        p = Parser(self, filename)
+        root = self.get_body(p.parse())
 
-        def next_token(expect=None, lower=True, dtype=None):
-            if index[0] < len(config):
-                _, _, token = config[index[0]]
-                index[0] += 1
-                if lower:
-                    token = token.lower()
-                if expect and re.match(expect, token) is None:
-                    return error('expected {}'.format(expect))
-                if callable(dtype):
-                    token = dtype(token)
-                return token
-            return None
+        lm = self._root_lmotor = physics.LMotor('lmotor', self.world, root)
+        lm.velocities = 0
+        lm.cfms = self.CFM
+        lm.max_forces = 100 * self.FMAX
 
-        def error(msg):
-            lineno, tokenno, token = config[index[0]-1]
-            logging.fatal('%s:%d:%d: error parsing "%s": %s',
-                          filename, lineno+1, tokenno+1, token, msg)
+        am = self._root_alimit = physics.AMotor('alimit', self.world, root)
+        am.lo_stops = -2 * physics.TAU / 9
+        am.hi_stops = 2 * physics.TAU / 9
 
-        def array(n=3, dtype=float):
-            return np.array([next_token(expect=r'^-?\d+(\.\d*)?$', dtype=dtype) for _ in range(n)])
+        am = self._root_amotor = physics.AMotor('amotor', self.world, root)
+        lm.velocities = 0
+        lm.cfms = self.CFM
+        lm.max_forces = self.FMAX
 
-        tl = physics.make_quaternion(physics.TAU / 4, 0, 1, 0)
-        tr = physics.make_quaternion(-physics.TAU / 4, 0, 1, 0)
-        turns = {'turn-left': tl, 'tl': tl, 'turn-right': tr, 'tr': tr}
+    def load_marker_attachments(self, filename):
+        pass
 
-        def handle_body():
-            shape = next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
-            name = next_token(lower=False)
-            token = next_token()
-            kwargs = {}
-            while '=' in token:
-                k, v = token.split('=', 1)
-                kwargs[k.strip()] = float(v.strip())
-                token = next_token()
-            logging.info('creating %s %s %s', shape, name, kwargs)
-            body = self.create_body(shape, name, **kwargs)
-            if name == 'head':
-                body.position = 0, 0, 2
-            turn = turns.get(token)
-            if turn is None:
-                return token
-            body.quaternion = turn
-            return next_token()
+    def markers_to_angles(self, markers):
+        '''Follow a set of marker data.'''
+        if isinstance(markers, str):
+            markers = Dataset(markers)
+        state_sequence = []
+        smoothed_markers = Dataset.like(markers)
+        angles = Dataset(num_frames=markers.num_frames, num_dofs=self.num_dofs)
+        for i, frame in enumerate(markers):
+            self.contactgroup.empty()
+            self.space.collide(None, self.on_collision)
+            states_sequence.append(self.get_body_states())
+            self.set_body_states(state_sequence[-1])
 
-        def handle_joint():
-            shape = next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
-            body1 = next_token(lower=False)
-            offset1 = array()
-            body2 = next_token(lower=False)
-            offset2 = array()
-            kwargs = dict(
-                anchor=self.move_next_to(body1, body2, offset1, offset2),
-                angular_axis1=(1, 0, 0),
-                angular_axis1_frame=1,
-                angular_axis2=(0, 1, 0),
-                angular_axis2_frame=1,
-                angular_axis3=(0, 0, 1),
-                angular_axis3_frame=2,
-            )
-            if shape == 'ball':
-                kwargs['amotor_mode'] = ode.AMotorEuler
-            token = next_token()
-            while token:
-                if token in ('body', 'join'):
-                    break
-                key = token
-                value = None
-                if key.startswith('angular_axis'):
-                    value = array()
-                if key == 'lo_stops' or key == 'hi_stops':
-                    value = physics.TAU * array(physics.JOINTS[shape].ADOF) / 360
-                token = next_token()
-            logging.info('joining %s %s %s\n%s', shape, body1, body2,
-                         '\n'.join('{} = {}'.format(k, kwargs[k]) for k in sorted(kwargs)))
-            joint = self.join(shape, body1, body2, **kwargs)
-            joint.motor_cfms = self.CFM
-            #joint.max_forces = self.FMAX
-            return token
+            # update the positions and velocities of the markers.
+            markers # XXX
 
-        token = next_token(expect='^(body|joint)$')
-        while token is not None:
-            if token == 'body':
-                token = handle_body()
-            elif token == 'join':
-                token = handle_joint()
-            else:
-                error('unexpected token')
+            # update the ode world.
+            self.world.step(self.dt)
 
-        root = self.get_body('head')
+            # record the marker positions on the body.
+            smoothed_markers[i] = 0 # XXX
 
-        lm = self._root_lmotor = ode.LMotor(self.world)
-        lm.attach(root.ode_body, None)
-        lm.setNumAxes(3)
-        lm.setAxis(0, 0, (1, 0, 0))
-        lm.setAxis(1, 0, (0, 1, 0))
-        lm.setAxis(2, 0, (0, 0, 1))
-        lm.setParam(ode.ParamVel, 0)
-        lm.setParam(ode.ParamVel2, 0)
-        lm.setParam(ode.ParamVel3, 0)
-        lm.setParam(ode.ParamCFM, self.CFM)
-        lm.setParam(ode.ParamCFM2, self.CFM)
-        lm.setParam(ode.ParamCFM3, self.CFM)
-        lm.setParam(ode.ParamFMax, 100 * self.FMAX)
-        lm.setParam(ode.ParamFMax2, 100 * self.FMAX)
-        lm.setParam(ode.ParamFMax3, 100 * self.FMAX)
-        lm.setFeedback(True)
+            # recocrd the angles of each joint in the body.
+            j = 0
+            for joint in self.joints:
+                angles[i, j:j+joint.ADOF] = joint.angles
+                j += joint.ADOF
 
-        am = self._root_alimit = ode.AMotor(self.world)
-        am.attach(root.ode_body, None)
-        am.setNumAxes(3)
-        am.setMode(ode.AMotorEuler)
-        am.setAxis(0, 1, (1, 0, 0))
-        am.setAxis(2, 2, (0, 0, 1))
-        am.setParam(ode.ParamLoStop, -2 * physics.TAU / 9)
-        am.setParam(ode.ParamHiStop, 2 * physics.TAU / 9)
-        am.setFeedback(True)
+        return state_sequence, smoothed_markers, angles
 
-        am = self._root_amotor = ode.AMotor(self.world)
-        am.attach(root.ode_body, None)
-        am.setNumAxes(3)
-        am.setMode(ode.AMotorEuler)
-        am.setAxis(0, 1, (1, 0, 0))
-        am.setAxis(2, 2, (0, 0, 1))
-        am.setParam(ode.ParamVel, 0)
-        am.setParam(ode.ParamVel2, 0)
-        am.setParam(ode.ParamVel3, 0)
-        am.setParam(ode.ParamCFM, self.CFM)
-        am.setParam(ode.ParamCFM2, self.CFM)
-        am.setParam(ode.ParamCFM3, self.CFM)
-        am.setParam(ode.ParamFMax, self.FMAX)
-        am.setParam(ode.ParamFMax2, self.FMAX)
-        am.setParam(ode.ParamFMax3, self.FMAX)
-        am.setFeedback(True)
+    def angles_to_torques(self, angles):
+        '''Follow a set of angle data.'''
+        state_sequence = []
+        torques = Dataset.like(angles)
+        for i, frame in enumerate(angles):
+            self.contactgroup.empty()
+            self.space.collide(None, self.on_collision)
+            state_sequence.append(self.get_body_states())
+            self.set_body_states(state_sequence[-1])
 
-    def step(self, substeps=2):
-        joint = list(self.joints)[self._joint_index]
+            # move toward target angles for each joint.
+            j = 0
+            for joint in self.joints:
+                joint.velocities = [
+                    ctrl(tgt - cur, self.dt) for cur, tgt, ctrl in
+                    zip(joint.angles, frame[j:j+joint.ADOF], joint.controllers)]
+                j += joint.ADOF
 
-        lo_stop = list(joint.lo_stops)[self._axis_index]
-        hi_stop = list(joint.hi_stops)[self._axis_index]
+            # update the ode world.
+            self.world.step(self.dt)
 
-        angles = list(joint.angles)
-        angles[self._axis_index] = lo_stop + self._steps[self._step_index] * (hi_stop - lo_stop)
-        joint.angles = angles
+            # record the torques that the joints experienced.
+            torques[i] = 0 # XXX
 
-        logging.info('joint %s, axis %s, step %s: %s %s',
-                     self._joint_index, self._axis_index, self._step_index,
-                     joint, joint.angles)
+        return state_sequence, torques
 
-        self._step_index += 1
-        if self._step_index == len(self._steps):
-            self._step_index = 0
-            self._axis_index += 1
-            if self._axis_index == joint.ADOF:
-                self._axis_index = 0
-                self._joint_index = (self._joint_index + 1) % len(self._joints)
+    def follow_torques(self, torques):
+        '''Move the body according to a set of torque data.'''
+        state_sequence = []
+        for i, frame in enumerate(torques):
+            self.contactgroup.empty()
+            self.space.collide(None, self.on_collision)
+            state_sequence.append(self.get_body_states())
+            self.set_body_states(state_sequence[-1])
 
-        for _ in range(substeps):
-            self.world.step(self.dt / substeps)
+            self.set_body_states(state_sequence[-1])
+            for joint in self.joints:
+                joint.max_forces = [0] * joint.ADOF
 
-        return True
+            j = 0
+            for joint in self.joints:
+                joint.add_torque(frame[j:j+joint.ADOF])
+                j += joint.ADOF
+
+            # update the ode world.
+            self.world.step(self.dt)
+
+            #body->restoreControl()  # XXX
+
+        return state_sequence
