@@ -239,8 +239,7 @@ class Joint(object):
         self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(world)
         self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_joint.setAnchor(anchor)
-        if feedback:
-            self.ode_joint.setFeedback(True)
+        self.ode_joint.setFeedback(feedback)
 
         self.axes = (1, 0, 0), (0, 1, 0), (0, 0, 1)
 
@@ -386,11 +385,81 @@ class Universal(Joint):
             self.ode_joint.setAxis2(axes[1])
 
 
+class Ball(Joint):
+    ADOF = 3
+    LDOF = 0
+
+    def __init__(self, name, world, body_a, body_b=None, **kwargs):
+        # attach auxiliary amotors to apply forces to the joint and enforce
+        # kinematic rotation limits.
+        self.amotor = AMotor(name + '.motor', world, body_a, body_b)
+        self.alimits = AMotor(name + '.limits', world, body_a, body_b)
+        super(Ball, self).__init__(name, world, body_a, body_b=body_b, **kwargs)
+
+    @property
+    def axes(self):
+        return self.amotor.axes
+
+    @property
+    def lo_stops(self):
+        return self.alimits.lo_stops
+
+    @property
+    def hi_stops(self):
+        return self.alimits.hi_stops
+
+    @property
+    def velocities(self, velocities):
+        return self.amotor.velocities
+
+    @property
+    def max_forces(self, forces):
+        return self.amotor.max_forces
+
+    @property
+    def cfms(self, cfms):
+        return self.amotor.cfms
+
+    @property
+    def angles(self):
+        return self.alimits.angles
+
+    @property
+    def angle_rates(self):
+        return self.alimits.angle_rates
+
+    @axes.setter
+    def axes(self, axes):
+        self.amotor.axes = axes
+        self.alimits.axes = axes
+
+    @lo_stops.setter
+    def lo_stops(self, lo_stops):
+        self.alimits.lo_stops = lo_stops
+
+    @hi_stops.setter
+    def hi_stops(self, hi_stops):
+        self.alimits.hi_stops = hi_stops
+
+    @velocities.setter
+    def velocities(self, velocities):
+        self.amotor.velocities = velocities
+
+    @max_forces.setter
+    def max_forces(self, forces):
+        self.amotor.max_forces = forces
+
+    @cfms.setter
+    def cfms(self, cfms):
+        self.amotor.cfms = cfms
+
+
 class AMotor(Joint):
     LDOF = 0
 
     def __init__(self, name, world, body_a, body_b=None,
                  axes=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+                 feedback=True,
                  mode=ode.AMotorUser):
         self.name = name
         self.world = world
@@ -400,6 +469,7 @@ class AMotor(Joint):
         self.amotor = ode.AMotor(world)
         self.amotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.amotor.setMode(mode)
+        self.amotor.setFeedback(feedback)
         self.axes = axes
 
     @property
@@ -462,65 +532,72 @@ class AMotor(Joint):
         self._set_params(self.amotor, 'CFM', cfms)
 
 
-class Ball(Joint):
-    ADOF = 3
-    LDOF = 0
+class LMotor(Joint):
+    ADOF = 0
 
-    def __init__(self, name, world, body_a, body_b=None, **kwargs):
-        # attach auxiliary amotors to apply forces to the joint and enforce
-        # kinematic rotation limits.
-        self.amotor = AMotor(name + '.motor', world, body_a, body_b)
-        self.alimits = AMotor(name + '.limits', world, body_a, body_b)
-        super(Ball, self).__init__(name, world, body_a, body_b=body_b, **kwargs)
+    def __init__(self, name, world, body_a, body_b=None,
+                 axes=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+                 feedback=True):
+        self.name = name
+        self.world = world
+        self.body_a = body_a
+        self.body_b = body_b
+
+        self.lmotor = ode.LMotor(world)
+        self.lmotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.lmotor.setFeedback(feedback)
+        self.axes = axes
 
     @property
     def axes(self):
-        return self.amotor.axes
+        return [self.lmotor.getAxis(i) for i in range(self.LDOF)]
 
     @property
     def lo_stops(self):
-        return self.alimits.lo_stops
+        return self._get_params(self.lmotor, 'LoStop')
 
     @property
     def hi_stops(self):
-        return self.alimits.hi_stops
+        return self._get_params(self.lmotor, 'HiStop')
 
     @property
-    def velocities(self, velocities):
-        return self.amotor.velocities
+    def velocities(self):
+        return self._get_params(self.lmotor, 'Vel')
 
     @property
-    def max_forces(self, forces):
-        return self.amotor.max_forces
+    def max_forces(self):
+        return self._get_params(self.lmotor, 'FMax')
 
     @property
-    def cfms(self, cfms):
-        return self.amotor.cfms
+    def cfms(self):
+        return self._get_params(self.lmotor, 'CFM')
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = axes
-        self.alimits.axes = axes
+        self.LDOF = len(axes)
+        self.lmotor.setNumAxes(len(axes))
+        for i, ax in enumerate(axes):
+            self.lmotor.setAxis(i, 0, ax)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        self.alimits.lo_stops = lo_stops
+        self._set_params(self.lmotor, 'LoStop', lo_stops)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        self.alimits.hi_stops = hi_stops
+        self._set_params(self.lmotor, 'HiStop', hi_stops)
 
     @velocities.setter
     def velocities(self, velocities):
-        self.amotor.velocities = velocities
+        self._set_params(self.lmotor, 'Vel', velocities)
 
     @max_forces.setter
     def max_forces(self, forces):
-        self.amotor.max_forces = forces
+        self._set_params(self.lmotor, 'FMax', forces)
 
     @cfms.setter
     def cfms(self, cfms):
-        self.amotor.cfms = cfms
+        self._set_params(self.lmotor, 'CFM', cfms)
 
 
 # Create a lookup table for things derived from the Body class. Should probably
@@ -725,6 +802,7 @@ class World(base.World):
                 gl.glTranslate(0, 0, l)
                 glut.glutSolidSphere(r, n, n)
             gl.glPopMatrix()
+        return
         for name, joint in self._joints.iteritems():
             l = 0.3
             x, y, z = joint.anchor
