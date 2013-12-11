@@ -78,8 +78,8 @@ lo_stops -150 -70
 hi_stops    1  70
 
 join hinge
-rl-arm 0 0 -0.95
-r-hand 0 0 1
+rl-arm 0 -1 -0.95
+r-hand 0 -1 1
 lo_stops -70
 hi_stops  70
 
@@ -107,8 +107,8 @@ lo_stops -150 -70
 hi_stops    1  70
 
 join hinge
-ll-arm 0 0 -0.95
-l-hand 0 0  1
+ll-arm 0 -1 -0.95
+l-hand 0 -1  1
 lo_stops -70
 hi_stops  70
 
