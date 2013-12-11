@@ -86,35 +86,39 @@ class Parser(object):
         shape = self.next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
         name = self.next_token(lower=False)
 
-        token = self.next_token()
         kwargs = {}
         quaternion = None
         position = None
+        token = self.next_token()
         while token:
             if token in ('body', 'join'):
                 break
-            key = token
-            if key == 'lengths':
-                kwargs[key] = self.array()
-            if key == 'radius':
-                kwargs[key] = self.next_float()
-            if key == 'length':
-                kwargs[key] = self.next_float()
-            if key == 'quaternion':
+            if token == 'lengths':
+                kwargs[token] = self.array()
+            if token == 'radius':
+                kwargs[token] = self.next_float()
+            if token == 'length':
+                kwargs[token] = self.next_float()
+            if token == 'quaternion':
                 theta, x, y, z = self.array(4)
                 quaternion = physics.make_quaternion(physics.TAU * theta / 360, x, y, z)
-            if key == 'position':
+            if token == 'position':
                 position = self.array()
-            if key == 'root':
+            if token == 'root':
+                logging.info('"%s" will be used as the root', name)
                 self.root = name
             token = self.next_token()
 
         logging.info('creating %s %s %s', shape, name, kwargs)
 
         body = self.world.create_body(shape, name, **kwargs)
+
         if quaternion is not None:
+            logging.info('setting rotation %s', quaternion)
             body.quaternion = quaternion
+
         if position is not None:
+            logging.info('setting position %s', position)
             body.position = position
 
         return token
@@ -129,30 +133,32 @@ class Parser(object):
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
 
         token = self.next_token()
-        kwargs = dict(axis0=(1, 0, 0), axis1=(0, 1, 0), axis2=(0, 0, 1))
+        axes = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        lo_stops = None
+        hi_stops = None
         while token:
             if token in ('body', 'join'):
                 break
-
-            key = token
-            value = None
-            if key.startswith('axis'):
-                value = self.array()
-            if key == 'lo_stops' or key == 'hi_stops':
-                value = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
-            kwargs[key] = value
+            if token.startswith('axis'):
+                axes[int(token.replace('axis', ''))] = self.array()
+            if token == 'lo_stops':
+                lo_stops = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
+            if token == 'hi_stops':
+                hi_stops = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
             token = self.next_token()
 
         logging.info('joining %s %s %s', shape, body1, body2)
 
         joint = self.world.join(shape, body1, body2, anchor=anchor)
-        joint.axes = kwargs['axis0'], kwargs['axis1'], kwargs['axis2']
-        if 'lo_stops' in kwargs:
-            joint.lo_stops = kwargs['lo_stops']
-        if 'hi_stops' in kwargs:
-            joint.hi_stops = kwargs['hi_stops']
+        joint.axes = axes
+        if lo_stops is not None:
+            joint.lo_stops = lo_stops
+        if hi_stops is not None:
+            joint.hi_stops = hi_stops
         joint.cfms = self.world.CFM
-        joint.max_forces = self.world.FMAX
+        #joint.max_forces = self.world.FMAX
+
+        # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
         joint.controllers = [lmj.pid.Controller(kp=0.9) for i in range(joint.ADOF)]
 
@@ -189,18 +195,19 @@ class World(physics.World):
 
     def create_from_file(self, filename):
         p = Parser(self, filename)
+
         root = self.get_body(p.parse())
 
-        lm = self._root_lmotor = physics.LMotor('lmotor', self.world, root)
+        lm = self._root_lmotor = self.join('lmotor', root)
         lm.velocities = 0
         lm.cfms = self.CFM
-        lm.max_forces = 100 * self.FMAX
+        lm.max_forces = 1000 * self.FMAX
 
-        am = self._root_alimit = physics.AMotor('alimit', self.world, root)
+        am = self._root_alimit = self.join('amotor', root)
         am.lo_stops = -2 * physics.TAU / 9
         am.hi_stops = 2 * physics.TAU / 9
 
-        am = self._root_amotor = physics.AMotor('amotor', self.world, root)
+        am = self._root_amotor = self.join('amotor', root)
         lm.velocities = 0
         lm.cfms = self.CFM
         lm.max_forces = self.FMAX
