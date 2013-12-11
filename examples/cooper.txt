@@ -20,12 +20,12 @@ body box ll-arm   lengths 0.08 0.08 0.25
 body box l-hand   lengths 0.08 0.03 0.15
 
 body box ru-leg   lengths 0.12 0.14 0.50
-body box rl-leg   lengths 0.08 0.11 0.38
+body box rl-leg   lengths 0.08 0.11 0.42
 body box r-heel   lengths 0.08 0.10 0.08
 body box r-tarsal lengths 0.08 0.12 0.04
 
 body box lu-leg   lengths 0.12 0.14 0.50
-body box ll-leg   lengths 0.08 0.11 0.38
+body box ll-leg   lengths 0.08 0.11 0.42
 body box l-heel   lengths 0.08 0.10 0.08
 body box l-tarsal lengths 0.08 0.12 0.04
 
