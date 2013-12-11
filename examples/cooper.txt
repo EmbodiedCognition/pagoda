@@ -1,74 +1,78 @@
-body sph head     radius=0.13
-body sph neck     radius=0.04
-body cap u-torso  radius=0.12 length=0.20 turn-left
-body cap l-torso  radius=0.08 length=0.20 turn-left
-body cap waist    radius=0.07 length=0.20 turn-left
+# body anthropometry from :
+# http://en.wikipedia.org/wiki/File:HeadAnthropometry.JPG
+# http://msis.jsc.nasa.gov/sections/section03.htm
+# http://www.emeraldinsight.com/journals.htm?articleid=844037&show=html
 
-body cap r-collar radius=0.05 length=0.09 turn-left
-body cap ru-arm   radius=0.05 length=0.27
-body cap rl-arm   radius=0.04 length=0.17
-body sph r-hand   radius=0.045
+body box head     lengths 0.15 0.20 0.23  position 0 0 2  root
+body box neck     lengths 0.08 0.08 0.10
+body box u-torso  lengths 0.28 0.25 0.25
+body box l-torso  lengths 0.26 0.20 0.10
+body box pelvis   lengths 0.26 0.20 0.15
 
-body cap l-collar radius=0.05 length=0.09 turn-right
-body cap lu-arm   radius=0.05 length=0.27
-body cap ll-arm   radius=0.04 length=0.17
-body sph l-hand   radius=0.045
+body box r-collar lengths 0.17 0.12 0.05
+body box ru-arm   lengths 0.08 0.12 0.36
+body box rl-arm   lengths 0.08 0.08 0.25
+body box r-hand   lengths 0.08 0.03 0.15
 
-body cap ru-leg   radius=0.09 length=0.30
-body cap rl-leg   radius=0.08 length=0.28
-body sph r-heel   radius=0.07
-body cap r-tarsal radius=0.03 length=0.04 turn-left
-#body cap r-toe    radius=0.03 length=0.03 turn-left
+body box l-collar lengths 0.17 0.12 0.05
+body box lu-arm   lengths 0.08 0.12 0.36
+body box ll-arm   lengths 0.08 0.08 0.25
+body box l-hand   lengths 0.08 0.03 0.15
 
-body cap lu-leg   radius=0.09 length=0.30
-body cap ll-leg   radius=0.08 length=0.28
-body sph l-heel   radius=0.07
-body cap l-tarsal radius=0.03 length=0.04 turn-right
-#body cap l-toe    radius=0.03 length=0.03 turn-right
+body box ru-leg   lengths 0.12 0.14 0.50
+body box rl-leg   lengths 0.08 0.11 0.38
+body box r-heel   lengths 0.08 0.10 0.08
+body box r-tarsal lengths 0.08 0.12 0.04
+
+body box lu-leg   lengths 0.12 0.14 0.50
+body box ll-leg   lengths 0.08 0.11 0.38
+body box l-heel   lengths 0.08 0.10 0.08
+body box l-tarsal lengths 0.08 0.12 0.04
 
 # SPINE
 join ball
-head 0 -0.2 -0.85
+head 0 -0.2 -0.95
 neck 0  0    0.95
 lo_stops -30 -30 -60
 hi_stops  60  30  60
 
 join ball
-neck    0    0   -0.95
-u-torso 0.9 -0.2  0
+neck    0  0   -0.95
+u-torso 0 -0.2  0.95
 lo_stops -10 -30 -30
 hi_stops  30  30  30
 
 join ball
-u-torso -0.95 -0.1 0
-l-torso  0.9   0   0
+u-torso 0 0 -0.95
+l-torso 0 0  0.95
 lo_stops -10 -30 -10
 hi_stops  10  30  10
 
 join ball
-l-torso -0.9 0 0
-waist    0.5 0 0
+l-torso 0 0 -0.95
+pelvis  0 0  0.95
 lo_stops -10 -30 -10
 hi_stops  10  30  10
 
 # RIGHT ARM
 join uni
-u-torso  0.75 0 -0.35
-r-collar 0    0  1
+u-torso   0.5 0  1
+r-collar -1   0 -0.5
 axis0 0 1 0
 axis1 0 0 1
 lo_stops -30 -30
 hi_stops  30  30
 
 join ball
-r-collar 0 0 -0.9
-ru-arm   0 0  0.85
+r-collar 0.6 0 -0.95
+ru-arm   0   0  0.95
 lo_stops -150 -70 -30
 hi_stops  150  70  150
 
 join uni
 ru-arm 0 0 -0.95
 rl-arm 0 0  0.95
+axis0 1 0 0
 axis1 0 0 1
 lo_stops -150 -70
 hi_stops    1  70
@@ -81,22 +85,23 @@ hi_stops  70
 
 # LEFT ARM
 join uni
-u-torso  0.75 0 0.35
-l-collar 0    0 1
+u-torso  -0.5 0 1
+l-collar  1   0 -0.5
 axis0 0 1 0
 axis1 0 0 1
 lo_stops -30 -30
-hi_stops  70  70
+hi_stops  30  30
 
 join ball
-l-collar 0 0 -0.9
-lu-arm   0 0 0.85
+l-collar -0.6 0 -0.95
+lu-arm    0   0  0.95
 lo_stops -150 -70 -150
 hi_stops  150  70   30
 
 join uni
 lu-arm 0 0 -0.95
 ll-arm 0 0  0.95
+axis0 1 0 0
 axis1 0 0 1
 lo_stops -150 -70
 hi_stops    1  70
@@ -109,14 +114,15 @@ hi_stops  70
 
 # RIGHT LEG
 join ball
-waist  0 0 -0.6
-ru-leg 0 0  0.95
+pelvis 0.6 0 -0.95
+ru-leg 0   0  0.95
 lo_stops -150 -70 -30
 hi_stops   70  70 150
 
 join uni
 ru-leg 0 0 -0.95
 rl-leg 0 0  0.95
+axis0 1 0 0
 axis1 0 0 1
 lo_stops  -1 -30
 hi_stops 150  30
@@ -128,28 +134,22 @@ lo_stops -70 -70
 hi_stops  70  70
 
 join hinge
-r-heel    0 1.5 -1
-r-tarsal -1 0    0
-axis0 0 1 0
+r-heel    0  1 -1
+r-tarsal  0 -1 -1
 lo_stops -10
 hi_stops  10
 
-#join hinge
-#r-tarsal 0  0 0
-#r-toe    0 -2 0
-#lo_stops -20
-#hi_stops  20
-
 # LEFT LEG
 join ball
-waist  0 0 0.6
-lu-leg 0 0 0.95
+pelvis -0.6 0 -0.95
+lu-leg  0   0  0.95
 lo_stops -120 -60 -120
 hi_stops   60  60   30
 
 join uni
 lu-leg 0 0 -0.95
 ll-leg 0 0  0.95
+axis0 1 0 0
 axis1 0 0 1
 lo_stops  -1 -30
 hi_stops 150  30
@@ -161,14 +161,7 @@ lo_stops -60 -60
 hi_stops  60  60
 
 join hinge
-l-heel   0 1.5 -1
-l-tarsal 1 0    0
-axis0 0 1 0
+l-heel   0  1  -1
+l-tarsal 0 -1  -1
 lo_stops -10
 hi_stops  10
-
-#join hinge
-#l-tarsal 0  0 0
-#l-toe    0 -2 0
-#lo_stops -20
-#hi_stops  20
