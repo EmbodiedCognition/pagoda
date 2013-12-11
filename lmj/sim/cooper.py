@@ -82,9 +82,9 @@ class Parser(object):
     def array(self, n=3):
         return np.array([self.next_float() for _ in range(n)])
 
-    def handle_body(self):
+    def handle_body(self, namespace):
         shape = self.next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
-        name = self.next_token(lower=False)
+        name = namespace + self.next_token(lower=False)
 
         kwargs = {}
         quaternion = None
@@ -123,11 +123,11 @@ class Parser(object):
 
         return token
 
-    def handle_joint(self):
+    def handle_joint(self, namespace):
         shape = self.next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
-        body1 = self.next_token(lower=False)
+        body1 = namespace + self.next_token(lower=False)
         offset1 = self.array()
-        body2 = self.next_token(lower=False)
+        body2 = namespace + self.next_token(lower=False)
         offset2 = self.array()
 
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
@@ -155,8 +155,6 @@ class Parser(object):
             joint.lo_stops = lo_stops
         if hi_stops is not None:
             joint.hi_stops = hi_stops
-        joint.cfms = self.world.CFM
-        #joint.max_forces = self.world.FMAX
 
         # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
@@ -164,26 +162,45 @@ class Parser(object):
 
         return token
 
-    def parse(self):
+    def create(self, namespace=''):
         token = self.next_token(expect='^(body|joint)$')
         while token is not None:
             if token == 'body':
-                token = self.handle_body()
+                token = self.handle_body(namespace)
             elif token == 'join':
-                token = self.handle_joint()
+                token = self.handle_joint(namespace)
             else:
                 self.error('unexpected token')
         return self.root
 
 
-class World(physics.World):
-    FMAX = 250
-    CFM = 1e-10
-    INTERNAL_CFM = 0
+def create_skeleton(world, filename, namespace='', cfm=1e-10, max_force=250):
+    if namespace and namespace[0] not in '.:-':
+        namespace += '.'
 
+    p = Parser(world, filename)
+
+    root = world.get_body(p.create(namespace))
+
+    lm = world.join(namespace + 'lmotor', root)
+    am = world.join(namespace + 'amotor', root)
+    al = world.join(namespace + 'amotor', root)
+
+    for joint in world.joints:
+        if joint.name.startswith(namespace):
+            joint.cfms = cfm
+            joint.max_forces = max_force
+
+    lm.velocities = 0
+    am.velocities = 0
+    al.lo_stops = -2 * physics.TAU / 9
+    al.hi_stops = 2 * physics.TAU / 9
+
+
+class World(physics.World):
     @property
     def num_dofs(self):
-        return sum(j.ADOF for j in self.joints)
+        return sum(j.ADOF + j.LDOF for j in self.joints)
 
     def set_random_forces(self):
         for body in self.bodies:
@@ -192,25 +209,6 @@ class World(physics.World):
     def reset(self):
         for b in self.bodies:
             b.position = b.position + np.array([0, 0, 2])
-
-    def create_from_file(self, filename):
-        p = Parser(self, filename)
-
-        root = self.get_body(p.parse())
-
-        lm = self._root_lmotor = self.join('lmotor', root)
-        lm.velocities = 0
-        lm.cfms = self.CFM
-        lm.max_forces = 1000 * self.FMAX
-
-        am = self._root_alimit = self.join('amotor', root)
-        am.lo_stops = -2 * physics.TAU / 9
-        am.hi_stops = 2 * physics.TAU / 9
-
-        am = self._root_amotor = self.join('amotor', root)
-        lm.velocities = 0
-        lm.cfms = self.CFM
-        lm.max_forces = self.FMAX
 
     def load_marker_attachments(self, filename):
         pass
