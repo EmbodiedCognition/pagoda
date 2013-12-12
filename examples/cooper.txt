@@ -80,6 +80,7 @@ hi_stops    1  70
 join hinge
 rl-arm 0 -1 -0.95
 r-hand 0 -1 1
+axis0 1 0 0
 lo_stops -70
 hi_stops  70
 
@@ -109,6 +110,7 @@ hi_stops    1  70
 join hinge
 ll-arm 0 -1 -0.95
 l-hand 0 -1  1
+axis0 1 0 0
 lo_stops -70
 hi_stops  70
 
@@ -130,12 +132,15 @@ hi_stops 150  30
 join uni
 rl-leg 0 0 -0.95
 r-heel 0 0 1
+axis0 1 0 0
+axis1 0 1 0
 lo_stops -70 -70
 hi_stops  70  70
 
 join hinge
 r-heel    0  1 -1
 r-tarsal  0 -1 -1
+axis0 1 0 0
 lo_stops -10
 hi_stops  10
 
@@ -157,11 +162,14 @@ hi_stops 150  30
 join uni
 ll-leg 0 0 -0.95
 l-heel 0 0  1
+axis0 1 0 0
+axis1 0 1 0
 lo_stops -60 -60
 hi_stops  60  60
 
 join hinge
 l-heel   0  1  -1
 l-tarsal 0 -1  -1
+axis0 1 0 0
 lo_stops -10
 hi_stops  10

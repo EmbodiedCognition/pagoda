@@ -241,8 +241,6 @@ class Joint(object):
         self.ode_joint.setAnchor(anchor)
         self.ode_joint.setFeedback(feedback)
 
-        self.axes = (1, 0, 0), (0, 1, 0), (0, 0, 1)
-
     def __str__(self):
         return self.name
 
@@ -309,7 +307,13 @@ class Joint(object):
 
     @axes.setter
     def axes(self, axes):
-        self.ode_joint.setAxis(axes[0])
+        axis = axes
+        if isinstance(axes, (list, tuple)):
+            axis = axes[0]
+        if isinstance(axis, dict):
+            axis = axis.get('axis')
+        if axis is not None:
+            self.ode_joint.setAxis(axis)
 
     @velocities.setter
     def velocities(self, velocities):
@@ -379,10 +383,12 @@ class Universal(Joint):
 
     @axes.setter
     def axes(self, axes):
-        if axes[0] is not None:
-            self.ode_joint.setAxis1(axes[0])
-        if axes[1] is not None:
-            self.ode_joint.setAxis2(axes[1])
+        setters = [self.ode_joint.setAxis1, self.ode_joint.setAxis2]
+        for axis, setter in zip(axes, setters):
+            if isinstance(axis, dict):
+                axis = axis.get('axis')
+            if axis is not None:
+                setter(axis)
 
 
 class Ball(Joint):
@@ -458,7 +464,9 @@ class AMotor(Joint):
     LDOF = 0
 
     def __init__(self, name, world, body_a, body_b=None,
-                 axes=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+                 axes=(dict(rel=1, axis=(1, 0, 0)),
+                       dict(rel=1, axis=(0, 1, 0)),
+                       dict(rel=2, axis=(0, 0, 1))),
                  feedback=True,
                  mode=ode.AMotorUser):
         self.name = name
@@ -474,7 +482,8 @@ class AMotor(Joint):
 
     @property
     def axes(self):
-        return [self.amotor.getAxis(i) for i in range(self.ADOF)]
+        return [dict(rel=self.amotor.getAxisRel(i), axis=self.amotor.getAxis(i))
+                for i in range(self.ADOF)]
 
     @property
     def lo_stops(self):
@@ -508,8 +517,13 @@ class AMotor(Joint):
     def axes(self, axes):
         self.ADOF = len(axes)
         self.amotor.setNumAxes(len(axes))
-        for i, ax in enumerate(axes):
-            self.amotor.setAxis(i, self.amotor.getAxisRel(i), ax)
+        for i, axis in enumerate(axes):
+            rel = 1
+            if isinstance(axis, dict):
+                rel = axis.get('rel', 1)
+                axis = axis.get('axis')
+            if axis is not None:
+                self.amotor.setAxis(i, rel, axis)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
@@ -536,7 +550,9 @@ class LMotor(Joint):
     ADOF = 0
 
     def __init__(self, name, world, body_a, body_b=None,
-                 axes=((1, 0, 0), (0, 1, 0), (0, 0, 1)),
+                 axes=(dict(rel=1, axis=(1, 0, 0)),
+                       dict(rel=1, axis=(0, 1, 0)),
+                       dict(rel=2, axis=(0, 0, 1))),
                  feedback=True):
         self.name = name
         self.world = world
@@ -576,8 +592,13 @@ class LMotor(Joint):
     def axes(self, axes):
         self.LDOF = len(axes)
         self.lmotor.setNumAxes(len(axes))
-        for i, ax in enumerate(axes):
-            self.lmotor.setAxis(i, 0, ax)
+        for i, axis in enumerate(axes):
+            rel = 1
+            if isinstance(axis, dict):
+                rel = axis.get('rel', 1)
+                axis = axis.get('axis')
+            if axis is not None:
+                self.lmotor.setAxis(i, rel, axis)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):

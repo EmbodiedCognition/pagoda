@@ -70,10 +70,15 @@ class Parser(object):
             if lower:
                 token = token.lower()
             if expect and re.match(expect, token) is None:
-                return error('expected {}'.format(expect))
+                return self.error('expected {}'.format(expect))
             if callable(dtype):
                 token = dtype(token)
             return token
+        return None
+
+    def peek_token(self):
+        if self.index < len(self.config):
+            return self.config[self.index][-1]
         return None
 
     def next_float(self):
@@ -133,14 +138,20 @@ class Parser(object):
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
 
         token = self.next_token()
-        axes = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        axes = [dict(rel=1, axis=(1, 0, 0)),
+                dict(rel=2, axis=(0, 1, 0)),
+                dict(rel=2, axis=(0, 0, 1))]
         lo_stops = None
         hi_stops = None
         while token:
             if token in ('body', 'join'):
                 break
             if token.startswith('axis'):
-                axes[int(token.replace('axis', ''))] = self.array()
+                ax = axes[int(token.replace('axis', ''))]
+                ax['axis'] = self.array()
+                if self.peek_token() == 'rel':
+                    rel = self.next_token()
+                    ax['rel'] = self.next_token(expect='^\d$', dtype=int)
             if token == 'lo_stops':
                 lo_stops = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
             if token == 'hi_stops':
@@ -192,7 +203,13 @@ def create_skeleton(world, filename, namespace='', cfm=1e-10, max_force=250):
             joint.max_forces = max_force
 
     lm.velocities = 0
+    lm.axes = [dict(rel=0, axis=(1, 0, 0)),
+               dict(rel=0, axis=(0, 1, 0)),
+               dict(rel=0, axis=(0, 0, 1))]
     am.velocities = 0
+    am.axes = [dict(rel=0, axis=(1, 0, 0)),
+               dict(rel=0, axis=(0, 1, 0)),
+               dict(rel=0, axis=(0, 0, 1))]
     al.lo_stops = -2 * physics.TAU / 9
     al.hi_stops = 2 * physics.TAU / 9
 
