@@ -20,36 +20,6 @@ def rad(z):
     return physics.TAU * np.asarray(z) / 360
 
 
-class DataSeries(object):
-    def __init__(self, filename=None, num_frames=0, num_dofs=0):
-        self.data = None
-        if filename:
-            self.load(filename)
-        elif num_frames:
-            self.data = np.zeros((num_frames, num_dofs), float)
-        self.num_frames = len(self.data)
-        self.num_dofs = len(self.data[0])
-
-    def load(self, filename):
-        if filename.endswith('.c3d'):
-            reader = lmj.c3d.Reader(filename)
-            raise NotImplementedError
-        elif filename.endswith('.npy'):
-            self.data = np.load(filename)
-        else:
-            self.data = np.loadtxt(filename)
-
-    def save(self, filename):
-        if filename.endswith('.npy'):
-            np.save(filename, self.data)
-        else:
-            np.savetxt(filename, self.data)
-
-    @classmethod
-    def like(cls, dataset):
-        return cls(num_frames=dataset.num_frames, num_dofs=dataset.num_dofs)
-
-
 class Parser(object):
     def __init__(self, world, filename):
         self.world = world
@@ -133,6 +103,9 @@ class Parser(object):
             logging.info('setting position %s', position)
             body.position = position
 
+        # store marker attachment points in a list on each body.
+        body.markers = []
+
         return token
 
     def handle_joint(self, namespace):
@@ -187,14 +160,42 @@ class Parser(object):
 
         return token
 
+    def handle_marker(self, namespace):
+        index = label = self.next_token()
+        if index.count(':') == 1:
+            index, label = index.split(':')
+        index = int(index)
+        body = self.world.get_body(namespace + self.next_token(lower=False))
+        offset = self.floats()
+
+        logging.info('attaching %s %s <-> marker %d:%s',
+                     body, offset, index, label)
+
+        marker = self.world.create_body(
+            'sphere', radius=0.01, color=(1, 0, 0),
+            name='{}marker:{}'.format(namespace, label))
+
+        joint = ode.BallJoint(self.world.ode_world, group)
+        joint.attach(marker.ode_body, body.ode_body)
+        joint.setAnchor(body.body_to_world(offset))
+        joint.setParam(ode.ParamCFM, 0.0001)
+        joint.setParam(ode.ParamERP, 0.2)
+
+        # we store the marker attachments for a body on the body object.
+        body.markers.append((marker, joint))
+
+        return token
+
     def create(self, namespace=''):
-        token = self.next_token(expect='^(body|joint)$')
+        token = self.next_token(expect='^(body|joint|marker)$')
         while token is not None:
             try:
                 if token == 'body':
                     token = self.handle_body(namespace)
                 elif token == 'join':
                     token = self.handle_joint(namespace)
+                elif token == 'marker':
+                    token = self.handle_marker(namespace)
                 else:
                     self.error('unexpected token')
             except:
@@ -239,29 +240,63 @@ def create_skeleton(world, filename, namespace='', cfm=1e-10, max_force=250):
             joint.max_forces = max_force
 
 
+class Frames(object):
+    def __init__(self, filename=None, num_frames=0, num_dofs=0):
+        self.data = None
+        if filename:
+            self.load(filename)
+        elif num_frames:
+            self.data = np.zeros((num_frames, num_dofs), float)
+        self.num_dofs = len(self.data[0])
+
+    def __len__(self):
+        return len(self.data)
+
+    def load(self, filename):
+        if filename.endswith('.c3d'):
+            reader = lmj.c3d.Reader(filename)
+            param = reader.group('POINT').params['LABELS']
+            length, count = param.dimensions
+            labels = [param.bytes[i*length:(i+1)*length] for i in range(count)]
+            frames = list(reader.read_frames())
+            self.data = np.zeros((len(frames), len(labels)), float)
+            for i, (frame, _) in enumerate(frames):
+                for j, (x, y, z, c) in enumerate(frame):
+                    if j > 0 and not 1 < c < 10:
+                        x, y, z = self.data[i-1, j*3:(j+1)*3]
+                    self.data[i, j*3:(j+1)*3] = x, y, z
+        elif filename.endswith('.npy'):
+            self.data = np.load(filename)
+        else:
+            self.data = np.loadtxt(filename)
+
+    def save(self, filename):
+        if filename.endswith('.npy'):
+            np.save(filename, self.data)
+        else:
+            np.savetxt(filename, self.data)
+
+    @classmethod
+    def like(cls, frames):
+        return cls(num_frames=len(frames), num_dofs=frames.num_dofs)
+
+
 class World(physics.World):
     @property
     def num_dofs(self):
         return sum(j.ADOF + j.LDOF for j in self.joints)
 
-    def set_random_forces(self):
-        for body in self.bodies:
-            body.add_force(self.FMAX * rng.randn(3))
-
     def reset(self):
         for b in self.bodies:
             b.position = b.position + np.array([0, 0, 2])
 
-    def load_marker_attachments(self, filename):
-        pass
-
     def markers_to_angles(self, markers):
         '''Follow a set of marker data.'''
         if isinstance(markers, str):
-            markers = Dataset(markers)
+            markers = Frames(markers)
         state_sequence = []
-        smoothed_markers = Dataset.like(markers)
-        angles = Dataset(num_frames=markers.num_frames, num_dofs=self.num_dofs)
+        smoothed_markers = Frames.like(markers)
+        angles = Frames(num_frames=markers.num_frames, num_dofs=self.num_dofs)
         for i, frame in enumerate(markers):
             self.contactgroup.empty()
             self.space.collide(None, self.on_collision)
@@ -288,7 +323,7 @@ class World(physics.World):
     def angles_to_torques(self, angles):
         '''Follow a set of angle data.'''
         state_sequence = []
-        torques = Dataset.like(angles)
+        torques = Frames.like(angles)
         for i, frame in enumerate(angles):
             self.contactgroup.empty()
             self.space.collide(None, self.on_collision)
