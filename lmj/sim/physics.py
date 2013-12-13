@@ -394,13 +394,15 @@ class Joint(object):
     linear axis of displacement, so the linear properties are scalars.)
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=True):
+    def __init__(self, name, world, body_a, body_b=None,
+                 anchor=None, feedback=True, jointgroup=None):
         '''Create a new joint connecting two bodies in the world.
         '''
         self.name = name
         if isinstance(world, World):
             world = world.ode_world
-        self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(world)
+        self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(
+            world, jointgroup=jointgroup)
         self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_joint.setAnchor(anchor)
         self.ode_joint.setFeedback(feedback)
