@@ -225,6 +225,114 @@ for cls in Body.__subclasses__():
     BODIES[name] = BODIES[name[:3]] = cls
 
 
+def _get_params(target, param, dof):
+    '''Get the given param from each of the DOFs for this joint.'''
+    return [target.getParam(getattr(ode, 'Param{}{}'.format(param, s)))
+            for s in ['', '2', '3'][:dof]]
+
+def _set_params(target, param, values, dof):
+    '''Set the given param for each of the DOFs for this joint.'''
+    if not isinstance(values, (list, tuple, np.ndarray)):
+        values = [values] * dof
+    assert dof == len(values)
+    for s, value in zip(['', '2', '3'][:dof], values):
+        target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
+
+
+class Motor(object):
+    def __init__(self, name, world, body_a, body_b=None, feedback=True, dof=3):
+        self.name = name
+        if isinstance(world, World):
+            world = world.ode_world
+        self.motor = self.MOTOR_FACTORY(world)
+        self.motor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.motor.setFeedback(feedback)
+        self.motor.setNumAxes(dof)
+
+    @property
+    def dof(self):
+        return self.motor.getNumAxes()
+
+    @property
+    def axes(self):
+        return [dict(rel=self.motor.getAxisRel(i), axis=self.motor.getAxis(i))
+                for i in range(self.dof)]
+
+    @property
+    def lo_stops(self):
+        return _get_params(self.motor, 'LoStop', self.dof)
+
+    @property
+    def hi_stops(self):
+        return _get_params(self.motor, 'HiStop', self.dof)
+
+    @property
+    def velocities(self):
+        return _get_params(self.motor, 'Vel', self.dof)
+
+    @property
+    def max_forces(self):
+        return _get_params(self.motor, 'FMax', self.dof)
+
+    @property
+    def cfms(self):
+        return _get_params(self.motor, 'CFM', self.dof)
+
+    @property
+    def angles(self):
+        return [self.motor.getAngle(i) for i in range(self.dof)]
+
+    @property
+    def angle_rates(self):
+        return [self.motor.getAngleRate(i) for i in range(self.dof)]
+
+    @axes.setter
+    def axes(self, axes):
+        assert self.dof == len(axes)
+        for i, axis in enumerate(axes):
+            rel = 0
+            if isinstance(axis, dict):
+                rel = axis.get('rel', 0)
+                axis = axis.get('axis')
+            if axis is not None:
+                self.motor.setAxis(i, rel, axis)
+
+    @lo_stops.setter
+    def lo_stops(self, lo_stops):
+        _set_params(self.motor, 'LoStop', lo_stops, self.dof)
+
+    @hi_stops.setter
+    def hi_stops(self, hi_stops):
+        _set_params(self.motor, 'HiStop', hi_stops, self.dof)
+
+    @velocities.setter
+    def velocities(self, velocities):
+        _set_params(self.motor, 'Vel', velocities, self.dof)
+
+    @max_forces.setter
+    def max_forces(self, max_forces):
+        _set_params(self.motor, 'FMax', max_forces, self.dof)
+
+    @cfms.setter
+    def cfms(self, cfms):
+        _set_params(self.motor, 'CFM', cfms, self.dof)
+
+
+class AMotor(Motor):
+    MOTOR_FACTORY = ode.AMotor
+
+    def __init__(self, name, world, body_a, body_b=None, feedback=True, dof=3, mode='user'):
+        super(AMotor, self).__init__(
+            name, world, body_a, body_b=body_b, feedback=feedback, dof=dof)
+        if isinstance(mode, str):
+            mode = ode.AMotorEuler if mode.lower().startswith('e') else ode.AMotorUser
+        self.motor.setMode(mode)
+
+
+class LMotor(Motor):
+    MOTOR_FACTORY = ode.LMotor
+
+
 class Joint(object):
     '''This class wraps the ODE Joint class with some Python properties.'''
 
@@ -232,10 +340,8 @@ class Joint(object):
         '''
         '''
         self.name = name
-        self.world = world
-        self.body_a = body_a
-        self.body_b = body_b
-
+        if isinstance(world, World):
+            world = world.ode_world
         self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(world)
         self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_joint.setAnchor(anchor)
@@ -244,58 +350,45 @@ class Joint(object):
     def __str__(self):
         return self.name
 
-    def _get_params(self, target, param):
-        '''Get the given param from each of the DOFs for this joint.'''
-        return [target.getParam(getattr(ode, 'Param{}{}'.format(param, s)))
-                for s in ['', '2', '3'][:self.ADOF]]
-
-    def _set_params(self, target, param, values):
-        '''Set the given param for each of the DOFs for this joint.'''
-        if not isinstance(values, (list, tuple, np.ndarray)):
-            values = [values] * self.ADOF
-        assert self.ADOF == len(values)
-        for s, value in zip(['', '2', '3'][:self.ADOF], values):
-            target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
-
     @property
     def feedback(self):
         return self.ode_joint.getFeedback()
-
-    @property
-    def axes(self):
-        return self.ode_joint.getAxis(),
 
     @property
     def anchor(self):
         return self.ode_joint.getAnchor()
 
     @property
+    def axes(self):
+        return (self.ode_joint.getAxis(), )
+
+    @property
     def velocities(self):
-        return self._get_params(self.ode_joint, 'Vel')
+        return _get_params(self.ode_joint, 'Vel', self.ADOF)
 
     @property
     def max_forces(self):
-        return self._get_params(self.ode_joint, 'FMax')
+        return _get_params(self.ode_joint, 'FMax', self.ADOF)
 
     @property
     def cfms(self):
-        return self._get_params(self.ode_joint, 'CFM')
+        return _get_params(self.ode_joint, 'CFM', self.ADOF)
 
     @property
     def lo_stops(self):
-        return self._get_params(self.ode_joint, 'LoStop')
+        return _get_params(self.ode_joint, 'LoStop', self.ADOF)
 
     @property
     def hi_stops(self):
-        return self._get_params(self.ode_joint, 'HiStop')
+        return _get_params(self.ode_joint, 'HiStop', self.ADOF)
 
     @property
     def angles(self):
-        return self.ode_joint.getAngle(),
+        return (self.ode_joint.getAngle(), )
 
     @property
     def angle_rates(self):
-        return self.ode_joint.getAngleRate(),
+        return (self.ode_joint.getAngleRate(), )
 
     @property
     def position(self):
@@ -307,33 +400,27 @@ class Joint(object):
 
     @axes.setter
     def axes(self, axes):
-        axis = axes
-        if isinstance(axes, (list, tuple)):
-            axis = axes[0]
-        if isinstance(axis, dict):
-            axis = axis.get('axis')
-        if axis is not None:
-            self.ode_joint.setAxis(axis)
+        self.ode_joint.setAxis(axes[0])
 
     @velocities.setter
     def velocities(self, velocities):
-        self._set_params(self.ode_joint, 'Vel', velocities)
+        _set_params(self.ode_joint, 'Vel', velocities, self.ADOF)
 
     @max_forces.setter
-    def max_forces(self, forces):
-        self._set_params(self.ode_joint, 'FMax', forces)
+    def max_forces(self, max_forces):
+        _set_params(self.ode_joint, 'FMax', max_forces, self.ADOF)
 
     @cfms.setter
     def cfms(self, cfms):
-        self._set_params(self.ode_joint, 'CFM', cfms)
+        _set_params(self.ode_joint, 'CFM', cfms, self.ADOF)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        self._set_params(self.ode_joint, 'LoStop', lo_stops)
+        _set_params(self.ode_joint, 'LoStop', lo_stops, self.ADOF)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        self._set_params(self.ode_joint, 'HiStop', hi_stops)
+        _set_params(self.ode_joint, 'HiStop', hi_stops, self.ADOF)
 
     def trace(self):
         feedback = self.feedback
@@ -371,22 +458,20 @@ class Universal(Joint):
 
     @property
     def axes(self):
-        return self.ode_joint.getAxis1(), self.ode_joint.getAxis2()
+        return (self.ode_joint.getAxis1(), self.ode_joint.getAxis2())
 
     @property
     def angles(self):
-        return self.ode_joint.getAngle1(), self.ode_joint.getAngle2()
+        return (self.ode_joint.getAngle1(), self.ode_joint.getAngle2())
 
     @property
     def angle_rates(self):
-        return self.ode_joint.getAngle1Rate(), self.ode_joint.getAngle2Rate()
+        return (self.ode_joint.getAngle1Rate(), self.ode_joint.getAngle2Rate())
 
     @axes.setter
     def axes(self, axes):
         setters = [self.ode_joint.setAxis1, self.ode_joint.setAxis2]
         for axis, setter in zip(axes, setters):
-            if isinstance(axis, dict):
-                axis = axis.get('axis')
             if axis is not None:
                 setter(axis)
 
@@ -395,12 +480,13 @@ class Ball(Joint):
     ADOF = 3
     LDOF = 0
 
-    def __init__(self, name, world, body_a, body_b=None, **kwargs):
-        # attach auxiliary amotors to apply forces to the joint and enforce
-        # kinematic rotation limits.
-        self.amotor = AMotor(name + '.motor', world, body_a, body_b)
-        self.alimits = AMotor(name + '.limits', world, body_a, body_b)
-        super(Ball, self).__init__(name, world, body_a, body_b=body_b, **kwargs)
+    def __init__(self, name, world, body_a, body_b=None, feedback=True, anchor=None):
+        super(Ball, self).__init__(
+            name, world, body_a, body_b=body_b, feedback=feedback, anchor=anchor)
+        self.amotor = AMotor(name + '.amotor', world, body_a, body_b,
+                             feedback=feedback, dof=self.ADOF, mode='euler')
+        self.alimit = AMotor(name + '.alimit', world, body_a, body_b,
+                             feedback=feedback, dof=self.ADOF, mode='euler')
 
     @property
     def axes(self):
@@ -408,11 +494,11 @@ class Ball(Joint):
 
     @property
     def lo_stops(self):
-        return self.alimits.lo_stops
+        return self.alimit.lo_stops
 
     @property
     def hi_stops(self):
-        return self.alimits.hi_stops
+        return self.alimit.hi_stops
 
     @property
     def velocities(self, velocities):
@@ -428,24 +514,24 @@ class Ball(Joint):
 
     @property
     def angles(self):
-        return self.alimits.angles
+        return self.alimit.angles
 
     @property
     def angle_rates(self):
-        return self.alimits.angle_rates
+        return self.alimit.angle_rates
 
     @axes.setter
     def axes(self, axes):
         self.amotor.axes = axes
-        self.alimits.axes = axes
+        self.alimit.axes = axes
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        self.alimits.lo_stops = lo_stops
+        self.alimit.lo_stops = lo_stops
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        self.alimits.hi_stops = hi_stops
+        self.alimit.hi_stops = hi_stops
 
     @velocities.setter
     def velocities(self, velocities):
@@ -460,169 +546,7 @@ class Ball(Joint):
         self.amotor.cfms = cfms
 
 
-class AMotor(Joint):
-    LDOF = 0
-
-    def __init__(self, name, world, body_a, body_b=None,
-                 axes=(dict(rel=1, axis=(1, 0, 0)),
-                       dict(rel=1, axis=(0, 1, 0)),
-                       dict(rel=2, axis=(0, 0, 1))),
-                 feedback=True,
-                 mode=ode.AMotorUser):
-        self.name = name
-        self.world = world
-        self.body_a = body_a
-        self.body_b = body_b
-
-        self.amotor = ode.AMotor(world)
-        self.amotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.amotor.setMode(mode)
-        self.amotor.setFeedback(feedback)
-        self.axes = axes
-
-    @property
-    def axes(self):
-        return [dict(rel=self.amotor.getAxisRel(i), axis=self.amotor.getAxis(i))
-                for i in range(self.ADOF)]
-
-    @property
-    def lo_stops(self):
-        return self._get_params(self.amotor, 'LoStop')
-
-    @property
-    def hi_stops(self):
-        return self._get_params(self.amotor, 'HiStop')
-
-    @property
-    def velocities(self):
-        return self._get_params(self.amotor, 'Vel')
-
-    @property
-    def max_forces(self):
-        return self._get_params(self.amotor, 'FMax')
-
-    @property
-    def cfms(self):
-        return self._get_params(self.amotor, 'CFM')
-
-    @property
-    def angles(self):
-        return [self.amotor.getAngle(i) for i in range(self.ADOF)]
-
-    @property
-    def angle_rates(self):
-        return [self.amotor.getAngleRate(i) for i in range(self.ADOF)]
-
-    @axes.setter
-    def axes(self, axes):
-        self.ADOF = len(axes)
-        self.amotor.setNumAxes(len(axes))
-        for i, axis in enumerate(axes):
-            rel = 1
-            if isinstance(axis, dict):
-                rel = axis.get('rel', 1)
-                axis = axis.get('axis')
-            if axis is not None:
-                self.amotor.setAxis(i, rel, axis)
-
-    @lo_stops.setter
-    def lo_stops(self, lo_stops):
-        self._set_params(self.amotor, 'LoStop', lo_stops)
-
-    @hi_stops.setter
-    def hi_stops(self, hi_stops):
-        self._set_params(self.amotor, 'HiStop', hi_stops)
-
-    @velocities.setter
-    def velocities(self, velocities):
-        self._set_params(self.amotor, 'Vel', velocities)
-
-    @max_forces.setter
-    def max_forces(self, forces):
-        self._set_params(self.amotor, 'FMax', forces)
-
-    @cfms.setter
-    def cfms(self, cfms):
-        self._set_params(self.amotor, 'CFM', cfms)
-
-
-class LMotor(Joint):
-    ADOF = 0
-
-    def __init__(self, name, world, body_a, body_b=None,
-                 axes=(dict(rel=1, axis=(1, 0, 0)),
-                       dict(rel=1, axis=(0, 1, 0)),
-                       dict(rel=2, axis=(0, 0, 1))),
-                 feedback=True):
-        self.name = name
-        self.world = world
-        self.body_a = body_a
-        self.body_b = body_b
-
-        self.lmotor = ode.LMotor(world)
-        self.lmotor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.lmotor.setFeedback(feedback)
-        self.axes = axes
-
-    @property
-    def axes(self):
-        return [self.lmotor.getAxis(i) for i in range(self.LDOF)]
-
-    @property
-    def lo_stops(self):
-        return self._get_params(self.lmotor, 'LoStop')
-
-    @property
-    def hi_stops(self):
-        return self._get_params(self.lmotor, 'HiStop')
-
-    @property
-    def velocities(self):
-        return self._get_params(self.lmotor, 'Vel')
-
-    @property
-    def max_forces(self):
-        return self._get_params(self.lmotor, 'FMax')
-
-    @property
-    def cfms(self):
-        return self._get_params(self.lmotor, 'CFM')
-
-    @axes.setter
-    def axes(self, axes):
-        self.LDOF = len(axes)
-        self.lmotor.setNumAxes(len(axes))
-        for i, axis in enumerate(axes):
-            rel = 1
-            if isinstance(axis, dict):
-                rel = axis.get('rel', 1)
-                axis = axis.get('axis')
-            if axis is not None:
-                self.lmotor.setAxis(i, rel, axis)
-
-    @lo_stops.setter
-    def lo_stops(self, lo_stops):
-        self._set_params(self.lmotor, 'LoStop', lo_stops)
-
-    @hi_stops.setter
-    def hi_stops(self, hi_stops):
-        self._set_params(self.lmotor, 'HiStop', hi_stops)
-
-    @velocities.setter
-    def velocities(self, velocities):
-        self._set_params(self.lmotor, 'Vel', velocities)
-
-    @max_forces.setter
-    def max_forces(self, forces):
-        self._set_params(self.lmotor, 'FMax', forces)
-
-    @cfms.setter
-    def cfms(self, cfms):
-        self._set_params(self.lmotor, 'CFM', cfms)
-
-
-# Create a lookup table for things derived from the Body class. Should probably
-# do this using a metaclass, but this is less head-warpy.
+# Create a lookup table for things derived from the Joint class.
 JOINTS = {}
 for cls in Joint.__subclasses__():
     name = cls.__name__.lower()
@@ -654,15 +578,15 @@ class World(base.World):
         self.elasticity = elasticity
         self.friction = friction
 
-        self.world = ode.World()
-        self.world.setGravity(gravity)
-        self.world.setERP(erp)
-        self.world.setCFM(cfm)
-        self.world.setMaxAngularSpeed(max_angular_speed)
+        self.ode_world = ode.World()
+        self.ode_world.setGravity(gravity)
+        self.ode_world.setERP(erp)
+        self.ode_world.setCFM(cfm)
+        self.ode_world.setMaxAngularSpeed(max_angular_speed)
 
-        self.space = ode.QuadTreeSpace((0, 0, 0), (100, 100, 20), 10)
+        self.ode_space = ode.QuadTreeSpace((0, 0, 0), (100, 100, 20), 10)
 
-        self.floor = ode.GeomPlane(self.space, (0, 0, 1), 0)
+        self.floor = ode.GeomPlane(self.ode_space, (0, 0, 1), 0)
         self.contactgroup = ode.JointGroup()
         self._colors = {}
         self._bodies = {}
@@ -702,7 +626,7 @@ class World(base.World):
                 name = '{}{}'.format(shape, i)
                 if name not in self._bodies:
                     break
-        body = BODIES[shape](name, self.world, self.space, **kwargs)
+        body = BODIES[shape](name, self.ode_world, self.ode_space, **kwargs)
         self._colors[name] = color
         if color is None:
             self._colors[name] = tuple(rng.random(3)) + (0.5, )
@@ -720,7 +644,7 @@ class World(base.World):
         shape = shape.lower()
         if name is None:
             name = '{}:{}:{}'.format(ba.name, shape, bb.name if bb else '')
-        joint = JOINTS[shape](name, self.world, ba, bb, **kwargs)
+        joint = JOINTS[shape](name, self.ode_world, ba, bb, **kwargs)
         self._joints[name] = joint
         return joint
 
@@ -764,8 +688,8 @@ class World(base.World):
         dt = self.dt / substeps
         for _ in range(substeps):
             self.contactgroup.empty()
-            self.space.collide(None, self.on_collision)
-            self.world.step(dt)
+            self.ode_space.collide(None, self.on_collision)
+            self.ode_world.step(dt)
         return True
 
     def trace(self, handle):
@@ -791,7 +715,7 @@ class World(base.World):
         for c in ode.collide(geom_a, geom_b):
             c.setBounce(self.elasticity)
             c.setMu(self.friction)
-            ode.ContactJoint(self.world, self.contactgroup, c).attach(
+            ode.ContactJoint(self.ode_world, self.contactgroup, c).attach(
                 geom_a.getBody(), geom_b.getBody())
 
     def draw(self, color=None, n=59):
