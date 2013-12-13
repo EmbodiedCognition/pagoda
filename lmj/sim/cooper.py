@@ -298,8 +298,8 @@ class World(physics.World):
         smoothed_markers = Frames.like(markers)
         angles = Frames(num_frames=markers.num_frames, num_dofs=self.num_dofs)
         for i, frame in enumerate(markers):
-            self.contactgroup.empty()
-            self.space.collide(None, self.on_collision)
+            self.ode_contactgroup.empty()
+            self.ode_space.collide(None, self.on_collision)
             states_sequence.append(self.get_body_states())
             self.set_body_states(state_sequence[-1])
 
@@ -325,8 +325,8 @@ class World(physics.World):
         state_sequence = []
         torques = Frames.like(angles)
         for i, frame in enumerate(angles):
-            self.contactgroup.empty()
-            self.space.collide(None, self.on_collision)
+            self.ode_contactgroup.empty()
+            self.ode_space.collide(None, self.on_collision)
             state_sequence.append(self.get_body_states())
             self.set_body_states(state_sequence[-1])
 
@@ -350,8 +350,8 @@ class World(physics.World):
         '''Move the body according to a set of torque data.'''
         state_sequence = []
         for i, frame in enumerate(torques):
-            self.contactgroup.empty()
-            self.space.collide(None, self.on_collision)
+            self.ode_contactgroup.empty()
+            self.ode_space.collide(None, self.on_collision)
             state_sequence.append(self.get_body_states())
             self.set_body_states(state_sequence[-1])
 

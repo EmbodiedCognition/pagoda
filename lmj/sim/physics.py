@@ -651,7 +651,8 @@ class World(base.World):
         self.ode_space = ode.QuadTreeSpace((0, 0, 0), (100, 100, 20), 10)
 
         self.floor = ode.GeomPlane(self.ode_space, (0, 0, 1), 0)
-        self.contactgroup = ode.JointGroup()
+        self.ode_contactgroup = ode.JointGroup()
+
         self._colors = {}
         self._bodies = {}
         self._joints = {}
@@ -751,7 +752,7 @@ class World(base.World):
         self.frame += 1
         dt = self.dt / substeps
         for _ in range(substeps):
-            self.contactgroup.empty()
+            self.ode_contactgroup.empty()
             self.ode_space.collide(None, self.on_collision)
             self.ode_world.step(dt)
         return True
@@ -779,7 +780,7 @@ class World(base.World):
         for c in ode.collide(geom_a, geom_b):
             c.setBounce(self.elasticity)
             c.setMu(self.friction)
-            ode.ContactJoint(self.ode_world, self.contactgroup, c).attach(
+            ode.ContactJoint(self.ode_world, self.ode_contactgroup, c).attach(
                 geom_a.getBody(), geom_b.getBody())
 
     def draw(self, color=None, n=59):
