@@ -13,6 +13,13 @@ from . import physics
 logging = lmj.cli.get_logger(__name__)
 
 
+def deg(z):
+    return 360 * np.asarray(z) / physics.TAU
+
+def rad(z):
+    return physics.TAU * np.asarray(z) / 360
+
+
 class DataSeries(object):
     def __init__(self, filename=None, num_frames=0, num_dofs=0):
         self.data = None
@@ -84,8 +91,8 @@ class Parser(object):
     def next_float(self):
         return self.next_token(expect=r'^-?\d+(\.\d*)?$', dtype=float)
 
-    def array(self, n=3):
-        return np.array([self.next_float() for _ in range(n)])
+    def floats(self, n=3):
+        return [self.next_float() for _ in range(n)]
 
     def handle_body(self, namespace):
         shape = self.next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
@@ -99,16 +106,16 @@ class Parser(object):
             if token in ('body', 'join'):
                 break
             if token == 'lengths':
-                kwargs[token] = self.array()
+                kwargs[token] = self.floats()
             if token == 'radius':
                 kwargs[token] = self.next_float()
             if token == 'length':
                 kwargs[token] = self.next_float()
             if token == 'quaternion':
-                theta, x, y, z = self.array(4)
+                theta, x, y, z = self.floats(4)
                 quaternion = physics.make_quaternion(physics.TAU * theta / 360, x, y, z)
             if token == 'position':
-                position = self.array()
+                position = self.floats()
             if token == 'root':
                 logging.info('"%s" will be used as the root', name)
                 self.root = name
@@ -131,31 +138,38 @@ class Parser(object):
     def handle_joint(self, namespace):
         shape = self.next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
         body1 = namespace + self.next_token(lower=False)
-        offset1 = self.array()
+        offset1 = self.floats()
         body2 = namespace + self.next_token(lower=False)
-        offset2 = self.array()
+        offset2 = self.floats()
 
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
 
         token = self.next_token()
-        axes = [dict(rel=1, axis=(1, 0, 0)),
-                dict(rel=2, axis=(0, 1, 0)),
-                dict(rel=2, axis=(0, 0, 1))]
+        axes = [(1, 0, 0)]
+        if shape.startswith('bal'):
+            axes = [dict(rel=1, axis=(1, 0, 0)),
+                    None,
+                    dict(rel=2, axis=(0, 1, 0))]
+        if shape.startswith('uni'):
+            axes = [(1, 0, 0), (0, 1, 0)]
         lo_stops = None
         hi_stops = None
         while token:
             if token in ('body', 'join'):
                 break
             if token.startswith('axis'):
-                ax = axes[int(token.replace('axis', ''))]
-                ax['axis'] = self.array()
+                i = int(token.replace('axis', ''))
+                if isinstance(axes[i], dict):
+                    axes[i]['axis'] = self.floats()
+                else:
+                    axes[i] = self.floats()
                 if self.peek_token() == 'rel':
-                    rel = self.next_token()
-                    ax['rel'] = self.next_token(expect='^\d$', dtype=int)
+                    _ = self.next_token()
+                    axes[i]['rel'] = self.next_token(expect='^\d$', dtype=int)
             if token == 'lo_stops':
-                lo_stops = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
+                lo_stops = rad(self.floats(physics.JOINTS[shape].ADOF))
             if token == 'hi_stops':
-                hi_stops = physics.TAU * self.array(physics.JOINTS[shape].ADOF) / 360
+                hi_stops = rad(self.floats(physics.JOINTS[shape].ADOF))
             token = self.next_token()
 
         logging.info('joining %s %s %s', shape, body1, body2)
@@ -176,12 +190,16 @@ class Parser(object):
     def create(self, namespace=''):
         token = self.next_token(expect='^(body|joint)$')
         while token is not None:
-            if token == 'body':
-                token = self.handle_body(namespace)
-            elif token == 'join':
-                token = self.handle_joint(namespace)
-            else:
-                self.error('unexpected token')
+            try:
+                if token == 'body':
+                    token = self.handle_body(namespace)
+                elif token == 'join':
+                    token = self.handle_joint(namespace)
+                else:
+                    self.error('unexpected token')
+            except:
+                self.error('internal error')
+                raise
         return self.root
 
 
@@ -189,29 +207,36 @@ def create_skeleton(world, filename, namespace='', cfm=1e-10, max_force=250):
     if namespace and namespace[0] not in '.:-':
         namespace += '.'
 
-    p = Parser(world, filename)
+    root = world.get_body(Parser(world, filename).create(namespace))
 
-    root = world.get_body(p.create(namespace))
+    lm = physics.LMotor(namespace + 'lmotor', world, root, dof=3)
+    lm.velocities = 0
+    lm.cfms = cfm
+    lm.max_forces = max_force
+    lm.axes = (dict(rel=0, axis=(1, 0, 0)),
+               dict(rel=0, axis=(0, 1, 0)),
+               dict(rel=0, axis=(0, 0, 1)))
 
-    lm = world.join(namespace + 'lmotor', root)
-    am = world.join(namespace + 'amotor', root)
-    al = world.join(namespace + 'amotor', root)
+    am = physics.AMotor(namespace + 'amotor', world, root, mode='euler', dof=3)
+    am.velocities = 0
+    am.cfms = cfm
+    am.max_forces = max_force
+    am.axes = (dict(rel=1, axis=(1, 0, 0)),
+               None,
+               dict(rel=2, axis=(0, 0, 1)))
+
+    al = physics.AMotor(namespace + 'alimit', world, root, mode='euler', dof=3)
+    al.lo_stops = -physics.TAU / 5
+    al.hi_stops = physics.TAU / 5
+    al.axes = (dict(rel=1, axis=(1, 0, 0)),
+               None,
+               dict(rel=2, axis=(0, 0, 1)))
 
     for joint in world.joints:
         if joint.name.startswith(namespace):
+            joint.velocities = 0
             joint.cfms = cfm
             joint.max_forces = max_force
-
-    lm.velocities = 0
-    lm.axes = [dict(rel=0, axis=(1, 0, 0)),
-               dict(rel=0, axis=(0, 1, 0)),
-               dict(rel=0, axis=(0, 0, 1))]
-    am.velocities = 0
-    am.axes = [dict(rel=0, axis=(1, 0, 0)),
-               dict(rel=0, axis=(0, 1, 0)),
-               dict(rel=0, axis=(0, 0, 1))]
-    al.lo_stops = -2 * physics.TAU / 9
-    al.hi_stops = 2 * physics.TAU / 9
 
 
 class World(physics.World):
@@ -247,7 +272,7 @@ class World(physics.World):
             markers # XXX
 
             # update the ode world.
-            self.world.step(self.dt)
+            self.ode_world.step(self.dt)
 
             # record the marker positions on the body.
             smoothed_markers[i] = 0 # XXX
@@ -279,7 +304,7 @@ class World(physics.World):
                 j += joint.ADOF
 
             # update the ode world.
-            self.world.step(self.dt)
+            self.ode_world.step(self.dt)
 
             # record the torques that the joints experienced.
             torques[i] = 0 # XXX
@@ -305,7 +330,7 @@ class World(physics.World):
                 j += joint.ADOF
 
             # update the ode world.
-            self.world.step(self.dt)
+            self.ode_world.step(self.dt)
 
             #body->restoreControl()  # XXX
 
