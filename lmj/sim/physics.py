@@ -119,6 +119,25 @@ class Body(object):
     def torque(self, torque):
         self.ode_body.setTorque(torque)
 
+    @property
+    def is_kinematic(self):
+        return self.ode_body.isKinematic()
+
+    @is_kinematic.setter
+    def is_kinematic(self, is_kinematic):
+        if is_kinematic:
+            self.ode_body.setKinematic()
+        else:
+            self.ode_body.setDynamic()
+
+    @property
+    def follows_gravity(self):
+        return self.ode_body.getGravityMode()
+
+    @follows_gravity.setter
+    def follows_gravity(self, follows_gravity):
+        self.ode_body.setGravity(follows_gravity)
+
     def trace(self):
         if not self.feedback:
             return ''
