@@ -418,6 +418,7 @@ class Joint(object):
 
     - the feedback that the joint is experiencing (`feedback`),
     - the anchor of the joint in world coordinates (`anchor`),
+    - the anchor of the joint on body 2 in world coordinates (`anchor2`),
     - the current angular configuration of the joint (`angles`) as well as the
       derivative (`angle_rates`),
     - the current linear configuration of the joint (`position`) as well as the
@@ -447,9 +448,10 @@ class Joint(object):
         # necessary joint forces, independent of the kinematic state.
         self.amotor = None
         if self.ADOF > 0:
-            kw = {k: v for k, v in kwargs.iteritems() if k != 'anchor'}
-            self.amotor = AMotor(args[0] + ':amotor', *args[1:],
-                                 dof=self.ADOF, mode='user', **kw)
+            self.amotor = AMotor(
+                name + ':amotor', world, body_a,
+                body_b=body_b, dof=self.ADOF, mode='user',
+                feedback=feedback, jointgroup=jointgroup)
 
     def __str__(self):
         return self.name
@@ -461,6 +463,10 @@ class Joint(object):
     @property
     def anchor(self):
         return self.ode_joint.getAnchor()
+
+    @property
+    def anchor2(self):
+        return self.ode_joint.getAnchor2()
 
     @property
     def angles(self):
