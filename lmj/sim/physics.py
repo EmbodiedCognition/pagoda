@@ -235,7 +235,7 @@ class Capsule(Body):
         return np.asarray([d, d, d + self.length])
 
     def init_mass(self, m, density):
-        m.setCappedCylinder(density, 3, self.radius, self.length)
+        m.setCapsule(density, 3, self.radius, self.length)
 
 
 # Create a lookup table for things derived from the Body class.
@@ -490,7 +490,7 @@ class Joint(object):
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = dict(rel=1, axis=axes[0])
+        self.amotor.axes = (dict(rel=1, axis=axes[0]), )
         self.ode_joint.setAxis(axes[0])
 
     @property
@@ -632,7 +632,7 @@ class Ball(Joint):
     @axes.setter
     def axes(self, axes):
         # always set axes in euler mode.
-        axes = dict(rel=1, axis=axes[0]), None, dict(rel=2, axis=axes[-1])
+        axes = dict(rel=1, axis=axes[0]), None, dict(rel=2, axis=axes[1])
         self.amotor.axes = axes
         self.alimit.axes = axes
 
