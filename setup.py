@@ -17,7 +17,7 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['lmj.cli', 'numpy', 'glumpy', 'PyOpenGL', 'PyODE'],
+    install_requires=['lmj.cli', 'numpy', 'glumpy', 'PyOpenGL', 'Open-Dynamics-Engine'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
