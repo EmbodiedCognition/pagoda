@@ -30,7 +30,8 @@ class World(lmj.sim.physics.World):
     def reset(self):
         for b in self.bodies:
             b.position = np.array([0, 0, 10]) + 3 * rng.randn(3)
-            b.quaternion = self.make_quaternion(np.pi * rng.rand(), 0, 1, 1)
+            b.quaternion = lmj.sim.physics.make_quaternion(
+                np.pi * rng.rand(), 0, 1, 1)
 
 
 @lmj.cli.annotate(
