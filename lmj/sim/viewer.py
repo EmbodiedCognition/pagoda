@@ -29,6 +29,11 @@ import sys
 
 from . import base
 
+gl.ERROR_LOGGING = False
+
+from OpenGL.arrays import numpymodule
+numpymodule.NumpyHandler.ERROR_ON_COPY = True
+
 
 class Null(object):
     def __init__(self, world):
@@ -53,6 +58,7 @@ class GL(glumpy.Figure):
         self.trackball = glumpy.Trackball(65, 120, 1, distance)
         self._x = 0
         self._y = 0
+        self._shadow_color = np.array([0, 0, 0, 0.3], 'f')
         glut.glutInitDisplayMode(
             glut.GLUT_DOUBLE |
             glut.GLUT_RGBA |
@@ -121,7 +127,7 @@ class GL(glumpy.Figure):
 
     def on_key_press(self, key, modifiers):
         if key == glumpy.window.key.ESCAPE:
-            sys.exit()
+            self.window.stop()
         elif key == glumpy.window.key.SPACE:
             self.paused = False if self.paused else True
         elif key == glumpy.window.key.R:
@@ -185,7 +191,7 @@ class GL(glumpy.Figure):
         gl.glPushMatrix()
         gl.glScale(1, 1, -1)
 
-        self.world.draw(color=(0, 0, 0, 0.3))
+        self.world.draw(color=self._shadow_color)
 
         gl.glPopMatrix()
 
@@ -208,7 +214,7 @@ class GL(glumpy.Figure):
         while self.elapsed > self.world.dt:
             self.elapsed -= self.world.dt
             if not self.world.step():
-                sys.exit()
+                self.window.stop()
             if self.trace:
                 self.world.trace(self.trace)
             if self.twirl:
@@ -219,4 +225,6 @@ class GL(glumpy.Figure):
             self.redraw()
 
     def run(self):
+        glut.glutSetOption(glut.GLUT_ACTION_ON_WINDOW_CLOSE,
+                           glut.GLUT_ACTION_CONTINUE_EXECUTION)
         self.show()
