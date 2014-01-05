@@ -42,7 +42,7 @@ class Null(object):
 
 
 class GL(glumpy.Figure):
-    def __init__(self, world, trace=None, paused=False, distance=30):
+    def __init__(self, world, trace=None, paused=False, distance=20):
         super(GL, self).__init__()
         self.world = world
         self.trace = trace
@@ -50,7 +50,7 @@ class GL(glumpy.Figure):
         self.paused = paused
         self.elapsed = 0
         self.lens = self.add_frame()
-        self.trackball = glumpy.Trackball(65, 30, 1, distance)
+        self.trackball = glumpy.Trackball(65, 120, 1, distance)
         self._x = 0
         self._y = 0
         glut.glutInitDisplayMode(
@@ -67,22 +67,14 @@ class GL(glumpy.Figure):
     on_mouse_motion = noop
 
     def on_mouse_scroll(self, x, y, dx, dy):
-        paused = self.paused
-        self.paused = True
         self.trackball.zoom_to(x, y, dx, 20 * [1, -1][dy < 0])
-        self.redraw()
-        self.paused = paused
 
     def on_mouse_drag(self, x, y, dx, dy, button):
-        paused = self.paused
-        self.paused = True
         if button == 1:  # pan_to
             self._x += 0.1 * dx
             self._y += 0.1 * dy
         else:
             self.trackball.drag_to(x, y, dx, dy)
-        self.redraw()
-        self.paused = paused
 
     def on_init(self):
         self.on_resize(800, 600)
@@ -100,13 +92,13 @@ class GL(glumpy.Figure):
 
         gl.glEnable(gl.GL_LIGHTING)
         gl.glEnable(gl.GL_LIGHT0)
-        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [2, 2, 5, 0.5])
+        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [2, 2, 10, 0.5])
         gl.glLight(gl.GL_LIGHT0, gl.GL_DIFFUSE, [1, 1, 1, 1])
         gl.glLight(gl.GL_LIGHT0, gl.GL_SPECULAR, [1, 1, 1, 1])
         gl.glEnable(gl.GL_LIGHT1)
-        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [-2, 4, 5, 0.5])
-        gl.glLight(gl.GL_LIGHT0, gl.GL_DIFFUSE, [1, 1, 1, 1])
-        gl.glLight(gl.GL_LIGHT0, gl.GL_SPECULAR, [1, 1, 1, 1])
+        gl.glLight(gl.GL_LIGHT1, gl.GL_POSITION, [-2, 4, 10, 0.5])
+        gl.glLight(gl.GL_LIGHT1, gl.GL_DIFFUSE, [1, 1, 1, 1])
+        gl.glLight(gl.GL_LIGHT1, gl.GL_SPECULAR, [1, 1, 1, 1])
 
         # fog ? from http://www.swiftless.com/tutorials/opengl/fog.html
         #gl.glFogi(gl.GL_FOG_MODE, gl.GL_EXP2)
@@ -135,7 +127,7 @@ class GL(glumpy.Figure):
         elif key == glumpy.window.key.R:
             self.twirl = False if self.twirl else True
         else:
-            self.world.reset()
+            self.world.on_key_press(key, glumpy.window.key)
         self.redraw()
 
     def on_draw(self):
@@ -189,12 +181,14 @@ class GL(glumpy.Figure):
 
         gl.glDisable(gl.GL_TEXTURE_2D)
         gl.glDisable(gl.GL_DEPTH_TEST)
+
         gl.glPushMatrix()
         gl.glScale(1, 1, -1)
 
         self.world.draw(color=(0, 0, 0, 0.3))
 
         gl.glPopMatrix()
+
         gl.glEnable(gl.GL_DEPTH_TEST)
         gl.glDisable(gl.GL_STENCIL_TEST)
 
