@@ -673,33 +673,47 @@ def make_quaternion(theta, *axis):
 class World(base.World):
     '''A wrapper for an ODE World object, for running in a simulator.'''
 
-    def __init__(self,
-                 dt=1. / 60,
-                 elasticity=0.2,
-                 friction=200,
-                 gravity=(0, 0, -9.81),
-                 erp=0.8,
-                 cfm=1e-5,
-                 max_angular_speed=20):
-        self.frame = 0
-        self.dt = dt
-        self.elasticity = elasticity
-        self.friction = friction
-
+    def __init__(self, dt=1. / 60, max_angular_speed=20):
         self.ode_world = ode.World()
-        self.ode_world.setGravity(gravity)
-        self.ode_world.setERP(erp)
-        self.ode_world.setCFM(cfm)
         self.ode_world.setMaxAngularSpeed(max_angular_speed)
-
         self.ode_space = ode.QuadTreeSpace((0, 0, 0), (100, 100, 20), 10)
-
-        self.floor = ode.GeomPlane(self.ode_space, (0, 0, 1), 0)
+        self.ode_floor = ode.GeomPlane(self.ode_space, (0, 0, 1), 0)
         self.ode_contactgroup = ode.JointGroup()
 
+        self.frame = 0
+        self.dt = dt
+        self.elasticity = 0.1
+        self.friction = 1000
+        self.gravity = 0, 0, -9.81
+
+        self.alpha = 0.9
         self._colors = {}
         self._bodies = {}
         self._joints = {}
+
+    @property
+    def gravity(self):
+        return self.ode_world.getGravity()
+
+    @gravity.setter
+    def gravity(self, gravity):
+        return self.ode_world.setGravity(gravity)
+
+    @property
+    def cfm(self):
+        return self.ode_world.getCFM()
+
+    @cfm.setter
+    def cfm(self, cfm):
+        return self.ode_world.setCFM(cfm)
+
+    @property
+    def erp(self):
+        return self.ode_world.getERP()
+
+    @erp.setter
+    def erp(self, erp):
+        return self.ode_world.setERP(erp)
 
     @property
     def bodies(self):
@@ -738,7 +752,7 @@ class World(base.World):
         body = BODIES[shape](name, self.ode_world, self.ode_space, **kwargs)
         self._colors[name] = color
         if color is None:
-            self._colors[name] = tuple(rng.random(3)) + (0.5, )
+            self._colors[name] = np.array(tuple(rng.random(3)) + (self.alpha, ), 'f')
         self._bodies[name] = body
         return body
 
@@ -830,7 +844,7 @@ class World(base.World):
     def draw(self, color=None, n=59):
         '''Draw all bodies in the world.'''
         for name, body in self._bodies.iteritems():
-            gl.glColor(*(color or self._colors[name]))
+            gl.glColor(color if color is not None else self._colors[name])
             x, y, z = body.position
             r = body.rotation
             gl.glPushMatrix()
