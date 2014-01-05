@@ -24,12 +24,12 @@ body box l-hand   lengths 0.08 0.03 0.15
 body box ru-leg   lengths 0.12 0.14 0.50
 body box rl-leg   lengths 0.08 0.11 0.42
 body box r-heel   lengths 0.08 0.10 0.08
-body box r-tarsal lengths 0.08 0.12 0.04
+body box r-foot   lengths 0.08 0.12 0.04
 
 body box lu-leg   lengths 0.12 0.14 0.50
 body box ll-leg   lengths 0.08 0.11 0.42
 body box l-heel   lengths 0.08 0.10 0.08
-body box l-tarsal lengths 0.08 0.12 0.04
+body box l-foot   lengths 0.08 0.12 0.04
 
 # --- joint attachments ---
 
@@ -111,7 +111,7 @@ axis1 0 1 0
 lo_stops -70 -70
 hi_stops  70  70
 
-join hinge  r-heel 0 1 -1  r-tarsal 0 -1 -1
+join hinge  r-heel 0 1 -1  r-foot 0 -1 -1
 axis0 1 0 0
 lo_stops -10
 hi_stops  10
@@ -133,7 +133,7 @@ axis1 0 1 0
 lo_stops -60 -60
 hi_stops  60  60
 
-join hinge  l-heel 0 1 -1  l-tarsal 0 -1 -1
+join hinge  l-heel 0 1 -1  l-foot 0 -1 -1
 axis0 1 0 0
 lo_stops -10
 hi_stops  10
