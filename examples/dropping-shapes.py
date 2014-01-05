@@ -41,7 +41,9 @@ class World(lmj.sim.physics.World):
     elasticity=('elasticity constant for collisions', 'option', None, float),
     )
 def main(n=10, frame_rate=60., friction=5000, elasticity=0.1):
-    w = World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
+    w = World(dt=1. / frame_rate)
+    w.friction = friction
+    w.elasticity = elasticity
     g = lambda n, k=0.1, size=1: np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
     for _ in range(n):
         s, kw = sorted(dict(
