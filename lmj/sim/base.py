@@ -39,3 +39,7 @@ class World(object):
     def step(self):
         '''Advance the world simulation by one time step.'''
         raise NotImplementedError
+
+    def on_key_press(self, key, keys):
+        '''Handle an otherwise-unhandled keypress event.'''
+        self.reset()
