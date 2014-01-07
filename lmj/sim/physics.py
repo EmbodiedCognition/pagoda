@@ -39,7 +39,7 @@ class Body(object):
     equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, color=(0.8, 0.2, 0.3, 0.9),
+    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1),
                  trace=True, density=1000., **shape):
         self.name = name
         self.shape = shape
@@ -440,6 +440,7 @@ class Joint(object):
         self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_joint.setAnchor(anchor)
         self.ode_joint.setFeedback(feedback)
+        self.ode_joint.setParam(ode.ParamCFM, 0)
 
         # we augment angular joints with a motor that allows us to monitor the
         # necessary joint forces, independent of the kinematic state.
