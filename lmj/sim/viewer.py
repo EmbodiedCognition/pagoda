@@ -20,19 +20,14 @@
 
 '''OpenGL world viewer.'''
 
-import glumpy
 import numpy as np
-import OpenGL.GL as gl
-import OpenGL.GLU as glu
-import OpenGL.GLUT as glut
-import sys
+import pyglet
 
-from . import base
+from pyglet.gl import *
 
-gl.ERROR_LOGGING = False
+from . import physics
 
-from OpenGL.arrays import numpymodule
-numpymodule.NumpyHandler.ERROR_ON_COPY = True
+TAU = 2 * np.pi
 
 
 class Null(object):
@@ -46,185 +41,245 @@ class Null(object):
                 self.world.reset()
 
 
-class GL(glumpy.Figure):
-    def __init__(self, world, trace=None, paused=False, distance=20):
-        super(GL, self).__init__()
+class GL(pyglet.window.Window):
+    @staticmethod
+    def vec(*args):
+        return (GLfloat * len(args))(*args)
+
+    @staticmethod
+    def build_vertex_list(shape):
+        idx, vtx, nrm = shape()
+        return pyglet.graphics.vertex_list_indexed(
+            len(vtx) // 3, idx, ('v3f/static', vtx), ('n3f/static', nrm))
+
+    @staticmethod
+    def box_vertices():
+        vtx = np.array([
+            [ 1, 1, 1], [ 1, 1, -1], [ 1, -1, -1], [ 1, -1, 1],
+            [-1, 1, 1], [-1, 1, -1], [-1, -1, -1], [-1, -1, 1]], 'f')
+        nrm = vtx / np.sqrt((vtx * vtx).sum(axis=1))[:, None]
+        return [
+            0, 3, 2,  0, 2, 1,  4, 5, 7,  7, 5, 6,  # x
+            0, 1, 4,  4, 1, 5,  6, 2, 3,  6, 3, 7,  # y
+            0, 4, 7,  0, 7, 3,  1, 2, 5,  5, 2, 6,  # z
+        ], vtx.flatten(), nrm.flatten()
+
+    @staticmethod
+    def sphere_vertices(n=2):
+        idx = [[0, 1, 2], [0, 5, 1], [0, 2, 4], [0, 4, 5],
+               [3, 2, 1], [3, 4, 2], [3, 5, 4], [3, 1, 5]]
+        vtx = list(np.array([
+            [ 1, 0, 0], [0,  1, 0], [0, 0,  1],
+            [-1, 0, 0], [0, -1, 0], [0, 0, -1]], 'f'))
+        for _ in range(n):
+            idx_ = []
+            for ui, vi, wi in idx:
+                u, v, w = vtx[ui], vtx[vi], vtx[wi]
+                d, e, f = u + v, v + w, w + u
+                di = len(vtx)
+                vtx.append(d / np.linalg.norm(d))
+                ei = len(vtx)
+                vtx.append(e / np.linalg.norm(e))
+                fi = len(vtx)
+                vtx.append(f / np.linalg.norm(f))
+                idx_.append([ui, di, fi])
+                idx_.append([vi, ei, di])
+                idx_.append([wi, fi, ei])
+                idx_.append([di, ei, fi])
+            idx = idx_
+        vtx = np.array(vtx, 'f').flatten()
+        return np.array(idx).flatten(), vtx, vtx
+
+    @staticmethod
+    def cylinder_vertices(n=14):
+        idx = []
+        vtx = [0, 0, 1,  0, 0, -1,  1, 0, 1,  1, 0, -1]
+        nrm = [0, 0, 1,  0, 0, -1,  1, 0, 0,  1, 0, 0]
+        thetas = np.linspace(0, TAU, n)
+        for i in range(len(thetas) - 1):
+            t0 = thetas[i]
+            t1 = thetas[i+1]
+            a = 2 * (i+1)
+            b = 2 * (i+2)
+            idx.extend([0, a, b,  a, a+1, b,  b, a+1, b+1,  b+1, a+1, 1])
+            x, y = np.cos(t1), np.sin(t1)
+            vtx.extend([x, y, 1,  x, y, -1])
+            nrm.extend([x, y, 0,  x, y, 0])
+        return idx, vtx, nrm
+
+    def __init__(self, world, trace=None, paused=False):
+        platform = pyglet.window.get_platform()
+        display = platform.get_default_display()
+        screen = display.get_default_screen()
+        try:
+            config = screen.get_best_config(Config(
+                alpha_size=8,
+                depth_size=24,
+                double_buffer=True,
+                sample_buffers=1,
+                samples=4))
+        except pyglet.window.NoSuchConfigException:
+            config = screen.get_best_config(Config())
+
+        super(GL, self).__init__(
+            width=1000, height=600, resizable=True, vsync=False, config=config)
+
         self.world = world
         self.trace = trace
-        self.twirl = False
         self.paused = paused
-        self.elapsed = 0
-        self.lens = self.add_frame()
-        self.trackball = glumpy.Trackball(65, 120, 1, distance)
-        self._x = 0
-        self._y = 0
-        self._shadow_color = np.array([0, 0, 0, 0.3], 'f')
-        glut.glutInitDisplayMode(
-            glut.GLUT_DOUBLE |
-            glut.GLUT_RGBA |
-            glut.GLUT_DEPTH |
-            glut.GLUT_STENCIL)
 
-    def noop(self, *args, **kwargs):
-        pass
+        self.zoom = 15
+        self.ty = 0
+        self.tz = 1
+        self.ry = 30
+        self.rz = 30
 
-    on_mouse_press = noop
-    on_mouse_release = noop
-    on_mouse_motion = noop
+        #self.fps = pyglet.clock.ClockDisplay()
+
+        self.on_resize(self.width, self.height)
+
+        glEnable(GL_BLEND)
+        glEnable(GL_COLOR_MATERIAL)
+        glEnable(GL_CULL_FACE)
+        glEnable(GL_DEPTH_TEST)
+        glEnable(GL_LIGHTING)
+        glEnable(GL_NORMALIZE)
+        glEnable(GL_POLYGON_SMOOTH)
+
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+        glDepthFunc(GL_LEQUAL)
+        glCullFace(GL_BACK)
+        glFrontFace(GL_CCW)
+        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST)
+        glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST)
+        glShadeModel(GL_SMOOTH)
+
+        glLightfv(GL_LIGHT0, GL_AMBIENT, GL.vec(0.2, 0.2, 0.2, 1.0))
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, GL.vec(1.0, 1.0, 1.0, 1.0))
+        glLightfv(GL_LIGHT0, GL_POSITION, GL.vec(3.0, 3.0, 10.0, 1.0))
+        glEnable(GL_LIGHT0)
+
+        self.box = GL.build_vertex_list(GL.box_vertices)
+        self.sphere = GL.build_vertex_list(GL.sphere_vertices)
+        self.cylinder = GL.build_vertex_list(GL.cylinder_vertices)
 
     def on_mouse_scroll(self, x, y, dx, dy):
-        self.trackball.zoom_to(x, y, dx, 20 * [1, -1][dy < 0])
+        if dy == 0: return
+        self.zoom *= 1.1 ** (-1 if dy < 0 else 1)
 
-    def on_mouse_drag(self, x, y, dx, dy, button):
-        if button == 1:  # pan_to
-            self._x += 0.1 * dx
-            self._y += 0.1 * dy
+    def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
+        if buttons == pyglet.window.mouse.LEFT:
+            # pan
+            self.ty += 0.03 * dx
+            self.tz += 0.03 * dy
         else:
-            self.trackball.drag_to(x, y, dx, dy)
-
-    def on_init(self):
-        self.on_resize(800, 600)
-
-        gl.glColorMaterial(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE)
-        gl.glEnable(gl.GL_COLOR_MATERIAL)
-
-        gl.glDepthFunc(gl.GL_LEQUAL)
-        gl.glEnable(gl.GL_DEPTH_TEST)
-
-        gl.glShadeModel(gl.GL_SMOOTH)
-        gl.glHint(gl.GL_PERSPECTIVE_CORRECTION_HINT, gl.GL_NICEST)
-
-        gl.glEnable(gl.GL_NORMALIZE)
-
-        gl.glEnable(gl.GL_LIGHTING)
-        gl.glEnable(gl.GL_LIGHT0)
-        gl.glLight(gl.GL_LIGHT0, gl.GL_POSITION, [2, 2, 10, 0.5])
-        gl.glLight(gl.GL_LIGHT0, gl.GL_DIFFUSE, [1, 1, 1, 1])
-        gl.glLight(gl.GL_LIGHT0, gl.GL_SPECULAR, [1, 1, 1, 1])
-        gl.glEnable(gl.GL_LIGHT1)
-        gl.glLight(gl.GL_LIGHT1, gl.GL_POSITION, [-2, 4, 10, 0.5])
-        gl.glLight(gl.GL_LIGHT1, gl.GL_DIFFUSE, [1, 1, 1, 1])
-        gl.glLight(gl.GL_LIGHT1, gl.GL_SPECULAR, [1, 1, 1, 1])
-
-        # fog ? from http://www.swiftless.com/tutorials/opengl/fog.html
-        #gl.glFogi(gl.GL_FOG_MODE, gl.GL_EXP2)
-        #gl.glFogfv(gl.GL_FOG_COLOR, (0.5, 0,5, 0,5, 1.0))
-        #gl.glFogf(gl.GL_FOG_DENSITY, 0.2)
-        #gl.glHint(gl.GL_FOG_HINT, gl.GL_NICEST)
+            # roll
+            self.ry += 0.2 * dy
+            self.rz += 0.2 * dx
+        #print('z', self.zoom, 't', self.ty, self.tz, 'r', self.ry, self.rz)
 
     def on_resize(self, width, height):
-        w, h = float(width), float(height)
-
-        gl.glViewport(0, 0, int(w), int(h))
-
-        gl.glMatrixMode(gl.GL_PROJECTION)
-        gl.glLoadIdentity()
-        glu.gluPerspective(60, w / h, .1, 1000)
-
-        gl.glMatrixMode(gl.GL_MODELVIEW)
-        gl.glLoadIdentity()
-        gl.glMultMatrixf(self.trackball.matrix)
+        glViewport(0, 0, width, height)
+        glMatrixMode(GL_PROJECTION)
+        glLoadIdentity()
+        glu.gluPerspective(45, float(width) / height, 1, 100)
 
     def on_key_press(self, key, modifiers):
-        if key == glumpy.window.key.ESCAPE:
-            self.window.stop()
-        elif key == glumpy.window.key.SPACE:
+        if key == pyglet.window.key.ESCAPE:
+            pyglet.app.exit()
+        elif key == pyglet.window.key.SPACE:
             self.paused = False if self.paused else True
-        elif key == glumpy.window.key.R:
-            self.twirl = False if self.twirl else True
         else:
-            self.world.on_key_press(key, glumpy.window.key)
-        self.redraw()
+            self.world.on_key_press(key, pyglet.window.key)
 
     def on_draw(self):
-        def ground():
-            '''Draw a 10-meter square on the ground plane.'''
-            gl.glBegin(gl.GL_QUADS)
-            gl.glColor(0.3, 0.3, 0.3, 0.5)
-            gl.glNormal(0, 0, 1)
-            gl.glVertex(-10,  10, 0)
-            gl.glVertex( 10,  10, 0)
-            gl.glVertex( 10, -10, 0)
-            gl.glVertex(-10, -10, 0)
-            gl.glEnd()
+        self.clear()
 
-        # modified slightly from glumpy.trackball.Trackball.push
-        _, _, w, h = gl.glGetIntegerv(gl.GL_VIEWPORT)
-        top = np.tan(35 * np.pi / 360) * 0.1 * self.trackball.zoom
-        right = w * top / float(h)
-        gl.glMatrixMode(gl.GL_PROJECTION)
-        gl.glPushMatrix()
-        gl.glLoadIdentity()
-        gl.glFrustum(-right, right, -top, top, 0.1, 100)
+        # http://njoubert.com/teaching/cs184_fa08/section/sec09_camera.pdf
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+        gluLookAt(1, 0, 0, 0, 0, 0, 0, 0, 1)
+        glTranslatef(-self.zoom, 0, 0)
+        glTranslatef(0, self.ty, self.tz)
+        glRotatef(self.ry, 0, 1, 0)
+        glRotatef(self.rz, 0, 0, 1)
 
-        gl.glMatrixMode(gl.GL_MODELVIEW)
-        gl.glPushMatrix()
-        gl.glLoadIdentity()
+        self.draw()
 
-        gl.glTranslate(self._x, self._y, -self.trackball.distance)
-        gl.glMultMatrixf(self.trackball.matrix)
-
-        # shadows from http://www.swiftless.com/tutorials/opengl/basic_shadows.html
-        gl.glClearStencil(0)
-        gl.glClearDepth(1)
-        gl.glClearColor(1, 1, 1, 1)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT |
-                   gl.GL_DEPTH_BUFFER_BIT |
-                   gl.GL_STENCIL_BUFFER_BIT)
-
-        gl.glColorMask(gl.GL_FALSE, gl.GL_FALSE, gl.GL_FALSE, gl.GL_FALSE)
-        gl.glDepthMask(gl.GL_FALSE)
-        gl.glEnable(gl.GL_STENCIL_TEST)
-        gl.glStencilFunc(gl.GL_ALWAYS, 1, 0xFFFFFFFF)
-        gl.glStencilOp(gl.GL_REPLACE, gl.GL_REPLACE, gl.GL_REPLACE)
-
-        ground()
-
-        gl.glColorMask(gl.GL_TRUE, gl.GL_TRUE, gl.GL_TRUE, gl.GL_TRUE)
-        gl.glDepthMask(gl.GL_TRUE)
-        gl.glStencilFunc(gl.GL_EQUAL, 1, 0xFFFFFFFF)
-        gl.glStencilOp(gl.GL_KEEP, gl.GL_KEEP, gl.GL_KEEP)
-
-        gl.glDisable(gl.GL_TEXTURE_2D)
-        gl.glDisable(gl.GL_DEPTH_TEST)
-
-        gl.glPushMatrix()
-        gl.glScale(1, 1, -1)
-
-        self.world.draw(color=self._shadow_color)
-
-        gl.glPopMatrix()
-
-        gl.glEnable(gl.GL_DEPTH_TEST)
-        gl.glDisable(gl.GL_STENCIL_TEST)
-
-        ground()
-
-        gl.glEnable(gl.GL_BLEND)
-        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
-
-        self.world.draw()
-
-        self.trackball.pop()
-
-    def on_idle(self, dt):
+    def update(self, dt):
         if self.paused:
             return
-        self.elapsed += dt
-        while self.elapsed > self.world.dt:
-            self.elapsed -= self.world.dt
-            if not self.world.step():
-                self.window.stop()
-            if self.trace:
-                self.world.trace(self.trace)
-            if self.twirl:
-                p = self.trackball.phi
-                self.trackball.phi = (p + 0.2) % 360
-            if self.world.needs_reset():
-                self.world.reset()
-            self.redraw()
+        if not self.world.step():
+            pyglet.app.exit()
+        if self.trace:
+            self.world.trace(self.trace)
+        if self.world.needs_reset():
+            self.world.reset()
 
     def run(self):
-        glut.glutSetOption(glut.GLUT_ACTION_ON_WINDOW_CLOSE,
-                           glut.GLUT_ACTION_CONTINUE_EXECUTION)
-        self.show()
+        pyglet.clock.schedule_interval(self.update, self.world.dt)
+        pyglet.app.run()
+
+
+class Physics(GL):
+    def __init__(self, *args, **kwargs):
+        super(Physics, self).__init__(*args, **kwargs)
+        BLK = [100, 100, 100] * 6
+        WHT = [150, 150, 150] * 6
+        N = 10
+        vtx = []
+        for i in range(N, -N, -1):
+            for j in range(-N, N, 1):
+                vtx.extend((j,   i, 0, j, i-1, 0, j+1, i,   0,
+                            j+1, i, 0, j, i-1, 0, j+1, i-1, 0))
+
+        self.floor = pyglet.graphics.vertex_list(
+            len(vtx) // 3,
+            ('v3i/static', vtx),
+            ('c3B/static', ((BLK + WHT) * N + (WHT + BLK) * N) * N),
+            ('n3i/static', [0, 0, 1] * (len(vtx) // 3)))
+
+    def draw(self, color=None):
+        '''Draw all bodies in the world.'''
+        self.floor.draw(GL_TRIANGLES)
+        for body in self.world.bodies:
+            x, y, z = body.position
+            r = body.rotation
+            glColor4f(*(color if color is not None else body.color))
+            glPushMatrix()
+            glMultMatrixf(GL.vec(
+                r[0], r[3], r[6], 0.,
+                r[1], r[4], r[7], 0.,
+                r[2], r[5], r[8], 0.,
+                x, y, z, 1.))
+            if isinstance(body, physics.Box):
+                x, y, z = body.lengths
+                glScalef(x / 2., y / 2., z / 2.)
+                self.box.draw(GL_TRIANGLES)
+            if isinstance(body, physics.Sphere):
+                r = body.radius
+                glScalef(r, r, r)
+                self.sphere.draw(GL_TRIANGLES)
+            if isinstance(body, physics.Cylinder):
+                l = body.length
+                r = body.radius
+                glScalef(r, r, l / 2)
+                self.cylinder.draw(GL_TRIANGLES)
+            if isinstance(body, physics.Capsule):
+                r = body.radius
+                l = body.length
+                glPushMatrix()
+                glScalef(r, r, l / 2)
+                self.cylinder.draw(GL_TRIANGLES)
+                glPopMatrix()
+                glPushMatrix()
+                glTranslatef(0, 0, -l / 2)
+                glScalef(r, r, r)
+                self.sphere.draw(GL_TRIANGLES)
+                glPopMatrix()
+                glPushMatrix()
+                glTranslatef(0, 0, l / 2)
+                glScalef(r, r, r)
+                self.sphere.draw(GL_TRIANGLES)
+                glPopMatrix()
+            glPopMatrix()

@@ -23,14 +23,9 @@
 from __future__ import division, print_function
 
 import numpy as np
-import numpy.random as rng
 import ode
-import OpenGL.GL as gl
-import OpenGL.GLUT as glut
 
 from . import base
-
-TAU = 2 * np.pi
 
 
 class Body(object):
@@ -44,10 +39,12 @@ class Body(object):
     equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, feedback=True, density=1000., **shape):
+    def __init__(self, name, world, space, color=(0.8, 0.2, 0.3, 0.9),
+                 trace=True, density=1000., **shape):
         self.name = name
         self.shape = shape
-        self.feedback = feedback
+        self.trace = trace
+        self.color = color
 
         m = ode.Mass()
         self.init_mass(m, density)
@@ -142,15 +139,15 @@ class Body(object):
     def trace(self):
         if not self.feedback:
             return ''
-        x, y, z = self.position
-        a, b, c, d = self.quaternion
-        lx, ly, lz = self.linear_velocity
-        ax, ay, az = self.angular_velocity
-        return '{} p {} {} {} q {} {} {} {} lv {} {} {} av {} {} {}'.format(
-            self.name, x, y, z, a, b, c, d, lx, ly, lz, ax, ay, az)
+        args = [self.name]
+        args.extend(self.position)
+        args.extend(self.quaternion)
+        args.extend(self.linear_velocity)
+        args.extend(self.angular_velocity)
+        return '{} p {} {} {} q {} {} {} {} lv {} {} {} av {} {} {}'.format(*args)
 
     def rotate_to_body(self, x):
-        return np.dot(np.asarray(self.rotation).reshape((3, 3)), x)
+        return np.dot(x, np.array(self.rotation).reshape((3, 3)))
 
     def body_to_world(self, position):
         return self.ode_body.getRelPointPos(position)
@@ -182,7 +179,7 @@ class Box(Body):
 
     @property
     def dimensions(self):
-        return np.asarray(self.lengths)
+        return np.array(self.lengths).squeeze()
 
     def init_mass(self, m, density):
         m.setBox(density, *self.lengths)
@@ -196,7 +193,7 @@ class Sphere(Body):
     @property
     def dimensions(self):
         d = 2 * self.radius
-        return np.asarray([d, d, d])
+        return np.array([d, d, d]).squeeze()
 
     def init_mass(self, m, density):
         m.setSphere(density, self.radius)
@@ -214,7 +211,7 @@ class Cylinder(Body):
     @property
     def dimensions(self):
         d = self.radius
-        return np.asarray([d, d, self.length])
+        return np.array([d, d, self.length]).squeeze()
 
     def init_mass(self, m, density):
         m.setCylinder(density, 3, self.radius, self.length)
@@ -232,7 +229,7 @@ class Capsule(Body):
     @property
     def dimensions(self):
         d = 2 * self.radius
-        return np.asarray([d, d, d + self.length])
+        return np.array([d, d, d + self.length]).squeeze()
 
     def init_mass(self, m, density):
         m.setCapsule(density, 3, self.radius, self.length)
@@ -686,8 +683,6 @@ class World(base.World):
         self.friction = 1000
         self.gravity = 0, 0, -9.81
 
-        self.alpha = 0.9
-        self._colors = {}
         self._bodies = {}
         self._joints = {}
 
@@ -741,7 +736,7 @@ class World(base.World):
     def get_joint(self, name):
         return self._joints[name]
 
-    def create_body(self, shape, name=None, color=None, **kwargs):
+    def create_body(self, shape, name=None, **kwargs):
         '''Create a new body.'''
         shape = shape.lower()
         if name is None:
@@ -750,9 +745,6 @@ class World(base.World):
                 if name not in self._bodies:
                     break
         body = BODIES[shape](name, self.ode_world, self.ode_space, **kwargs)
-        self._colors[name] = color
-        if color is None:
-            self._colors[name] = np.array(tuple(rng.random(3)) + (self.alpha, ), 'f')
         self._bodies[name] = body
         return body
 
@@ -840,54 +832,3 @@ class World(base.World):
             c.setMu(self.friction)
             ode.ContactJoint(self.ode_world, self.ode_contactgroup, c).attach(
                 geom_a.getBody(), geom_b.getBody())
-
-    def draw(self, color=None, n=59):
-        '''Draw all bodies in the world.'''
-        for name, body in self._bodies.iteritems():
-            gl.glColor(color if color is not None else self._colors[name])
-            x, y, z = body.position
-            r = body.rotation
-            gl.glPushMatrix()
-            gl.glMultMatrixf([r[0], r[3], r[6], 0.,
-                              r[1], r[4], r[7], 0.,
-                              r[2], r[5], r[8], 0.,
-                              x, y, z, 1.])
-            if isinstance(body, Box):
-                gl.glScale(*body.lengths)
-                glut.glutSolidCube(1)
-            if isinstance(body, Sphere):
-                glut.glutSolidSphere(body.radius, n, n)
-            if isinstance(body, Cylinder):
-                l = body.length
-                gl.glTranslate(0, 0, -l / 2.)
-                glut.glutSolidCylinder(body.radius, l, n, n)
-            if isinstance(body, Capsule):
-                r = body.radius
-                l = body.length
-                gl.glTranslate(0, 0, -l / 2.)
-                glut.glutSolidCylinder(r, l, n, n)
-                glut.glutSolidSphere(r, n, n)
-                gl.glTranslate(0, 0, l)
-                glut.glutSolidSphere(r, n, n)
-            gl.glPopMatrix()
-        return
-        for name, joint in self._joints.iteritems():
-            l = 0.3
-            x, y, z = joint.anchor
-            for i, (rx, ry, rz) in enumerate(joint.axes):
-                r = joint.body_a.rotation
-                gl.glColor((i+1) / 3., 0, 0)
-                gl.glPushMatrix()
-                gl.glMultMatrixf([r[0], r[3], r[6], 0.,
-                                  r[1], r[4], r[7], 0.,
-                                  r[2], r[5], r[8], 0.,
-                                  x, y, z, 1.])
-                # http://thjsmith.com/40/cylinder-between-two-points-opengl-c
-                # http://en.wikipedia.org/wiki/Cross_product
-                # (rx, ry, rz) x (0, 0, 1) = (ry, -rx, 0)
-                # theta = acos((rx, ry, rz) * (0, 0, 1)) / |(rx, ry, rz)|
-                rl = np.sqrt(rx * rx + ry * ry + rz * rz)
-                gl.glRotate(np.arccos(rz / rl) * 360 / TAU, ry, -rx, 0)
-                gl.glTranslate(0, 0, -l / 2.)
-                glut.glutSolidCylinder(l / 20, l, n, n)
-                gl.glPopMatrix()
