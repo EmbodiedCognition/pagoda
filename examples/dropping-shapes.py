@@ -40,7 +40,7 @@ class World(lmj.sim.physics.World):
     friction=('coefficient of friction', 'option', None, float),
     elasticity=('elasticity constant for collisions', 'option', None, float),
     )
-def main(n=10, frame_rate=60., friction=5000, elasticity=0.1):
+def main(n=20, frame_rate=60., friction=5000, elasticity=0.2):
     w = World(dt=1. / frame_rate)
     w.friction = friction
     w.elasticity = elasticity
@@ -48,13 +48,14 @@ def main(n=10, frame_rate=60., friction=5000, elasticity=0.1):
     for _ in range(n):
         s, kw = sorted(dict(
             box=dict(lengths=g(3, size=3)),
-            capsule=dict(radius=g(3), length=g(7)),
-            cylinder=dict(radius=g(2), length=g(7)),
+            capsule=dict(radius=g(3), length=g(10)),
+            cylinder=dict(radius=g(2), length=g(10)),
             sphere=dict(radius=g(2)),
             ).iteritems())[rng.randint(4)]
+        kw['color'] = tuple(rng.uniform(0, 1, size=3)) + (0.9, )
         w.create_body(s, **kw)
     w.reset()
-    lmj.sim.viewer.GL(w).run()
+    lmj.sim.viewer.Physics(w).run()
 
 
 if __name__ == '__main__':

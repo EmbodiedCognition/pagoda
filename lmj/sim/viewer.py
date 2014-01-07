@@ -20,6 +20,7 @@
 
 '''OpenGL world viewer.'''
 
+import contextlib
 import numpy as np
 import pyglet
 
@@ -41,72 +42,86 @@ class Null(object):
                 self.world.reset()
 
 
+@contextlib.contextmanager
+def gl_context(scale=None, translate=None, rotate=None, mat=None):
+    glPushMatrix()
+    if mat is not None:
+        glMultMatrixf(vec(*mat))
+    if translate is not None:
+        glTranslatef(*translate)
+    if rotate is not None:
+        glRotatef(*rotate)
+    if scale is not None:
+        glScalef(*scale)
+    yield
+    glPopMatrix()
+
+
+def vec(*args):
+    return (GLfloat * len(args))(*args)
+
+
+def build_vertex_list(idx, vtx, nrm):
+    return pyglet.graphics.vertex_list_indexed(
+        len(vtx) // 3, idx, ('v3f/static', vtx), ('n3f/static', nrm))
+
+
+def box_vertices():
+    vtx = np.array([
+        [ 1, 1, 1], [ 1, 1, -1], [ 1, -1, -1], [ 1, -1, 1],
+        [-1, 1, 1], [-1, 1, -1], [-1, -1, -1], [-1, -1, 1]], 'f')
+    nrm = vtx / np.sqrt((vtx * vtx).sum(axis=1))[:, None]
+    return [
+        0, 3, 2,  0, 2, 1,  4, 5, 7,  7, 5, 6,  # x
+        0, 1, 4,  4, 1, 5,  6, 2, 3,  6, 3, 7,  # y
+        0, 4, 7,  0, 7, 3,  1, 2, 5,  5, 2, 6,  # z
+    ], vtx.flatten(), nrm.flatten()
+
+
+def sphere_vertices(n=2):
+    idx = [[0, 1, 2], [0, 5, 1], [0, 2, 4], [0, 4, 5],
+           [3, 2, 1], [3, 4, 2], [3, 5, 4], [3, 1, 5]]
+    vtx = list(np.array([
+        [ 1, 0, 0], [0,  1, 0], [0, 0,  1],
+        [-1, 0, 0], [0, -1, 0], [0, 0, -1]], 'f'))
+    for _ in range(n):
+        idx_ = []
+        for ui, vi, wi in idx:
+            u, v, w = vtx[ui], vtx[vi], vtx[wi]
+            d, e, f = u + v, v + w, w + u
+            di = len(vtx)
+            vtx.append(d / np.linalg.norm(d))
+            ei = len(vtx)
+            vtx.append(e / np.linalg.norm(e))
+            fi = len(vtx)
+            vtx.append(f / np.linalg.norm(f))
+            idx_.append([ui, di, fi])
+            idx_.append([vi, ei, di])
+            idx_.append([wi, fi, ei])
+            idx_.append([di, ei, fi])
+        idx = idx_
+    vtx = np.array(vtx, 'f').flatten()
+    return np.array(idx).flatten(), vtx, vtx
+
+
+def cylinder_vertices(n=14):
+    idx = []
+    vtx = [0, 0, 1,  0, 0, -1,  1, 0, 1,  1, 0, -1]
+    nrm = [0, 0, 1,  0, 0, -1,  1, 0, 0,  1, 0, 0]
+    thetas = np.linspace(0, TAU, n)
+    for i in range(len(thetas) - 1):
+        t0 = thetas[i]
+        t1 = thetas[i+1]
+        a = 2 * (i+1)
+        b = 2 * (i+2)
+        idx.extend([0, a, b,  a, a+1, b,  b, a+1, b+1,  b+1, a+1, 1])
+        x, y = np.cos(t1), np.sin(t1)
+        vtx.extend([x, y, 1,  x, y, -1])
+        nrm.extend([x, y, 0,  x, y, 0])
+    return idx, vtx, nrm
+
+
 class GL(pyglet.window.Window):
-    @staticmethod
-    def vec(*args):
-        return (GLfloat * len(args))(*args)
-
-    @staticmethod
-    def build_vertex_list(shape):
-        idx, vtx, nrm = shape()
-        return pyglet.graphics.vertex_list_indexed(
-            len(vtx) // 3, idx, ('v3f/static', vtx), ('n3f/static', nrm))
-
-    @staticmethod
-    def box_vertices():
-        vtx = np.array([
-            [ 1, 1, 1], [ 1, 1, -1], [ 1, -1, -1], [ 1, -1, 1],
-            [-1, 1, 1], [-1, 1, -1], [-1, -1, -1], [-1, -1, 1]], 'f')
-        nrm = vtx / np.sqrt((vtx * vtx).sum(axis=1))[:, None]
-        return [
-            0, 3, 2,  0, 2, 1,  4, 5, 7,  7, 5, 6,  # x
-            0, 1, 4,  4, 1, 5,  6, 2, 3,  6, 3, 7,  # y
-            0, 4, 7,  0, 7, 3,  1, 2, 5,  5, 2, 6,  # z
-        ], vtx.flatten(), nrm.flatten()
-
-    @staticmethod
-    def sphere_vertices(n=2):
-        idx = [[0, 1, 2], [0, 5, 1], [0, 2, 4], [0, 4, 5],
-               [3, 2, 1], [3, 4, 2], [3, 5, 4], [3, 1, 5]]
-        vtx = list(np.array([
-            [ 1, 0, 0], [0,  1, 0], [0, 0,  1],
-            [-1, 0, 0], [0, -1, 0], [0, 0, -1]], 'f'))
-        for _ in range(n):
-            idx_ = []
-            for ui, vi, wi in idx:
-                u, v, w = vtx[ui], vtx[vi], vtx[wi]
-                d, e, f = u + v, v + w, w + u
-                di = len(vtx)
-                vtx.append(d / np.linalg.norm(d))
-                ei = len(vtx)
-                vtx.append(e / np.linalg.norm(e))
-                fi = len(vtx)
-                vtx.append(f / np.linalg.norm(f))
-                idx_.append([ui, di, fi])
-                idx_.append([vi, ei, di])
-                idx_.append([wi, fi, ei])
-                idx_.append([di, ei, fi])
-            idx = idx_
-        vtx = np.array(vtx, 'f').flatten()
-        return np.array(idx).flatten(), vtx, vtx
-
-    @staticmethod
-    def cylinder_vertices(n=14):
-        idx = []
-        vtx = [0, 0, 1,  0, 0, -1,  1, 0, 1,  1, 0, -1]
-        nrm = [0, 0, 1,  0, 0, -1,  1, 0, 0,  1, 0, 0]
-        thetas = np.linspace(0, TAU, n)
-        for i in range(len(thetas) - 1):
-            t0 = thetas[i]
-            t1 = thetas[i+1]
-            a = 2 * (i+1)
-            b = 2 * (i+2)
-            idx.extend([0, a, b,  a, a+1, b,  b, a+1, b+1,  b+1, a+1, 1])
-            x, y = np.cos(t1), np.sin(t1)
-            vtx.extend([x, y, 1,  x, y, -1])
-            nrm.extend([x, y, 0,  x, y, 0])
-        return idx, vtx, nrm
-
     def __init__(self, world, trace=None, paused=False):
         platform = pyglet.window.get_platform()
         display = platform.get_default_display()
@@ -154,14 +169,14 @@ class GL(pyglet.window.Window):
         glHint(GL_POLYGON_SMOOTH_HINT, GL_NICEST)
         glShadeModel(GL_SMOOTH)
 
-        glLightfv(GL_LIGHT0, GL_AMBIENT, GL.vec(0.2, 0.2, 0.2, 1.0))
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, GL.vec(1.0, 1.0, 1.0, 1.0))
-        glLightfv(GL_LIGHT0, GL_POSITION, GL.vec(3.0, 3.0, 10.0, 1.0))
+        glLightfv(GL_LIGHT0, GL_AMBIENT, vec(0.2, 0.2, 0.2, 1.0))
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, vec(1.0, 1.0, 1.0, 1.0))
+        glLightfv(GL_LIGHT0, GL_POSITION, vec(3.0, 3.0, 10.0, 1.0))
         glEnable(GL_LIGHT0)
 
-        self.box = GL.build_vertex_list(GL.box_vertices)
-        self.sphere = GL.build_vertex_list(GL.sphere_vertices)
-        self.cylinder = GL.build_vertex_list(GL.cylinder_vertices)
+        self.box = build_vertex_list(*box_vertices())
+        self.sphere = build_vertex_list(*sphere_vertices())
+        self.cylinder = build_vertex_list(*cylinder_vertices(32))
 
     def on_mouse_scroll(self, x, y, dx, dy):
         if dy == 0: return
@@ -174,7 +189,7 @@ class GL(pyglet.window.Window):
             self.tz += 0.03 * dy
         else:
             # roll
-            self.ry += 0.2 * dy
+            self.ry += 0.2 * -dy
             self.rz += 0.2 * dx
         #print('z', self.zoom, 't', self.ty, self.tz, 'r', self.ry, self.rz)
 
@@ -220,6 +235,9 @@ class GL(pyglet.window.Window):
         pyglet.clock.schedule_interval(self.update, self.world.dt)
         pyglet.app.run()
 
+    def draw(self):
+        raise NotImplementedError
+
 
 class Physics(GL):
     def __init__(self, *args, **kwargs):
@@ -246,40 +264,35 @@ class Physics(GL):
             x, y, z = body.position
             r = body.rotation
             glColor4f(*(color if color is not None else body.color))
-            glPushMatrix()
-            glMultMatrixf(GL.vec(
-                r[0], r[3], r[6], 0.,
-                r[1], r[4], r[7], 0.,
-                r[2], r[5], r[8], 0.,
-                x, y, z, 1.))
-            if isinstance(body, physics.Box):
-                x, y, z = body.lengths
-                glScalef(x / 2., y / 2., z / 2.)
-                self.box.draw(GL_TRIANGLES)
-            if isinstance(body, physics.Sphere):
-                r = body.radius
-                glScalef(r, r, r)
-                self.sphere.draw(GL_TRIANGLES)
-            if isinstance(body, physics.Cylinder):
-                l = body.length
-                r = body.radius
-                glScalef(r, r, l / 2)
-                self.cylinder.draw(GL_TRIANGLES)
-            if isinstance(body, physics.Capsule):
-                r = body.radius
-                l = body.length
-                glPushMatrix()
-                glScalef(r, r, l / 2)
-                self.cylinder.draw(GL_TRIANGLES)
-                glPopMatrix()
-                glPushMatrix()
-                glTranslatef(0, 0, -l / 2)
-                glScalef(r, r, r)
-                self.sphere.draw(GL_TRIANGLES)
-                glPopMatrix()
-                glPushMatrix()
-                glTranslatef(0, 0, l / 2)
-                glScalef(r, r, r)
-                self.sphere.draw(GL_TRIANGLES)
-                glPopMatrix()
-            glPopMatrix()
+            with gl_context(mat=(r[0], r[3], r[6], 0.,
+                                 r[1], r[4], r[7], 0.,
+                                 r[2], r[5], r[8], 0.,
+                                 x, y, z, 1.)):
+                if isinstance(body, physics.Box):
+                    x, y, z = body.lengths
+                    glScalef(x / 2., y / 2., z / 2.)
+                    self.box.draw(GL_TRIANGLES)
+                elif isinstance(body, physics.Sphere):
+                    r = body.radius
+                    glScalef(r, r, r)
+                    self.sphere.draw(GL_TRIANGLES)
+                elif isinstance(body, physics.Cylinder):
+                    l = body.length
+                    r = body.radius
+                    glScalef(r, r, l / 2)
+                    self.cylinder.draw(GL_TRIANGLES)
+                elif isinstance(body, physics.Capsule):
+                    r = body.radius
+                    l = body.length
+                    with gl_context(scale=(r, r, l / 2)):
+                        self.cylinder.draw(GL_TRIANGLES)
+                    with gl_context(mat=(r, 0, 0, 0,
+                                         0, r, 0, 0,
+                                         0, 0, r, 0,
+                                         0, 0, -l / 2, 1)):
+                        self.sphere.draw(GL_TRIANGLES)
+                    with gl_context(mat=(r, 0, 0, 0,
+                                         0, r, 0, 0,
+                                         0, 0, r, 0,
+                                         0, 0, l / 2, 1)):
+                        self.sphere.draw(GL_TRIANGLES)

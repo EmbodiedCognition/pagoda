@@ -21,20 +21,25 @@
 # SOFTWARE.
 
 import lmj.cli
-import lmj.sim as ls
+import lmj.sim
+import lmj.sim.cooper
 import os
 import sys
 
-
 @lmj.cli.annotate(
-    frame_rate=('frame rate of the simulation', 'option', None, float),
-    friction=('coefficient of friction', 'option', None, float),
-    elasticity=('elasticity constant for collisions', 'option', None, float),
+    cfm=('constraint force mix parameter (0-inf)', 'option', None, float),
+    erp=('error restoration parameter (0-1)', 'option', None, float),
     )
-def main(frame_rate=60., friction=5000, elasticity=0.1):
-    w = ls.cooper.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
-    ls.cooper.create_skeleton(w, os.path.join(os.path.dirname(__file__), 'cooper.txt'))
-    ls.viewer.GL(w, paused=True).run()
+def main(cfm=1e-5, erp=0.7):
+    w = lmj.sim.cooper.World(dt=1. / 120)
+    w.friction = 5000
+    w.elasticity = 0.1
+    w.cfm = cfm
+    w.erp = erp
+    w.load_skeleton(os.path.join(os.path.dirname(__file__), 'cooper-skeleton.txt'))
+    w.load_markers(os.path.join(os.path.dirname(__file__), 'cooper-motion.c3d'),
+                   os.path.join(os.path.dirname(__file__), 'cooper-markers.txt'))
+    lmj.sim.viewer.Physics(w).run()
 
 
 if __name__ == '__main__':
