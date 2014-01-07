@@ -36,14 +36,14 @@ class World(lmj.sim.physics.World):
 
 @lmj.cli.annotate(
     n=('number of bodies in the simulation', 'option', None, int),
-    frame_rate=('frame rate of the simulation', 'option', None, float),
-    friction=('coefficient of friction', 'option', None, float),
-    elasticity=('elasticity constant for collisions', 'option', None, float),
     )
-def main(n=20, frame_rate=60., friction=5000, elasticity=0.2):
-    w = World(dt=1. / frame_rate)
-    w.friction = friction
-    w.elasticity = elasticity
+def main(n=20):
+    w = World(dt=1. / 60.)
+    w.friction = 5000
+    w.elasticity = 0.2
+    # set the cfm parameter below for a trampoline-like floor !
+    #w.cfm = 1e-3
+    w.erp = 0.7
     g = lambda n, k=0.1, size=1: np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
     for _ in range(n):
         s, kw = sorted(dict(
