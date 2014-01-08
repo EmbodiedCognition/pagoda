@@ -26,16 +26,9 @@ import lmj.sim.cooper
 import os
 import sys
 
-@lmj.cli.annotate(
-    cfm=('constraint force mix parameter (0-inf)', 'option', None, float),
-    erp=('error restoration parameter (0-1)', 'option', None, float),
-    )
-def main(cfm=1e-5, erp=0.7):
+
+def main():
     w = lmj.sim.cooper.World(dt=1. / 120)
-    w.friction = 5000
-    w.elasticity = 0.1
-    w.cfm = cfm
-    w.erp = erp
     w.load_skeleton(os.path.join(os.path.dirname(__file__), 'cooper-skeleton.txt'))
     w.load_markers(os.path.join(os.path.dirname(__file__), 'cooper-motion.c3d'),
                    os.path.join(os.path.dirname(__file__), 'cooper-markers.txt'))

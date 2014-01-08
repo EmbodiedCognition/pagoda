@@ -38,12 +38,9 @@ class World(lmj.sim.physics.World):
     n=('number of bodies in the simulation', 'option', None, int),
     )
 def main(n=20):
-    w = World(dt=1. / 60.)
-    w.friction = 5000
-    w.elasticity = 0.2
+    w = World()
     # set the cfm parameter below for a trampoline-like floor !
     #w.cfm = 1e-3
-    w.erp = 0.7
     g = lambda n, k=0.1, size=1: np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
     for _ in range(n):
         s, kw = sorted(dict(
