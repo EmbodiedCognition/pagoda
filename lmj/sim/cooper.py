@@ -14,9 +14,9 @@ logging = lmj.cli.get_logger(__name__)
 
 
 class Parser(object):
-    def __init__(self, world, filename, namespace, jointgroup=None):
+    def __init__(self, world, source, namespace, jointgroup=None):
         self.world = world
-        self.filename = filename
+        self.filename = source
         self.namespace = namespace
         self.jointgroup = jointgroup
 
@@ -24,11 +24,15 @@ class Parser(object):
         self.index = 0
         self.root = None
 
-        with open(filename) as handle:
-            for i, line in enumerate(handle):
-                for j, token in enumerate(line.split('#')[0].strip().split()):
-                    if token.strip():
-                        self.config.append((i, j, token))
+        if isinstance(source, str):
+            source = open(source)
+        else:
+            self.filename = '(file)'
+        for i, line in enumerate(source):
+            for j, token in enumerate(line.split('#')[0].strip().split()):
+                if token.strip():
+                    self.config.append((i, j, token))
+        source.close()
 
     def error(self, msg):
         lineno, tokenno, token = self.config[self.index - 1]
@@ -133,8 +137,6 @@ class Parser(object):
             joint.lo_stops = lo_stops
         if hi_stops is not None:
             joint.hi_stops = hi_stops
-        joint.cfms = 1e-9
-        joint.ode_joint.setParam(ode.ParamCFM, 0)
 
         # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
@@ -166,6 +168,7 @@ class Skeleton(object):
         '''
         '''
         self.world = world
+        self.filename = filename
         self.jointgroup = ode.JointGroup()
 
         if namespace is None:
@@ -190,7 +193,9 @@ class Skeleton(object):
 
     @property
     def joints(self):
-        return self.jointgroup.jointlist
+        for joint in self.world.joints:
+            if joint.name.startswith(self.namespace):
+                yield joint
 
     @property
     def max_force(self):
@@ -218,6 +223,23 @@ class Skeleton(object):
         for joint in self.joints:
             values.extend(joint.velocities)
         return values
+
+    def get_body_states(self):
+        '''Return a list of the states of all bodies in the skeleton.'''
+        return [(b.name,
+                 b.position,
+                 b.quaternion,
+                 b.linear_velocity,
+                 b.angular_velocity) for b in self.bodies]
+
+    def set_body_states(self, states):
+        '''Set the states of all bodies in the skeleton.'''
+        for name, pos, rot, lin, ang in states:
+            body = self.world.get_body(name)
+            body.position = pos
+            body.quaternion = rot
+            body.linear_velocity = lin
+            body.angular_velocity = ang
 
     def reset_velocities(self, target=0):
         for joint in self.joints:
@@ -292,6 +314,7 @@ class Markers(Frames):
     def __init__(self, world, filename, channels=None):
         self.world = world
         self.jointgroup = ode.JointGroup()
+        self.joints = []
         self.channels = channels or {}
         self.marker_bodies = {}
         self.attach_bodies = {}
@@ -332,44 +355,50 @@ class Markers(Frames):
             body = self.world.create_body(
                 'sphere',
                 name='marker:{}'.format(label),
-                radius=0.03,
-                color=(1, 1, 1, 0.7))
+                radius=0.02,
+                color=(1, 1, 1, 0.5))
             body.is_kinematic = True
             self.marker_bodies[label] = body
 
-    def load_attachments(self, filename, skeleton):
+    def load_attachments(self, source, skeleton):
         self.attach_bodies = {}
         self.attach_offsets = {}
-        with open(filename) as handle:
-            for i, line in enumerate(handle):
-                tokens = line.split('#')[0].strip().split()
-                if not tokens:
-                    continue
-                label = tokens.pop(0)
-                if label not in self.channels:
-                    logging.info('%s:%d: unknown marker %s', filename, i, label)
-                    continue
-                if not tokens:
-                    continue
-                name = tokens.pop(0)
-                s = '{}{}'.format(skeleton.namespace, name)
-                bodies = [b for b in skeleton.bodies if b.name == s]
-                if len(bodies) != 1:
-                    logging.info('%s:%d: %d skeleton bodies match %s',
-                                 filename, i, len(bodies), name)
-                    continue
-                b = self.attach_bodies[label] = bodies[0]
-                o = self.attach_offsets[label] = \
-                    np.array(map(float, tokens)) * b.dimensions / 2
-                logging.info('%s <--> %s, offset %s', label, b.name, o)
+
+        filename = source
+        if isinstance(source, str):
+            source = open(source)
+        else:
+            filename = '(stringio)'
+
+        for i, line in enumerate(source):
+            tokens = line.split('#')[0].strip().split()
+            if not tokens:
+                continue
+            label = tokens.pop(0)
+            if label not in self.channels:
+                logging.info('%s:%d: unknown marker %s', filename, i, label)
+                continue
+            if not tokens:
+                continue
+            name = tokens.pop(0)
+            s = '{}{}'.format(skeleton.namespace, name)
+            bodies = [b for b in skeleton.bodies if b.name == s]
+            if len(bodies) != 1:
+                logging.info('%s:%d: %d skeleton bodies match %s',
+                             filename, i, len(bodies), name)
+                continue
+            b = self.attach_bodies[label] = bodies[0]
+            o = self.attach_offsets[label] = \
+                np.array(map(float, tokens)) * b.dimensions / 2
+            logging.info('%s <--> %s, offset %s', label, b.name, o)
 
     def detach(self):
         self.jointgroup.empty()
+        self.joints = []
 
     def attach(self, i, cfm, erp):
-        condition = self.data[i][:, 3]
         for label, j in self.channels.iteritems():
-            if not 1 < condition[j] < 100:
+            if not 1 < self.data[i, j, 3] < 100:
                 continue
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
             joint.attach(self.marker_bodies[label].ode_body,
@@ -378,6 +407,7 @@ class Markers(Frames):
             joint.setAnchor2Rel(self.attach_offsets[label])
             joint.setParam(ode.ParamCFM, cfm)
             joint.setParam(ode.ParamERP, erp)
+            self.joints.append(joint)
 
     def reposition(self, i):
         frame = self.data[i, :, :3]
@@ -400,6 +430,7 @@ class Markers(Frames):
 class World(physics.World):
     def load_skeleton(self, filename, namespace=None):
         self.skeleton = Skeleton(self, filename, namespace)
+        self.skeleton.cfm = 1e-8
 
     def load_markers(self, filename, attachments, namespace=None):
         self.markers = Markers(self, filename=filename)
@@ -425,7 +456,7 @@ class World(physics.World):
             self.markers.detach()
             self.markers.reposition(i)
             if cfm > 0 and erp > 0:
-                self.markers.attach(i, self.cfm, self.erp)
+                self.markers.attach(i, cfm, erp)
 
             # allow our caller to make changes to the world based on external
             # forces, target joint angles, etc. we provide the current marker
