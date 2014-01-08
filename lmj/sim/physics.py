@@ -280,7 +280,7 @@ class Motor(object):
     the motor.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, feedback=True, dof=3, **kwargs):
+    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3, **kwargs):
         self.name = name
         if isinstance(world, World):
             world = world.ode_world
@@ -429,7 +429,7 @@ class Joint(object):
     '''
 
     def __init__(self, name, world, body_a, body_b=None,
-                 anchor=None, feedback=True, jointgroup=None):
+                 anchor=None, feedback=False, jointgroup=None):
         '''Create a new joint connecting two bodies in the world.
         '''
         self.name = name
@@ -681,8 +681,10 @@ class World(base.World):
         self.frame = 0
         self.dt = dt
         self.elasticity = 0.1
-        self.friction = 1000
+        self.friction = 2000
         self.gravity = 0, 0, -9.81
+        self.cfm = 1e-8
+        self.erp = 0.5
 
         self._bodies = {}
         self._joints = {}
