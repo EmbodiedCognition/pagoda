@@ -31,6 +31,30 @@ body box ll-leg   lengths 0.08 0.11 0.42
 body box l-heel   lengths 0.08 0.10 0.08
 body box l-foot   lengths 0.08 0.12 0.04
 
+# --- marker attachments ---
+
+marker  0:vhead head 0 0 0
+marker  1:vhead head 0 0 0
+marker  2:vhead head 0 0 0
+marker  3:vhead head 0 0 0
+marker  4:vhead head 0 0 0
+marker  5:vhead head 0 0 0
+marker  6:vhead head 0 0 0
+marker  7:vhead head 0 0 0
+marker  8:vhead head 0 0 0
+marker  9:vhead head 0 0 0
+marker 10:vhead head 0 0 0
+marker 11:vhead head 0 0 0
+marker 12:vhead head 0 0 0
+marker 13:vhead head 0 0 0
+marker 14:vhead head 0 0 0
+marker 15:vhead head 0 0 0
+marker 16:vhead head 0 0 0
+marker 17:vhead head 0 0 0
+marker 18:vhead head 0 0 0
+marker 19:vhead head 0 0 0
+marker 20:vhead head 0 0 0
+
 # --- joint attachments ---
 
 # spine
