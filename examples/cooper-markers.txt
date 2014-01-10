@@ -1,13 +1,13 @@
-TakeoMonday:RBHD head  1 -1 0.5
+TakeoMonday:RBHD head  1 -1 0
 TakeoMonday:RFHD head  1  1 0.5
 TakeoMonday:LFHD head -1  1 0.5
-TakeoMonday:LBHD head -1 -1 0.5
+TakeoMonday:LBHD head -1 -1 0
 
-TakeoMonday:C7   neck    0 -1  0
-TakeoMonday:CLAV u-torso 0  1  0.8
-TakeoMonday:STRN u-torso 0  1 -0.8
-TakeoMonday:RBAC u-torso 0 -1  0
-TakeoMonday:T10  l-torso 0 -1  0
+TakeoMonday:C7   neck    0   -1 -1
+TakeoMonday:CLAV u-torso 0    1  0.8
+TakeoMonday:STRN u-torso 0    1 -0.8
+TakeoMonday:RBAC l-torso 0.5 -1  1
+TakeoMonday:T10  l-torso 0   -1  0
 
 TakeoMonday:RBWT pelvis  1 -1 0.5
 TakeoMonday:RFWT pelvis  1  1 0.5
@@ -30,18 +30,18 @@ TakeoMonday:RWRA rl-arm  -1 0 -1
 TakeoMonday:RWRB rl-arm   1 0 -1
 TakeoMonday:RFIN r-hand   0 1 0
 
-TakeoMonday:LTHI lu-leg -1   0   0
-TakeoMonday:LKNE lu-leg  0   0  -1
-TakeoMonday:LSHN ll-leg -1   0   0
-TakeoMonday:LANK ll-leg -1   0  -1
-TakeoMonday:LHEE l-heel  0  -1  -0.9
-TakeoMonday:LMT5 l-foot -0.9 0   1
-TakeoMonday:LTOE l-foot  0.9 0.9 1
+TakeoMonday:LTHI lu-leg -1    0   0
+TakeoMonday:LKNE lu-leg  0    0  -1
+TakeoMonday:LSHN ll-leg -1    0   0
+TakeoMonday:LANK ll-leg -1    0  -1
+TakeoMonday:LHEE l-heel  0.5 -1   1
+TakeoMonday:LMT5 l-foot -0.9  0   1
+TakeoMonday:LTOE l-foot  0.9  0.9 1
 
-TakeoMonday:RTHI ru-leg  1   0   0.5
-TakeoMonday:RKNE ru-leg  0   0  -1
-TakeoMonday:RSHN rl-leg  1   0   0.8
-TakeoMonday:RANK rl-leg  1   0  -1
-TakeoMonday:RHEE r-heel  0  -1  -0.9
-TakeoMonday:RMT5 r-foot  0.9 0   1
-TakeoMonday:RTOE r-foot -0.9 0.9 1
+TakeoMonday:RTHI ru-leg  1    0   0.5
+TakeoMonday:RKNE ru-leg  0    0  -1
+TakeoMonday:RSHN rl-leg  1    0   0.8
+TakeoMonday:RANK rl-leg  1    0  -1
+TakeoMonday:RHEE r-heel -0.5 -1   1
+TakeoMonday:RMT5 r-foot  0.9  0   1
+TakeoMonday:RTOE r-foot -0.9  0.9 1
