@@ -36,7 +36,7 @@ class Null(object):
         self.world = world
 
     def run(self):
-        while self.world.step():
+        while not self.world.step():
             self.world.trace()
             if self.world.needs_reset():
                 self.world.reset()
@@ -224,7 +224,7 @@ class GL(pyglet.window.Window):
     def update(self, dt):
         if self.paused:
             return
-        if not self.world.step():
+        if self.world.step():
             pyglet.app.exit()
         if self.trace:
             self.world.trace(self.trace)
