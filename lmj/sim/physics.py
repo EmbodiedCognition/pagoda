@@ -39,11 +39,9 @@ class Body(object):
     equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1),
-                 trace=True, density=1000., **shape):
+    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
         self.name = name
         self.shape = shape
-        self.trace = trace
         self.color = color
 
         m = ode.Mass()
@@ -137,8 +135,6 @@ class Body(object):
         self.ode_body.setGravity(follows_gravity)
 
     def trace(self):
-        if not self.feedback:
-            return ''
         args = [self.name]
         args.extend(self.position)
         args.extend(self.quaternion)
@@ -270,12 +266,13 @@ class Motor(object):
 
     There are also read-only properties for :
 
-    - the number of degrees of freedom (`dof`) and
+    - the feedback through the motor (`feedback`),
+    - the number of degrees of freedom (`dof`), and
     - the current state of the motor (`angles`) as well as the derivative
       (`angle_rates`).
 
-    All of these properties return sequences of values. The setters can be
-    applied using a scalar value, which will be applied to all degrees of
+    All of these properties except `dof` return sequences of values. The setters
+    can be applied using a scalar value, which will be applied to all degrees of
     freedom, or with a sequence whose length must match the number of DOFs in
     the motor.
     '''
@@ -284,26 +281,30 @@ class Motor(object):
         self.name = name
         if isinstance(world, World):
             world = world.ode_world
-        self.motor = self.MOTOR_FACTORY(world)
-        self.motor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.motor.setFeedback(feedback)
-        self.motor.setNumAxes(dof)
+        self.ode_motor = self.MOTOR_FACTORY(world)
+        self.ode_motor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.ode_motor.setFeedback(feedback)
+        self.ode_motor.setNumAxes(dof)
+
+    @property
+    def feedback(self):
+        return self.ode_motor.getFeedback()
 
     @property
     def dof(self):
-        return self.motor.getNumAxes()
+        return self.ode_motor.getNumAxes()
 
     @property
     def angles(self):
-        return [self.motor.getAngle(i) for i in range(self.dof)]
+        return [self.ode_motor.getAngle(i) for i in range(self.dof)]
 
     @property
     def angle_rates(self):
-        return [self.motor.getAngleRate(i) for i in range(self.dof)]
+        return [self.ode_motor.getAngleRate(i) for i in range(self.dof)]
 
     @property
     def axes(self):
-        return [dict(rel=self.motor.getAxisRel(i), axis=self.motor.getAxis(i))
+        return [dict(rel=self.ode_motor.getAxisRel(i), axis=self.ode_motor.getAxis(i))
                 for i in range(self.dof)]
 
     @axes.setter
@@ -315,47 +316,47 @@ class Motor(object):
                 rel = axis.get('rel', 0)
                 axis = axis.get('axis')
             if axis is not None:
-                self.motor.setAxis(i, rel, axis)
+                self.ode_motor.setAxis(i, rel, axis)
 
     @property
     def lo_stops(self):
-        return _get_params(self.motor, 'LoStop', self.dof)
+        return _get_params(self.ode_motor, 'LoStop', self.dof)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        _set_params(self.motor, 'LoStop', lo_stops, self.dof)
+        _set_params(self.ode_motor, 'LoStop', lo_stops, self.dof)
 
     @property
     def hi_stops(self):
-        return _get_params(self.motor, 'HiStop', self.dof)
+        return _get_params(self.ode_motor, 'HiStop', self.dof)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        _set_params(self.motor, 'HiStop', hi_stops, self.dof)
+        _set_params(self.ode_motor, 'HiStop', hi_stops, self.dof)
 
     @property
     def velocities(self):
-        return _get_params(self.motor, 'Vel', self.dof)
+        return _get_params(self.ode_motor, 'Vel', self.dof)
 
     @velocities.setter
     def velocities(self, velocities):
-        _set_params(self.motor, 'Vel', velocities, self.dof)
+        _set_params(self.ode_motor, 'Vel', velocities, self.dof)
 
     @property
     def max_forces(self):
-        return _get_params(self.motor, 'FMax', self.dof)
+        return _get_params(self.ode_motor, 'FMax', self.dof)
 
     @max_forces.setter
     def max_forces(self, max_forces):
-        _set_params(self.motor, 'FMax', max_forces, self.dof)
+        _set_params(self.ode_motor, 'FMax', max_forces, self.dof)
 
     @property
     def cfms(self):
-        return _get_params(self.motor, 'CFM', self.dof)
+        return _get_params(self.ode_motor, 'CFM', self.dof)
 
     @cfms.setter
     def cfms(self, cfms):
-        _set_params(self.motor, 'CFM', cfms, self.dof)
+        _set_params(self.ode_motor, 'CFM', cfms, self.dof)
 
     @property
     def stop_cfms(self):
@@ -390,7 +391,7 @@ class AMotor(Motor):
         mode = kwargs.get('mode', 'user')
         if isinstance(mode, str):
             mode = ode.AMotorEuler if mode.lower().startswith('e') else ode.AMotorUser
-        self.motor.setMode(mode)
+        self.ode_motor.setMode(mode)
 
 
 class LMotor(Motor):

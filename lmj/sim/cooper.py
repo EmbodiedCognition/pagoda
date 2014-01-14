@@ -140,7 +140,7 @@ class Parser(object):
 
         # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
-        joint.controllers = [lmj.pid.Controller(kp=0.9) for i in range(joint.ADOF)]
+        joint.controllers = [lmj.pid.Controller(kp=1) for i in range(joint.ADOF)]
 
         return token
 
@@ -245,28 +245,24 @@ class Skeleton(object):
         for joint in self.joints:
             joint.velocities = target
 
-    def set_target_angles(self, angles):
-        torques = []
-
+    def add_torques(self, torques):
         j = 0
         for joint in self.joints:
-            targets = frame[j:j+joint.ADOF]
+            joint.add_torque(torques[j:j+joint.ADOF])
             j += joint.ADOF
 
+    def set_target_angles(self, angles):
+        j = 0
+        for joint in self.joints:
             # move toward target angles for each joint.
             joint.velocities = [
                 ctrl(tgt - cur, self.world.dt) for cur, tgt, ctrl in
-                zip(joint.angles, targets, joint.controllers)]
-
-            # record the torques that this joint experienced.
-            torques.extend(joint.feedback[-1][:joint.ADOF])
-
-        return torques
+                zip(joint.angles, angles[j:j+joint.ADOF], joint.controllers)]
+            j += joint.ADOF
 
 
 class Frames(object):
-    def __init__(self, dt, filename=None, num_frames=0, num_dofs=0):
-        self.dt = dt
+    def __init__(self, filename=None, num_frames=0, num_dofs=0):
         self.data = None
         if filename:
             self.load(filename)
@@ -304,7 +300,7 @@ class Frames(object):
 
     @classmethod
     def like(cls, frames):
-        return cls(dt=self.dt, num_frames=len(frames), num_dofs=frames.num_dofs)
+        return cls(num_frames=len(frames), num_dofs=frames.num_dofs)
 
 
 class Markers(Frames):
@@ -315,21 +311,34 @@ class Markers(Frames):
         self.world = world
         self.jointgroup = ode.JointGroup()
         self.joints = []
-        self.channels = channels or {}
+        self.cfm = 1e-4
+        self.erp = 0.7
+
+        self.skeleton = None
         self.marker_bodies = {}
         self.attach_bodies = {}
         self.attach_offsets = {}
+
+        self.channels = self._interpret_channels(channels)
         self.load(filename)
-        self.create_bodies()
 
     @property
     def num_markers(self):
         return self.data.shape[1]
 
+    def _interpret_channels(self, channels):
+        if isinstance(channels, str):
+            channels = channels.strip().split()
+        if isinstance(channels, (tuple, list)):
+            return dict((c, i) for i, c in enumerate(channels))
+        return channels or {}
+
     def load(self, filename, channels=None):
         if not filename.lower().endswith('.c3d'):
-            self.channels = channels or self.channels
-            return super(Markers, self).load(filename)
+            self.channels = self._interpret_channels(channels or self.channels)
+            super(Markers, self).load(filename)
+            self.create_bodies()
+            return
 
         with open(filename, 'rb') as handle:
             reader = lmj.c3d.Reader(handle)
@@ -342,12 +351,14 @@ class Markers(Frames):
             l, n = param.dimensions
             labels = [param.bytes[i*l:(i+1)*l].strip() for i in range(n)]
             logging.info('%s: loaded marker labels %s', filename, labels)
-            self.channels = dict((l, i) for i, l in enumerate(labels))
+            self.channels = self._interpret_channels(labels)
 
             # read the actual c3d data into a numpy array.
             self.data = np.asarray(
                 [frame / 1000 for frame, _ in reader.read_frames()])
-            logging.info('%s: loaded marker data %s', filename, self.data.shape)
+
+        logging.info('%s: loaded marker data %s', filename, self.data.shape)
+        self.create_bodies()
 
     def create_bodies(self):
         self.marker_bodies = {}
@@ -361,6 +372,8 @@ class Markers(Frames):
             self.marker_bodies[label] = body
 
     def load_attachments(self, source, skeleton):
+        self.skeleton = skeleton
+
         self.attach_bodies = {}
         self.attach_offsets = {}
 
@@ -396,25 +409,25 @@ class Markers(Frames):
         self.jointgroup.empty()
         self.joints = []
 
-    def attach(self, i, cfm, erp):
+    def attach(self, frame_no):
         for label, j in self.channels.iteritems():
-            if not 1 < self.data[i, j, 3] < 100:
+            if not 1 < self.data[frame_no, j, 3] < 100:
                 continue
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
             joint.attach(self.marker_bodies[label].ode_body,
                          self.attach_bodies[label].ode_body)
             joint.setAnchor1Rel([0, 0, 0])
             joint.setAnchor2Rel(self.attach_offsets[label])
-            joint.setParam(ode.ParamCFM, cfm)
-            joint.setParam(ode.ParamERP, erp)
+            joint.setParam(ode.ParamCFM, self.cfm)
+            joint.setParam(ode.ParamERP, self.erp)
             self.joints.append(joint)
 
-    def reposition(self, i):
-        frame = self.data[i, :, :3]
+    def reposition(self, frame_no):
+        frame = self.data[frame_no, :, :3]
         delta = np.zeros_like(frame)
-        if 0 < i < self.num_frames - 1:
-            delta = (self.data[i+1, :, :3] - self.data[i-1, :, :3]) / (
-                2 * self.world.dt)
+        if 0 < frame_no < self.num_frames - 1:
+            delta = (self.data[frame_no + 1, :, :3] -
+                     self.data[frame_no - 1, :, :3]) / (2 * self.world.dt)
         for label, j in self.channels.iteritems():
             body = self.marker_bodies[label]
             body.position = frame[j]
@@ -429,81 +442,97 @@ class Markers(Frames):
 
 class World(physics.World):
     def load_skeleton(self, filename, namespace=None):
-        self.skeleton = Skeleton(self, filename, namespace)
-        self.skeleton.cfm = 1e-8
+        return Skeleton(self, filename, namespace)
 
-    def load_markers(self, filename, attachments, namespace=None):
-        self.markers = Markers(self, filename=filename)
-        self.markers.load_attachments(attachments, self.skeleton)
-        self.mover = iter(self.follow_markers())
+    def load_markers(self, filename, attachments, skeleton):
+        markers = Markers(self, filename=filename)
+        markers.load_attachments(attachments, skeleton)
+        return markers
 
     def step(self, substeps=2):
         # by default we step by following our loaded marker data.
         try:
-            next(self.mover)
-        except StopIteration:
-            self.mover = iter(self.follow_markers())
+            next(self.follower)
+        except:
+            self.follower = iter(self.follow(self.markers))
 
-    def follow_markers(self, cfm=1e-4, erp=0.7):
-        '''Iterate over the currently loaded marker data.'''
-        for i, frame in enumerate(self.markers):
-            self.ode_space.collide(None, self.on_collision)
-            states = self.get_body_states()
-            self.set_body_states(states)
-
+    def follow(self, markers):
+        '''Iterate over a set of marker data, dragging its skeleton along.'''
+        for i, frame in enumerate(markers):
             # update the positions and velocities of the markers.
-            self.markers.detach()
-            self.markers.reposition(i)
-            if cfm > 0 and erp > 0:
-                self.markers.attach(i, cfm, erp)
+            markers.detach()
+            markers.reposition(i)
+            markers.attach(i)
 
-            # allow our caller to make changes to the world based on external
-            # forces, target joint angles, etc. we provide the current marker
-            # frame and the current states of all ode bodies.
-            yield frame, states
+            self.ode_space.collide(None, self.on_collision)
+
+            states = markers.skeleton.get_body_states()
+            markers.skeleton.set_body_states(states)
 
             # update the ode world.
             self.ode_world.step(self.dt)
 
-            # clear out contact joints.
+            # yield the current simulation state to our caller.
+            yield frame, states
+
+            # clear out contact joints to prepare for the next frame.
             self.ode_contactgroup.empty()
 
-    def inverse_kinematics(self, cfm=1e-3, erp=0.7):
-        smoothed = Markers.like(self.markers)
-        angles = Frames(self.dt,
-                        num_frames=markers.num_frames,
-                        num_dofs=self.skeleton.num_dofs)
-        for i, (markers, states) in enumerate(self.follow_markers(cfm, erp)):
+    def inverse_kinematics(self, markers):
+        '''Follow a set of marker data, yielding kinematic joint angles.'''
+        for i, (frame, states) in enumerate(self.follow(markers)):
             # record the smoothed marker positions on the body.
-            for j, joint in enumerate(markers.joints):
-                smoothed[i, j] = joint.anchor2
+            smoothed = (j.anchor2 + (np.pi, ) for j in markers.joints)
+
             # record the angles of each joint in the body.
-            j = 0
-            for joint in self.skeleton.joints:
-                angles[i, j:j+joint.ADOF] = joint.angles
-                j += joint.ADOF
-        return smoothed, angles
+            angles = itertools.chain.from_iterable(
+                j.angles for j in markers.skeleton.joints)
 
-    def inverse_dynamics(self, angles, cfm=1e-3, erp=0.7):
-        '''Follow a set of angle data.'''
-        torques = Frames.like(angles)
-        mover = self.follow_markers(cfm, erp)
+            # yield the smoothed markers and angles to our caller.
+            yield list(smoothed), list(angles)
+
+    def inverse_dynamics(self, markers, angles):
+        '''Follow a set of angle data, yielding dynamic joint torques.'''
         for i, frame in enumerate(angles):
-            next(mover)  # advance the marker data and world by one frame.
-            torques[i] = self.skeleton.set_target_angles(frame)
-        return torques
+            # update the positions and velocities of the markers.
+            markers.detach()
+            markers.reposition(i)
+            markers.attach(i)
 
-    def forward_dynamics(self, torques, cfm=1e-3, erp=0.7):
-        '''Move the body according to a set of torque data.'''
-        mover = self.follow_markers(cfm, erp)
-        for i, frame in enumerate(torques):
-            markers, states = next(mover)
-            self.set_body_states(states)
-            self.skeleton.max_force = 0
-            j = 0
-            for joint in self.skeleton.joints:
-                joint.add_torque(frame[j:j+joint.ADOF])
-                j += joint.ADOF
+            self.ode_space.collide(None, self.on_collision)
+
+            states = markers.skeleton.get_body_states()
+            markers.skeleton.set_body_states(states)
+
+            # set the target angles for each joint.
+            markers.skeleton.set_target_angles(frame)
+
+            # update the ode world.
             self.ode_world.step(self.dt)
-            for joint in self.skeleton.joints:
-                joint.max_forces = 250
+
+            # record the joint torques.
+            torques = itertools.chain.from_iterable(
+                j.amotor.feedback[-1][:j.ADOF]
+                for j in markers.skeleton.joints)
+
+            # yield the computed torques to our caller.
+            yield torques
+
+            # reset the markers and skeleton to the start of the step.
+            markers.detach()
+            markers.reposition(i)
+            markers.attach(i)
+            markers.skeleton.set_body_states(states)
+
+            # reset the torques for the skeleton, and step again.
+            markers.skeleton.max_force = 0
+            markers.skeleton.add_torques(torques)
+            self.ode_world.step(self.dt)
+            markers.skeleton.max_force = 9999
+
+            self.ode_contactgroup.empty()
+
+    def forward_dynamics(self, markers, torques):
+        '''Move the body according to a set of torque data.'''
+        for i, (_, states) in enumerate(self.follow(markers)):
+            markers.skeleton.add_torques(torques[i])
