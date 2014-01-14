@@ -9,8 +9,8 @@
 body cap head     radius 0.09 length 0.06  position 0 0 2  root
 body cap neck     radius 0.04 length 0.04
 body box u-torso  lengths 0.28 0.20 0.20
-body box l-torso  lengths 0.26 0.16 0.18
-body box pelvis   lengths 0.26 0.20 0.16
+body box l-torso  lengths 0.26 0.18 0.20
+body box pelvis   lengths 0.28 0.20 0.16
 
 body box r-collar lengths 0.17 0.12 0.05
 body cap ru-arm   radius 0.05 length 0.26
@@ -19,7 +19,7 @@ body box r-hand   lengths 0.08 0.03 0.15
 
 body cap ru-leg   radius 0.08 length 0.33
 body cap rl-leg   radius 0.06 length 0.30
-body box r-heel   lengths 0.08 0.10 0.08
+body sph r-heel   radius 0.06
 body box r-foot   lengths 0.08 0.12 0.04
 
 body box l-collar lengths 0.17 0.12 0.05
@@ -29,32 +29,8 @@ body box l-hand   lengths 0.08 0.03 0.15
 
 body cap lu-leg   radius 0.08 length 0.33
 body cap ll-leg   radius 0.06 length 0.30
-body box l-heel   lengths 0.08 0.10 0.08
+body sph l-heel   radius 0.06
 body box l-foot   lengths 0.08 0.12 0.04
-
-# --- marker attachments ---
-
-marker  0:vhead head 0 0 0
-marker  1:vhead head 0 0 0
-marker  2:vhead head 0 0 0
-marker  3:vhead head 0 0 0
-marker  4:vhead head 0 0 0
-marker  5:vhead head 0 0 0
-marker  6:vhead head 0 0 0
-marker  7:vhead head 0 0 0
-marker  8:vhead head 0 0 0
-marker  9:vhead head 0 0 0
-marker 10:vhead head 0 0 0
-marker 11:vhead head 0 0 0
-marker 12:vhead head 0 0 0
-marker 13:vhead head 0 0 0
-marker 14:vhead head 0 0 0
-marker 15:vhead head 0 0 0
-marker 16:vhead head 0 0 0
-marker 17:vhead head 0 0 0
-marker 18:vhead head 0 0 0
-marker 19:vhead head 0 0 0
-marker 20:vhead head 0 0 0
 
 # --- joint attachments ---
 
@@ -67,11 +43,11 @@ join ball  neck 0 -0.5 -0.9  u-torso 0 -0.5 0.9
 lo_stops -10 -30 -30
 hi_stops  30  30  30
 
-join ball  u-torso 0 -1 -0.9  l-torso 0 -1 0.9
+join ball  u-torso 0 -1 -1  l-torso 0 -1 1
 lo_stops -10 -30 -10
 hi_stops  10  30  10
 
-join ball  l-torso 0 0 -0.9  pelvis 0 0 0.9
+join ball  l-torso 0 0 -1  pelvis 0 0 1
 lo_stops -10 -30 -10
 hi_stops  10  30  10
 
