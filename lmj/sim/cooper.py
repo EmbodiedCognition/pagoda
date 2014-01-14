@@ -443,7 +443,6 @@ class World(physics.World):
             next(self.mover)
         except StopIteration:
             self.mover = iter(self.follow_markers())
-        return True
 
     def follow_markers(self, cfm=1e-4, erp=0.7):
         '''Iterate over the currently loaded marker data.'''

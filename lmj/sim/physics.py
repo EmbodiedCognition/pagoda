@@ -808,7 +808,6 @@ class World(base.World):
             self.ode_contactgroup.empty()
             self.ode_space.collide(None, self.on_collision)
             self.ode_world.step(dt)
-        return True
 
     def trace(self, handle):
         '''Trace world bodies and joints.'''
