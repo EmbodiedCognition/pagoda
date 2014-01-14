@@ -29,6 +29,8 @@ import sys
 
 def main():
     w = lmj.sim.cooper.World(dt=1. / 120)
+    w.erp = 0.3
+    w.cfm = 1e-6
     w.load_skeleton(os.path.join(os.path.dirname(__file__), 'cooper-skeleton.txt'))
     w.load_markers(os.path.join(os.path.dirname(__file__), 'cooper-motion.c3d'),
                    os.path.join(os.path.dirname(__file__), 'cooper-markers.txt'))
