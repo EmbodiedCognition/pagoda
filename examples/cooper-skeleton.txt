@@ -4,30 +4,31 @@
 # http://en.wikipedia.org/wiki/File:HeadAnthropometry.JPG
 # http://msis.jsc.nasa.gov/sections/section03.htm
 # http://www.emeraldinsight.com/journals.htm?articleid=844037&show=html
+# ... and some guesswork.
 
-body box head     lengths 0.15 0.20 0.23  position 0 0 2  root
-body box neck     lengths 0.08 0.08 0.10
-body box u-torso  lengths 0.28 0.25 0.25
-body box l-torso  lengths 0.26 0.20 0.10
-body box pelvis   lengths 0.26 0.20 0.15
+body cap head     radius 0.09 length 0.06  position 0 0 2  root
+body cap neck     radius 0.04 length 0.04
+body box u-torso  lengths 0.28 0.20 0.20
+body box l-torso  lengths 0.26 0.16 0.18
+body box pelvis   lengths 0.26 0.20 0.16
 
 body box r-collar lengths 0.17 0.12 0.05
-body box ru-arm   lengths 0.08 0.12 0.36
-body box rl-arm   lengths 0.08 0.08 0.25
+body cap ru-arm   radius 0.05 length 0.26
+body cap rl-arm   radius 0.04 length 0.17
 body box r-hand   lengths 0.08 0.03 0.15
 
-body box l-collar lengths 0.17 0.12 0.05
-body box lu-arm   lengths 0.08 0.12 0.36
-body box ll-arm   lengths 0.08 0.08 0.25
-body box l-hand   lengths 0.08 0.03 0.15
-
-body box ru-leg   lengths 0.12 0.14 0.50
-body box rl-leg   lengths 0.08 0.11 0.42
+body cap ru-leg   radius 0.08 length 0.33
+body cap rl-leg   radius 0.06 length 0.30
 body box r-heel   lengths 0.08 0.10 0.08
 body box r-foot   lengths 0.08 0.12 0.04
 
-body box lu-leg   lengths 0.12 0.14 0.50
-body box ll-leg   lengths 0.08 0.11 0.42
+body box l-collar lengths 0.17 0.12 0.05
+body cap lu-arm   radius 0.05 length 0.26
+body cap ll-arm   radius 0.04 length 0.17
+body box l-hand   lengths 0.08 0.03 0.15
+
+body cap lu-leg   radius 0.08 length 0.33
+body cap ll-leg   radius 0.06 length 0.30
 body box l-heel   lengths 0.08 0.10 0.08
 body box l-foot   lengths 0.08 0.12 0.04
 
@@ -58,78 +59,77 @@ marker 20:vhead head 0 0 0
 # --- joint attachments ---
 
 # spine
-join ball  head 0 -0.2 -0.95  neck 0 0 0.95
+join ball  head 0 -0.5 -0.7  neck 0 0 0.9
 lo_stops -30 -30 -60
 hi_stops  60  30  60
 
-join ball  neck 0 0 -0.95  u-torso 0 -0.2 0.95
+join ball  neck 0 -0.5 -0.9  u-torso 0 -0.5 0.9
 lo_stops -10 -30 -30
 hi_stops  30  30  30
 
-join ball  u-torso 0 0 -0.95  l-torso 0 0 0.95
+join ball  u-torso 0 -1 -0.9  l-torso 0 -1 0.9
 lo_stops -10 -30 -10
 hi_stops  10  30  10
 
-join ball  l-torso 0 0 -0.95  pelvis 0 0 0.95
+join ball  l-torso 0 0 -0.9  pelvis 0 0 0.9
 lo_stops -10 -30 -10
 hi_stops  10  30  10
 
 # right arm
-join uni  u-torso 0.5 0 1  r-collar -1 0 -0.5
+join uni  u-torso 0.5 0 1  r-collar -1 0 -1
 axis0 0 1 0
 axis1 0 0 1
 lo_stops -30 -30
 hi_stops  30  30
 
-join ball  r-collar 0.6 0 -0.95  ru-arm 0 0 0.95
+join ball  r-collar 0.6 0 -0.9  ru-arm 0 0 0.9
 lo_stops -150 -70 -30
 hi_stops  150  70  150
 
-join uni  ru-arm 0 0 -0.95  rl-arm 0 0 0.95
+join uni  ru-arm 0 0 -0.9  rl-arm 0 0 0.9
 axis0 1 0 0
 axis1 0 0 1
 lo_stops -150 -70
 hi_stops    1  70
 
-join hinge  rl-arm 0 -1 -0.95  r-hand 0 -1 1
+join hinge  rl-arm 0 -1 -0.9  r-hand 0 -1 1
 axis0 1 0 0
 lo_stops -70
 hi_stops  70
 
 # left arm
-join uni  u-torso -0.5 0 1  l-collar 1 0 -0.5
+join uni  u-torso -0.5 0 1  l-collar 1 0 -1
 axis0 0 1 0
 axis1 0 0 1
 lo_stops -30 -30
 hi_stops  30  30
 
-join ball  l-collar -0.6 0 -0.95  lu-arm 0 0 0.95
+join ball  l-collar -0.6 0 -0.9  lu-arm 0 0 0.9
 lo_stops -150 -70 -150
 hi_stops  150  70   30
 
-join uni  lu-arm 0 0 -0.95  ll-arm 0 0 0.95
+join uni  lu-arm 0 0 -0.9  ll-arm 0 0 0.9
 axis0 1 0 0
 axis1 0 0 1
 lo_stops -150 -70
 hi_stops    1  70
 
-join hinge  ll-arm 0 -1 -0.95  l-hand 0 -1 1
+join hinge  ll-arm 0 -1 -0.9  l-hand 0 -1 1
 axis0 1 0 0
 lo_stops -70
 hi_stops  70
 
 # right leg
-join ball  pelvis 0.6 0 -0.95  ru-leg 0 0 0.95
+join ball  pelvis 0.6 0 -0.9  ru-leg 0 0 0.9
 lo_stops -150 -70 -30
 hi_stops   70  70 150
 
-join uni  ru-leg 0 0 -0.95  rl-leg 0 0 0.95
+join hinge  ru-leg 0 0 -0.9  rl-leg 0 0 0.9
 axis0 1 0 0
-axis1 0 0 1
-lo_stops  -1 -30
-hi_stops 150  30
+lo_stops  -1
+hi_stops 150
 
-join uni  rl-leg 0 0 -0.95  r-heel 0 0 1
+join uni  rl-leg 0 0 -0.9  r-heel 0 0 0.9
 axis0 1 0 0
 axis1 0 1 0
 lo_stops -70 -70
@@ -141,17 +141,16 @@ lo_stops -10
 hi_stops  10
 
 # left leg
-join ball  pelvis -0.6 0 -0.95  lu-leg 0 0 0.95
+join ball  pelvis -0.6 0 -0.9  lu-leg 0 0 0.9
 lo_stops -120 -60 -120
 hi_stops   60  60   30
 
-join uni  lu-leg 0 0 -0.95  ll-leg 0 0 0.95
+join hinge  lu-leg 0 0 -0.9  ll-leg 0 0 0.9
 axis0 1 0 0
-axis1 0 0 1
-lo_stops  -1 -30
-hi_stops 150  30
+lo_stops  -1
+hi_stops 150
 
-join uni  ll-leg 0 0 -0.95  l-heel 0 0 1
+join uni  ll-leg 0 0 -0.9  l-heel 0 0 0.9
 axis0 1 0 0
 axis1 0 1 0
 lo_stops -60 -60
