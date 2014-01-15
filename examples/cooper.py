@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import lmj.cli
+import climate
 import lmj.sim
 import lmj.sim.cooper
 import os
@@ -42,4 +42,4 @@ def main():
 
 
 if __name__ == '__main__':
-    lmj.cli.call(main)
+    climate.call(main)

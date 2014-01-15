@@ -21,14 +21,14 @@
 '''ASF (skeleton file) and AMC (motion file) parsers.'''
 
 import json
-import lmj.cli
+import climate
 import numpy as np
 import os
 import re
 
 from . import physics
 
-logging = lmj.cli.get_logger(__name__)
+logging = climate.get_logger(__name__)
 
 TAU = 2 * np.pi
 

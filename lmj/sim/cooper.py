@@ -1,7 +1,8 @@
 '''Python implementation of forward-dynamics solver by Joseph Cooper.'''
 
+import climate
+import itertools
 import lmj.c3d
-import lmj.cli
 import lmj.pid
 import numpy as np
 import ode
@@ -10,7 +11,7 @@ import re
 
 from . import physics
 
-logging = lmj.cli.get_logger(__name__)
+logging = climate.get_logger(__name__)
 
 
 class Parser(object):

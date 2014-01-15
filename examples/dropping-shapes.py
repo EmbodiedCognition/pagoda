@@ -20,7 +20,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import lmj.cli
+import climate
 import lmj.sim
 import numpy as np
 import numpy.random as rng
@@ -34,7 +34,7 @@ class World(lmj.sim.physics.World):
                 np.pi * rng.rand(), 0, 1, 1)
 
 
-@lmj.cli.annotate(
+@climate.annotate(
     n=('number of bodies in the simulation', 'option', None, int),
     )
 def main(n=20):
@@ -56,4 +56,4 @@ def main(n=20):
 
 
 if __name__ == '__main__':
-    lmj.cli.call(main)
+    climate.call(main)

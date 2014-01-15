@@ -20,11 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import lmj.cli
+import climate
 import lmj.sim as ls
 
 
-@lmj.cli.annotate(
+@climate.annotate(
     asf='load skeleton data from this file',
     amc='load motion data from this file',
     frame_rate=('frame rate of the simulation', 'option', None, float),
@@ -38,4 +38,4 @@ def main(asf, amc, frame_rate=60., friction=5000, elasticity=0.1):
 
 
 if __name__ == '__main__':
-    lmj.cli.call(main)
+    climate.call(main)
