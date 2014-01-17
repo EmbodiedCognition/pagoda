@@ -1,8 +1,8 @@
 '''Python implementation of forward-dynamics solver by Joseph Cooper.'''
 
+import c3d
 import climate
 import itertools
-import lmj.c3d
 import lmj.pid
 import numpy as np
 import ode
@@ -342,13 +342,13 @@ class Markers(Frames):
             return
 
         with open(filename, 'rb') as handle:
-            reader = lmj.c3d.Reader(handle)
+            reader = c3d.Reader(handle)
 
             # make sure the c3d file's frame rate matches our world.
             assert self.world.dt == 1. / reader.frame_rate()
 
             # set up a map from marker label to index in the data stream.
-            param = reader.group('POINT').params['LABELS']
+            param = reader.get('POINT.LABELS')
             l, n = param.dimensions
             labels = [param.bytes[i*l:(i+1)*l].strip() for i in range(n)]
             logging.info('%s: loaded marker labels %s', filename, labels)
