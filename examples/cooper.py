@@ -26,18 +26,15 @@ import lmj.sim.cooper
 import os
 import sys
 
+def full(name):
+    return os.path.join(os.path.dirname(__file__), name)
 
 def main():
     w = lmj.sim.cooper.World(dt=1. / 120)
     w.erp = 0.3
     w.cfm = 1e-6
-    skel = w.load_skeleton(
-        os.path.join(os.path.dirname(__file__), 'cooper-skeleton.txt'))
-    mark = w.load_markers(
-        os.path.join(os.path.dirname(__file__), 'cooper-motion.c3d'),
-        os.path.join(os.path.dirname(__file__), 'cooper-markers.txt'),
-        skel)
-    w.markers = mark
+    w.load_skeleton(full('cooper-skeleton.txt'))
+    w.load_markers(full('cooper-motion.c3d'), full('cooper-markers.txt'))
     lmj.sim.viewer.Physics(w).run()
 
 
