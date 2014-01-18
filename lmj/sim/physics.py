@@ -393,6 +393,9 @@ class AMotor(Motor):
             mode = ode.AMotorEuler if mode.lower().startswith('e') else ode.AMotorUser
         self.ode_motor.setMode(mode)
 
+    def add_torques(self, torques):
+        self.ode_motor.addTorques(*torques)
+
 
 class LMotor(Motor):
     '''An LMotor applies forces to change a position in the physics world.
@@ -547,6 +550,9 @@ class Joint(object):
     @stop_erps.setter
     def stop_erps(self, stop_erps):
         _set_params(self.ode_joint, 'StopERP', stop_erps, self.ADOF)
+
+    def add_torques(self, torques):
+        self.amotor.add_torques(torques)
 
     def trace(self):
         feedback = self.feedback
@@ -762,7 +768,7 @@ class World(base.World):
             bb = self.get_body(body_b)
         shape = shape.lower()
         if name is None:
-            name = '{}:{}:{}'.format(ba.name, shape, bb.name if bb else '')
+            name = '{}^{}^{}'.format(ba.name, shape, bb.name if bb else '')
         joint = JOINTS[shape](name, self.ode_world, ba, bb, **kwargs)
         self._joints[name] = joint
         return joint
