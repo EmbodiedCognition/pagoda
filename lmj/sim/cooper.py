@@ -246,15 +246,24 @@ class Skeleton(object):
         for joint in self.joints:
             joint.velocities = target
 
+    def get_torques(self):
+        torques = []
+        for joint in self.joints:
+            torques.extend(joint.amotor.feedback[-1][:joint.ADOF])
+        return torques
+
     def add_torques(self, torques):
         j = 0
         for joint in self.joints:
-            joint.add_torque(torques[j:j+joint.ADOF])
+            joint.add_torques(
+                list(torques[j:j+joint.ADOF]) + [0] * (3 - joint.ADOF))
             j += joint.ADOF
 
     def set_target_angles(self, angles):
+        self.max_force = 9999
         j = 0
         for joint in self.joints:
+            joint.amotor.ode_motor.setFeedback(True)
             # move toward target angles for each joint.
             joint.velocities = [
                 ctrl(tgt - cur, self.world.dt) for cur, tgt, ctrl in
@@ -483,18 +492,18 @@ class World(physics.World):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
         for i, (frame, states) in enumerate(self.follow(markers)):
             # record the smoothed marker positions on the body.
-            smoothed = (j.anchor2 + (np.pi, ) for j in markers.joints)
+            smoothed = (list(j.getAnchor2()) + [np.pi] for j in markers.joints)
 
             # record the angles of each joint in the body.
             angles = itertools.chain.from_iterable(
                 j.angles for j in markers.skeleton.joints)
 
-            # yield the smoothed markers and angles to our caller.
-            yield list(smoothed), list(angles)
+            # yield the raw markers, body states, smoothed markers and angles.
+            yield frame, states, list(smoothed), list(angles)
 
     def inverse_dynamics(self, markers, angles):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
-        for i, frame in enumerate(angles):
+        for i, thetas in enumerate(angles):
             # update the positions and velocities of the markers.
             markers.detach()
             markers.reposition(i)
@@ -506,18 +515,14 @@ class World(physics.World):
             markers.skeleton.set_body_states(states)
 
             # set the target angles for each joint.
-            markers.skeleton.set_target_angles(frame)
+            markers.skeleton.set_target_angles(thetas)
 
             # update the ode world.
             self.ode_world.step(self.dt)
 
-            # record the joint torques.
-            torques = itertools.chain.from_iterable(
-                j.amotor.feedback[-1][:j.ADOF]
-                for j in markers.skeleton.joints)
-
             # yield the computed torques to our caller.
-            yield torques
+            torques = markers.skeleton.get_torques()
+            yield states, thetas, torques
 
             # reset the markers and skeleton to the start of the step.
             markers.detach()
@@ -529,7 +534,6 @@ class World(physics.World):
             markers.skeleton.max_force = 0
             markers.skeleton.add_torques(torques)
             self.ode_world.step(self.dt)
-            markers.skeleton.max_force = 9999
 
             self.ode_contactgroup.empty()
 
