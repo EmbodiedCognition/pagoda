@@ -147,7 +147,7 @@ class Parser(object):
 
         # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
-        joint.controllers = [lmj.pid.Controller(kp=0.1) for i in range(joint.ADOF)]
+        joint.controllers = [lmj.pid.Controller(kp=120, ki=10) for i in range(joint.ADOF)]
 
         return token
 
@@ -183,17 +183,6 @@ class Skeleton(object):
         self.bodies = parser.bodies
         self.joints = parser.joints
 
-        self.alimit = physics.AMotor('alim', self.world, self.root)
-        self.alimit.lo_stops = -TAU / 7
-        self.alimit.hi_stops = TAU / 7
-
-        self.amotor = physics.AMotor('ahog', self.world, self.root)
-        self.amotor.velocities = 0
-        self.amotor.cfms = 1e-10
-        self.amotor.max_forces = 200
-
-        self.acontrollers = [lmj.pid.Controller(kp=0.1) for i in range(3)]
-
     @property
     def num_dofs(self):
         return sum(j.ADOF + j.LDOF for j in self.joints)
@@ -220,19 +209,35 @@ class Skeleton(object):
 
     @property
     def feedback(self):
-        return self.amotor.ode_motor.getFeedback()
+        for joint in self.joints:
+            return joint.amotor.ode_motor.getFeedback()
 
     @feedback.setter
     def feedback(self, feedback):
-        self.amotor.ode_motor.setFeedback(True)
         for joint in self.joints:
             joint.amotor.ode_motor.setFeedback(feedback)
 
     @property
     def velocities(self):
-        values = list(self.amotor.velocities)
+        values = []
         for joint in self.joints:
             values.extend(joint.velocities)
+        return values
+
+    @property
+    def angles(self):
+        values = []
+        for joint in self.joints:
+            values.extend(joint.angles)
+        return values
+
+    @property
+    def torques(self):
+        values = []
+        for joint in self.joints:
+            if 'rl-leg' in joint.name and 'ru-leg' in joint.name:
+                logging.info('%s[%d]: torque %d', joint.name, len(torques), joint.amotor.feedback[-1][0])
+            values.extend(joint.amotor.feedback[-1][:joint.ADOF])
         return values
 
     def get_body_states(self):
@@ -253,46 +258,38 @@ class Skeleton(object):
             body.angular_velocity = ang
 
     def reset_velocities(self, target=0):
-        self.amotor.velocities = target
         for joint in self.joints:
             joint.velocities = target
 
-    def enable_motors(self, max_force=9999):
+    def enable_motors(self, max_force=1000):
         self.max_force = max_force
         self.feedback = True
 
     def disable_motors(self):
         self.max_force = 0
-        for joint in self.joints:
-            joint.amotor.ode_motor.setFeedback(False)
-
-    def get_angles(self):
-        angles = list(self.amotor.angles)
-        for joint in self.joints:
-            angles.extend(joint.angles)
-        return angles
+        self.feedback = False
 
     def set_angles(self, angles):
         '''Move each joint toward a target angle.'''
-        self.amotor.velocities = [
-            ctrl(tgt - cur, self.world.dt) for cur, tgt, ctrl in
-            zip(self.amotor.angles, angles[:3], self.acontrollers)]
-        j = 3
+        j = 0
         for joint in self.joints:
-            joint.velocities = [
+            velocities = [
                 ctrl(tgt - cur, self.world.dt) for cur, tgt, ctrl in
                 zip(joint.angles, angles[j:j+joint.ADOF], joint.controllers)]
+            if 'rl-leg' in joint.name and 'ru-leg' in joint.name:
+                logging.info(
+                    '%s[%d]: target %d, actual %d, control %f',
+                    joint.name,
+                    j,
+                    360 * angles[j] / TAU,
+                    360 * joint.angles[0] / TAU,
+                    velocities[0],
+                )
+            joint.velocities = velocities
             j += joint.ADOF
 
-    def get_torques(self):
-        torques = list(self.amotor.feedback[-1])
-        for joint in self.joints:
-            torques.extend(joint.amotor.feedback[-1][:joint.ADOF])
-        return torques
-
     def add_torques(self, torques):
-        self.amotor.add_torques(torques[:3])
-        j = 3
+        j = 0
         for joint in self.joints:
             joint.add_torques(
                 list(torques[j:j+joint.ADOF]) + [0] * (3 - joint.ADOF))
@@ -343,12 +340,16 @@ class Markers(Frames):
     '''
     '''
 
+    DEFAULT_CFM = 1e-4
+    DEFAULT_ERP = 0.3
+
     def __init__(self, world, filename, channels=None):
         self.world = world
         self.jointgroup = ode.JointGroup()
         self.joints = []
-        self.cfm = 1e-4
-        self.erp = 0.7
+        self.cfm = Markers.DEFAULT_CFM
+        self.erp = Markers.DEFAULT_ERP
+        self.start = 0
 
         self.marker_bodies = {}
         self.attach_bodies = {}
@@ -444,6 +445,8 @@ class Markers(Frames):
     def attach(self, frame_no):
         frame_no += self.start
         for label, j in self.channels.iteritems():
+            if label not in self.attach_bodies:
+                continue
             if not 1 < self.data[frame_no, j, 3] < 100:
                 continue
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
@@ -498,17 +501,17 @@ class World(physics.World):
 
     def settle(self, min_frame=0, max_frame=0, max_rmse=0.06):
         self.markers.start = min_frame
-        self.markers.cfm = 1e-5
-        self.markers.erp = 0.7
-        i = states = None
+        self.markers.cfm = Markers.DEFAULT_CFM
+        self.markers.erp = Markers.DEFAULT_ERP
+        i = states = rmse = None
         for i, (_, states) in enumerate(self.follow()):
             rmse = self.markers.rmse()
-            logging.info('frame %d: marker rmse %s', i, rmse)
+            logging.debug('frame %d: marker rmse %s', i, rmse)
             if max_frame > 0 and i > max_frame:
                 break
             if max_rmse > 0 and rmse < max_rmse:
                 break
-        logging.info('settled skeleton to markers at frame %d', i)
+        logging.info('settled to markers at frame %d with rmse %.4f', i, rmse)
         return i, states
 
     def follow(self):
@@ -535,29 +538,32 @@ class World(physics.World):
 
     def inverse_kinematics(self):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
+        self.skeleton.disable_motors()
         for i, _ in enumerate(self.follow()):
-            yield self.skeleton.get_angles()
+            yield self.skeleton.angles
 
     def inverse_dynamics(self, angles):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
         for i, (_, states) in enumerate(self.follow()):
-            # set the target angles for each joint.
             self.skeleton.enable_motors()
             self.skeleton.set_angles(angles[i])
+            yield self.skeleton.torques
+            '''
+            # joseph's stability fix: step to compute torques, then reset the
+            # skeleton to the start of the step, and again step using computed
+            # torques.
 
             # update the ode world.
             self.ode_world.step(self.dt)
 
             # query the skeleton for active torques.
-            torques = self.skeleton.get_torques()
+            torques = self.skeleton.torques
+            yield torques
 
-            # joseph's stability fix: reset the skeleton to the start of the
-            # step, and step using computed torques.
             self.skeleton.disable_motors()
             self.skeleton.set_body_states(states)
             self.skeleton.add_torques(torques)
-
-            yield torques
+            '''
 
     def forward_dynamics(self, torques):
         '''Move the body according to a set of torque data.'''

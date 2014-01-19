@@ -393,6 +393,14 @@ class AMotor(Motor):
             mode = ode.AMotorEuler if mode.lower().startswith('e') else ode.AMotorUser
         self.ode_motor.setMode(mode)
 
+    @property
+    def amotor(self):
+        return self
+
+    @property
+    def ADOF(self):
+        return self.ode_motor.getNumAxes()
+
     def add_torques(self, torques):
         self.ode_motor.addTorques(*torques)
 
@@ -402,6 +410,10 @@ class LMotor(Motor):
     '''
 
     MOTOR_FACTORY = ode.LMotor
+
+    @property
+    def LDOF(self):
+        return self.ode_motor.getNumAxes()
 
 
 class Joint(object):
@@ -834,7 +846,11 @@ class World(base.World):
 
     def on_collision(self, args, geom_a, geom_b):
         '''Callback function for the collide() method.'''
-        if ode.areConnected(geom_a.getBody(), geom_b.getBody()):
+        body_a = geom_a.getBody()
+        body_b = geom_b.getBody()
+        if (ode.areConnected(body_a, body_b) or
+            (body_a and body_a.isKinematic()) or
+            (body_b and body_b.isKinematic())):
             return
         for c in ode.collide(geom_a, geom_b):
             c.setBounce(self.elasticity)
