@@ -7,7 +7,7 @@
 # ... and some guesswork.
 
 body cap head     radius 0.09 length 0.06  position -1 0 2
-body cap neck     radius 0.04 length 0.04
+body cap neck     radius 0.04 length 0.01
 body box u-torso  lengths 0.28 0.20 0.20
 body box l-torso  lengths 0.26 0.18 0.20
 body box pelvis   lengths 0.28 0.20 0.16  root
@@ -19,7 +19,7 @@ body box r-hand   lengths 0.08 0.03 0.15
 
 body cap ru-leg   radius 0.08 length 0.33
 body cap rl-leg   radius 0.06 length 0.30
-body sph r-heel   radius 0.06
+body sph r-heel   radius 0.04
 body box r-foot   lengths 0.08 0.12 0.04
 
 body box l-collar lengths 0.17 0.12 0.05
@@ -29,7 +29,7 @@ body box l-hand   lengths 0.08 0.03 0.15
 
 body cap lu-leg   radius 0.08 length 0.33
 body cap ll-leg   radius 0.06 length 0.30
-body sph l-heel   radius 0.06
+body sph l-heel   radius 0.04
 body box l-foot   lengths 0.08 0.12 0.04
 
 # --- joint attachments ---
