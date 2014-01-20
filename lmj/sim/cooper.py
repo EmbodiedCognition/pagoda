@@ -147,7 +147,7 @@ class Parser(object):
 
         # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
-        joint.controllers = [lmj.pid.Controller(kp=120, ki=10) for i in range(joint.ADOF)]
+        joint.controllers = [lmj.pid.Controller(kp=120) for i in range(joint.ADOF)]
 
         return token
 
@@ -236,7 +236,10 @@ class Skeleton(object):
         values = []
         for joint in self.joints:
             if 'rl-leg' in joint.name and 'ru-leg' in joint.name:
-                logging.info('%s[%d]: torque %d', joint.name, len(torques), joint.amotor.feedback[-1][0])
+                logging.info('%s[%d]: torque %d',
+                             joint.name,
+                             len(values),
+                             joint.amotor.feedback[-1][0])
             values.extend(joint.amotor.feedback[-1][:joint.ADOF])
         return values
 
@@ -506,13 +509,14 @@ class World(physics.World):
         i = states = rmse = None
         for i, (_, states) in enumerate(self.follow()):
             rmse = self.markers.rmse()
-            logging.debug('frame %d: marker rmse %s', i, rmse)
-            if max_frame > 0 and i > max_frame:
+            logging.info('frame %d: marker rmse %s', i, rmse)
+            if max_frame > 0 and min_frame + i > max_frame:
                 break
             if max_rmse > 0 and rmse < max_rmse:
                 break
-        logging.info('settled to markers at frame %d with rmse %.4f', i, rmse)
-        return i, states
+        logging.info('settled to markers at frame %d with rmse %.4f',
+                     min_frame + i, rmse)
+        return min_frame + i, states
 
     def follow(self):
         '''Iterate over a set of marker data, dragging its skeleton along.'''
@@ -522,8 +526,10 @@ class World(physics.World):
             self.markers.reposition(i)
             self.markers.attach(i)
 
+            # detect collisions
             self.ode_space.collide(None, self.on_collision)
 
+            # record the state of each skeleton body.
             states = self.skeleton.get_body_states()
             self.skeleton.set_body_states(states)
 
@@ -538,35 +544,34 @@ class World(physics.World):
 
     def inverse_kinematics(self):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
-        self.skeleton.disable_motors()
         for i, _ in enumerate(self.follow()):
+            self.skeleton.disable_motors()
             yield self.skeleton.angles
 
     def inverse_dynamics(self, angles):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
         for i, (_, states) in enumerate(self.follow()):
+            # joseph's stability fix: step to compute torques, then reset the
+            # skeleton to the start of the step, and then step using computed
+            # torques. thus any numerical errors between the body states after
+            # stepping using angle constraints will be removed, because we
+            # will be stepping the model using the actual (reported) torques.
+
             self.skeleton.enable_motors()
             self.skeleton.set_angles(angles[i])
-            yield self.skeleton.torques
-            '''
-            # joseph's stability fix: step to compute torques, then reset the
-            # skeleton to the start of the step, and again step using computed
-            # torques.
 
-            # update the ode world.
             self.ode_world.step(self.dt)
 
-            # query the skeleton for active torques.
             torques = self.skeleton.torques
             yield torques
 
             self.skeleton.disable_motors()
             self.skeleton.set_body_states(states)
             self.skeleton.add_torques(torques)
-            '''
 
     def forward_dynamics(self, torques):
         '''Move the body according to a set of torque data.'''
         for i, (_, states) in enumerate(self.follow()):
+            self.skeleton.disable_motors()
             self.skeleton.set_body_states(states)
             self.skeleton.add_torques(torques[i])
