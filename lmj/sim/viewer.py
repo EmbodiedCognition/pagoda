@@ -245,15 +245,16 @@ class Physics(GL):
         BLK = [100, 100, 100] * 6
         WHT = [150, 150, 150] * 6
         N = 10
+        z = kwargs.get('floor_z', 0)
         vtx = []
         for i in range(N, -N, -1):
             for j in range(-N, N, 1):
-                vtx.extend((j,   i, 0, j, i-1, 0, j+1, i,   0,
-                            j+1, i, 0, j, i-1, 0, j+1, i-1, 0))
+                vtx.extend((j,   i, z, j, i-1, z, j+1, i,   z,
+                            j+1, i, z, j, i-1, z, j+1, i-1, z))
 
         self.floor = pyglet.graphics.vertex_list(
             len(vtx) // 3,
-            ('v3i/static', vtx),
+            ('v3f/static', vtx),
             ('c3B/static', ((BLK + WHT) * N + (WHT + BLK) * N) * N),
             ('n3i/static', [0, 0, 1] * (len(vtx) // 3)))
 
