@@ -2,7 +2,15 @@ Index: bindings/python/ode.pxd
 ===================================================================
 --- bindings/python/ode.pxd	(revision 1939)
 +++ bindings/python/ode.pxd	(working copy)
-@@ -147,6 +147,7 @@
+@@ -82,6 +82,7 @@
+         dVector3 t1
+         dVector3 f2
+         dVector3 t2
++        dReal gf[8]
+ 
+     ctypedef void dNearCallback(void* data, dGeomID o1, dGeomID o2)
+     ctypedef dReal dHeightfieldGetHeight( void* p_user_data, int x, int z )
+@@ -147,6 +148,7 @@
      void dWorldSetAngularDamping (dWorldID, dReal scale)
      void dWorldImpulseToForce (dWorldID, dReal stepsize,
                                 dReal ix, dReal iy, dReal iz, dVector3 force)
@@ -10,7 +18,7 @@ Index: bindings/python/ode.pxd
  
      # Body
      dBodyID dBodyCreate (dWorldID)
-@@ -247,6 +248,9 @@
+@@ -247,6 +249,9 @@
      dBodyID dJointGetBody (dJointID, int index)
  
      void dJointSetBallAnchor (dJointID, dReal x, dReal y, dReal z)
@@ -20,7 +28,7 @@ Index: bindings/python/ode.pxd
      void dJointSetHingeAnchor (dJointID, dReal x, dReal y, dReal z)
      void dJointSetHingeAxis (dJointID, dReal x, dReal y, dReal z)
      void dJointSetHingeParam (dJointID, int parameter, dReal value)
-@@ -277,6 +281,7 @@
+@@ -277,6 +282,7 @@
      
      void dJointGetBallAnchor (dJointID, dVector3 result)
      void dJointGetBallAnchor2 (dJointID, dVector3 result)
@@ -83,7 +91,17 @@ Index: bindings/python/ode.pyx
      # createBody
  #    def createBody(self):
  #        return Body(self)
-@@ -2011,6 +2027,30 @@
+@@ -1970,7 +1986,8 @@
+         t1 = (fb.t1[0], fb.t1[1], fb.t1[2])
+         f2 = (fb.f2[0], fb.f2[1], fb.f2[2])
+         t2 = (fb.t2[0], fb.t2[1], fb.t2[2])
+-        return f1, t1, f2, t2
++        gf = (fb.gf[0], fb.gf[1], fb.gf[2])
++        return f1, t1, f2, t2, gf
+ 
+ ######################################################################
+ 
+@@ -2011,6 +2028,30 @@
          """
          dJointSetBallAnchor(self.jid, pos[0], pos[1], pos[2])
      
@@ -114,7 +132,7 @@ Index: bindings/python/ode.pyx
      # getAnchor
      def getAnchor(self):
          """getAnchor() -> 3-tuple of floats
-@@ -2039,11 +2079,41 @@
+@@ -2039,11 +2080,41 @@
  
      # setParam
      def setParam(self, param, value):
