@@ -143,11 +143,11 @@ class GL(pyglet.window.Window):
         self.trace = trace
         self.paused = paused
 
-        self.zoom = 15
-        self.ty = 0
-        self.tz = 1
-        self.ry = 30
-        self.rz = 30
+        self.zoom = 10
+        self.ty = 0.05
+        self.tz = -0.8
+        self.ry = 35
+        self.rz = -60
 
         #self.fps = pyglet.clock.ClockDisplay()
 
@@ -191,7 +191,6 @@ class GL(pyglet.window.Window):
             # roll
             self.ry += 0.2 * -dy
             self.rz += 0.2 * dx
-        #print('z', self.zoom, 't', self.ty, self.tz, 'r', self.ry, self.rz)
 
     def on_resize(self, width, height):
         glViewport(0, 0, width, height)
@@ -200,12 +199,18 @@ class GL(pyglet.window.Window):
         glu.gluPerspective(45, float(width) / height, 1, 100)
 
     def on_key_press(self, key, modifiers):
-        if key == pyglet.window.key.ESCAPE:
+        keymap = pyglet.window.key
+        if self.world.on_key_press(key, keymap):
+            return
+        if key == keymap.ESCAPE:
             pyglet.app.exit()
-        elif key == pyglet.window.key.SPACE:
+        if key == keymap.SPACE:
             self.paused = False if self.paused else True
-        else:
-            self.world.on_key_press(key, pyglet.window.key)
+        if key == keymap.RIGHT:
+            steps = int(1 / self.world.dt)
+            if modifiers & keymap.MOD_SHIFT:
+                steps *= 10
+            [self.update(self.world.dt) for _ in range(steps)]
 
     def on_draw(self):
         self.clear()
