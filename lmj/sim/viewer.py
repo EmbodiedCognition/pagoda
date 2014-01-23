@@ -180,7 +180,8 @@ class GL(pyglet.window.Window):
 
     def on_mouse_scroll(self, x, y, dx, dy):
         if dy == 0: return
-        self.zoom *= 1.1 ** (-1 if dy < 0 else 1)
+        self.zoom *= 1.1 ** (-1 if dy > 0 else 1)
+        self._update_view()
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if buttons == pyglet.window.mouse.LEFT:
@@ -191,12 +192,14 @@ class GL(pyglet.window.Window):
             # roll
             self.ry += 0.2 * -dy
             self.rz += 0.2 * dx
+        self._update_view()
 
     def on_resize(self, width, height):
         glViewport(0, 0, width, height)
         glMatrixMode(GL_PROJECTION)
         glLoadIdentity()
         glu.gluPerspective(45, float(width) / height, 1, 100)
+        self._update_view()
 
     def on_key_press(self, key, modifiers):
         keymap = pyglet.window.key
@@ -206,6 +209,8 @@ class GL(pyglet.window.Window):
             pyglet.app.exit()
         if key == keymap.SPACE:
             self.paused = False if self.paused else True
+        if key == keymap.ENTER:
+            self.world.reset()
         if key == keymap.RIGHT:
             steps = int(1 / self.world.dt)
             if modifiers & keymap.MOD_SHIFT:
@@ -214,17 +219,17 @@ class GL(pyglet.window.Window):
 
     def on_draw(self):
         self.clear()
+        glMatrixMode(GL_MODELVIEW)
+        self.draw()
 
+    def _update_view(self):
         # http://njoubert.com/teaching/cs184_fa08/section/sec09_camera.pdf
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         gluLookAt(1, 0, 0, 0, 0, 0, 0, 0, 1)
-        glTranslatef(-self.zoom, 0, 0)
-        glTranslatef(0, self.ty, self.tz)
+        glTranslatef(-self.zoom, self.ty, self.tz)
         glRotatef(self.ry, 0, 1, 0)
         glRotatef(self.rz, 0, 0, 1)
-
-        self.draw()
 
     def update(self, dt):
         if self.paused:
