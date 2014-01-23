@@ -6,11 +6,11 @@
 # http://www.emeraldinsight.com/journals.htm?articleid=844037&show=html
 # ... and some guesswork.
 
-body cap head     radius 0.09 length 0.06  position 0 0 2
+body cap head     radius 0.09 length 0.06  position 0 0 2  root
 body cap neck     radius 0.04 length 0.01
 body box u-torso  lengths 0.28 0.20 0.20
 body box l-torso  lengths 0.26 0.18 0.20
-body box pelvis   lengths 0.28 0.20 0.16  root
+body box pelvis   lengths 0.28 0.20 0.16
 
 body box r-collar lengths 0.17 0.12 0.05
 body cap ru-arm   radius 0.05 length 0.26
