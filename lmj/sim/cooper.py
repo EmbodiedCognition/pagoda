@@ -235,13 +235,15 @@ class Skeleton(object):
     def torques(self):
         values = []
         for joint in self.joints:
-            if 'rl-leg' in joint.name and 'ru-leg' in joint.name:
-                logging.info('%s[%d]: torque %d',
-                             joint.name,
-                             len(values),
-                             joint.amotor.feedback[-1][0])
             values.extend(joint.amotor.feedback[-1][:joint.ADOF])
         return values
+
+    def rmse(self):
+        deltas = []
+        for joint in self.joints:
+            delta = np.array(joint.anchor) - joint.anchor2
+            deltas.append((delta * delta).sum())
+        return np.sqrt(np.mean(deltas))
 
     def get_body_states(self):
         '''Return a list of the states of all bodies in the skeleton.'''
@@ -279,15 +281,6 @@ class Skeleton(object):
             velocities = [
                 ctrl(tgt - cur, self.world.dt) for cur, tgt, ctrl in
                 zip(joint.angles, angles[j:j+joint.ADOF], joint.controllers)]
-            if 'rl-leg' in joint.name and 'ru-leg' in joint.name:
-                logging.info(
-                    '%s[%d]: target %d, actual %d, control %f',
-                    joint.name,
-                    j,
-                    360 * angles[j] / TAU,
-                    360 * joint.angles[0] / TAU,
-                    velocities[0],
-                )
             joint.velocities = velocities
             j += joint.ADOF
 
@@ -306,7 +299,6 @@ class Frames(object):
             self.load(filename)
         elif num_frames:
             self.data = np.zeros((num_frames, num_dofs), float)
-        self.start = 0
 
     @property
     def num_frames(self):
@@ -317,7 +309,7 @@ class Frames(object):
         return self.data.shape[1]
 
     def __iter__(self):
-        return iter(self.data[self.start:])
+        return iter(self.data)
 
     def __getitem__(self, idx):
         return self.data[idx]
@@ -352,7 +344,6 @@ class Markers(Frames):
         self.joints = []
         self.cfm = Markers.DEFAULT_CFM
         self.erp = Markers.DEFAULT_ERP
-        self.start = 0
 
         self.marker_bodies = {}
         self.attach_bodies = {}
@@ -386,15 +377,17 @@ class Markers(Frames):
             assert self.world.dt == 1. / reader.frame_rate()
 
             # set up a map from marker label to index in the data stream.
-            param = reader.get('POINT.LABELS')
-            l, n = param.dimensions
-            labels = [param.bytes[i*l:(i+1)*l].strip() for i in range(n)]
+            labels = [s.strip() for s in reader['POINT:LABELS'].string_array]
             logging.info('%s: loaded marker labels %s', filename, labels)
             self.channels = self._interpret_channels(labels)
 
             # read the actual c3d data into a numpy array.
-            self.data = np.asarray(
-                [frame / 1000 for frame, _ in reader.read_frames()])
+            self.data = np.array([f for _, f, _ in reader.read_frames()])
+
+            # scale the data to meters -- mm is a very common C3D unit.
+            if reader['POINT:UNITS'].string_value.strip().lower() == 'mm':
+                logging.info('scaling point data from mm to m')
+                self.data[:, :, :4] /= 1000.
 
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
         self.create_bodies()
@@ -411,6 +404,8 @@ class Markers(Frames):
             self.marker_bodies[label] = body
 
     def load_attachments(self, source, skeleton):
+        self.root = skeleton.root
+
         self.attach_bodies = {}
         self.attach_offsets = {}
 
@@ -445,29 +440,31 @@ class Markers(Frames):
         self.jointgroup.empty()
         self.joints = []
 
-    def attach(self, frame_no):
-        frame_no += self.start
+    def attach(self, frame_no, root_factor=10.):
         for label, j in self.channels.iteritems():
             if label not in self.attach_bodies:
                 continue
-            if not 1 < self.data[frame_no, j, 3] < 100:
+            if self.data[frame_no, j, 4] < 0:
                 continue
+            f = root_factor if self.attach_bodies[label] is self.root else 1.
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
             joint.attach(self.marker_bodies[label].ode_body,
                          self.attach_bodies[label].ode_body)
             joint.setAnchor1Rel([0, 0, 0])
             joint.setAnchor2Rel(self.attach_offsets[label])
-            joint.setParam(ode.ParamCFM, self.cfm)
+            joint.setParam(ode.ParamCFM, self.cfm / f)
             joint.setParam(ode.ParamERP, self.erp)
             self.joints.append(joint)
 
     def reposition(self, frame_no):
-        frame_no += self.start
         frame = self.data[frame_no, :, :3]
         delta = np.zeros_like(frame)
         if 0 < frame_no < self.num_frames - 1:
-            delta = (self.data[frame_no + 1, :, :3] -
-                     self.data[frame_no - 1, :, :3]) / (2 * self.world.dt)
+            prev = self.data[frame_no - 1]
+            next = self.data[frame_no + 1]
+            for c in range(self.num_markers):
+                if prev[c, 4] > -1 and next[c, 4] > -1:
+                    delta[c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
         for label, j in self.channels.iteritems():
             body = self.marker_bodies[label]
             body.position = frame[j]
@@ -497,34 +494,44 @@ class World(physics.World):
 
     def step(self, substeps=2):
         # by default we step by following our loaded marker data.
+        if not hasattr(self, 'follower'):
+            self.follower = iter(self.follow())
         try:
             next(self.follower)
-        except:
+        except StopIteration:
             self.follower = iter(self.follow())
 
-    def settle(self, min_frame=0, max_frame=0, max_rmse=0.06):
-        self.markers.start = min_frame
+    def settle(self, min_frame=0, max_frame=0, max_rmse=0.06, pose=None):
         self.markers.cfm = Markers.DEFAULT_CFM
         self.markers.erp = Markers.DEFAULT_ERP
-        i = states = rmse = None
-        for i, (_, states) in enumerate(self.follow()):
+        frame_no = states = rmse = None
+        for frame_no, states in enumerate(self.follow(0, None)):
             rmse = self.markers.rmse()
-            logging.info('frame %d: marker rmse %s', i, rmse)
-            if max_frame > 0 and min_frame + i > max_frame:
+            logging.debug('settling at frame %d: marker rmse %.3f',
+                          frame_no, rmse)
+            if frame_no < min_frame:
+                if pose is not None:
+                    self.skeleton.set_body_states(pose)
+                continue
+            if frame_no > max_frame > 0 or max_rmse > rmse:
                 break
-            if max_rmse > 0 and rmse < max_rmse:
-                break
-        logging.info('settled to markers at frame %d with rmse %.4f',
-                     min_frame + i, rmse)
-        return min_frame + i, states
+        logging.info('settled to markers at frame %d with rmse %.3f',
+                     frame_no, rmse)
+        return frame_no, states
 
-    def follow(self):
+    def follow(self, start=0, states=None):
         '''Iterate over a set of marker data, dragging its skeleton along.'''
-        for i, frame in enumerate(self.markers):
+        if states is not None:
+            self.skeleton.set_body_states(states)
+
+        for frame_no, frame in enumerate(self.markers):
+            if frame_no < start:
+                continue
+
             # update the positions and velocities of the markers.
             self.markers.detach()
-            self.markers.reposition(i)
-            self.markers.attach(i)
+            self.markers.reposition(frame_no)
+            self.markers.attach(frame_no)
 
             # detect collisions
             self.ode_space.collide(None, self.on_collision)
@@ -534,7 +541,7 @@ class World(physics.World):
             self.skeleton.set_body_states(states)
 
             # yield the current simulation state to our caller.
-            yield frame, states
+            yield states
 
             # update the ode world.
             self.ode_world.step(self.dt)
@@ -542,20 +549,19 @@ class World(physics.World):
             # clear out contact joints to prepare for the next frame.
             self.ode_contactgroup.empty()
 
-    def inverse_kinematics(self):
+    def inverse_kinematics(self, start=0, states=None):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
-        for i, _ in enumerate(self.follow()):
-            self.skeleton.disable_motors()
+        for _ in self.follow(start, states):
             yield self.skeleton.angles
 
-    def inverse_dynamics(self, angles):
+    def inverse_dynamics(self, angles, start=0, states=None):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
-        for i, (_, states) in enumerate(self.follow()):
+        for i, states in enumerate(self.follow(start, states)):
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
             # torques. thus any numerical errors between the body states after
             # stepping using angle constraints will be removed, because we
-            # will be stepping the model using the actual (reported) torques.
+            # will be stepping the model using the computed torques.
 
             self.skeleton.enable_motors()
             self.skeleton.set_angles(angles[i])
@@ -563,15 +569,12 @@ class World(physics.World):
             self.ode_world.step(self.dt)
 
             torques = self.skeleton.torques
-            yield torques
-
             self.skeleton.disable_motors()
             self.skeleton.set_body_states(states)
             self.skeleton.add_torques(torques)
+            yield torques
 
-    def forward_dynamics(self, torques):
+    def forward_dynamics(self, torques, start=0, states=None):
         '''Move the body according to a set of torque data.'''
-        for i, (_, states) in enumerate(self.follow()):
-            self.skeleton.disable_motors()
-            self.skeleton.set_body_states(states)
+        for i, _ in enumerate(self.follow(start, states)):
             self.skeleton.add_torques(torques[i])
