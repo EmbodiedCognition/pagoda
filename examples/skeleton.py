@@ -21,7 +21,8 @@
 # SOFTWARE.
 
 import climate
-import lmj.sim as ls
+import lmj.sim
+import lmj.sim.viewer
 
 
 @climate.annotate(
@@ -31,10 +32,10 @@ import lmj.sim as ls
     friction=('coefficient of friction', 'option', None, float),
     elasticity=('elasticity constant for collisions', 'option', None, float),
     )
-def main(asf, amc, frame_rate=60., friction=5000, elasticity=0.1):
-    w = ls.skeleton.World(dt=1. / frame_rate, friction=friction, elasticity=elasticity)
+def main(asf, amc):
+    w = lmj.sim.skeleton.World(dt=1. / 60)
     w.add_motion(amc, name=w.add_skeleton(asf))
-    ls.viewer.GL(w, paused=True).run()
+    lmj.sim.viewer.Physics(w, paused=True).run()
 
 
 if __name__ == '__main__':

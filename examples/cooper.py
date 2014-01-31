@@ -22,7 +22,7 @@
 
 import climate
 import lmj.sim
-import lmj.sim.cooper
+import lmj.sim.viewer
 import os
 import sys
 
@@ -35,7 +35,7 @@ def main():
     w.cfm = 1e-6
     w.load_skeleton(full('cooper-skeleton.txt'))
     w.load_markers(full('cooper-motion.c3d'), full('cooper-markers.txt'))
-    lmj.sim.viewer.Physics(w).run()
+    lmj.sim.viewer.Physics(w, paused=True).run()
 
 
 if __name__ == '__main__':

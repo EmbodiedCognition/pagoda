@@ -22,6 +22,7 @@
 
 import climate
 import lmj.sim
+import lmj.sim.viewer
 import numpy as np
 import numpy.random as rng
 
@@ -44,7 +45,7 @@ def main(n=20):
     g = lambda n, k=0.1, size=1: np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
     for _ in range(n):
         s, kw = sorted(dict(
-            box=dict(lengths=g(3, size=3)),
+            box=dict(lengths=g(8, size=3)),
             capsule=dict(radius=g(3), length=g(10)),
             cylinder=dict(radius=g(2), length=g(10)),
             sphere=dict(radius=g(2)),
