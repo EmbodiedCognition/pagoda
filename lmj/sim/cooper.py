@@ -17,7 +17,7 @@ TAU = 2 * np.pi
 
 
 class Parser(object):
-    def __init__(self, world, source, jointgroup=None):
+    def __init__(self, world, source, jointgroup=None, pid_params=None):
         self.world = world
         self.filename = source
         self.jointgroup = jointgroup
@@ -25,9 +25,12 @@ class Parser(object):
         self.joints = []
         self.bodies = []
 
+        self.pid_params = dict(kp=1. / self.world.dt)
+        self.pid_params.update(**(pid_params or {}))
+
         self.config = []
         self.index = 0
-        self.root = None
+        self.roots = []
 
         if isinstance(source, str):
             source = open(source)
@@ -91,8 +94,8 @@ class Parser(object):
             if token == 'position':
                 position = self.floats()
             if token == 'root':
-                logging.info('"%s" will be used as the root', name)
-                self.root = name
+                logging.info('"%s" will be used as a root', name)
+                self.roots.append(name)
             token = self.next_token()
 
         logging.info('creating %s %s %s', shape, name, kwargs)
@@ -147,7 +150,7 @@ class Parser(object):
 
         # we add some additional attributes for controlling this joint
         joint.target_angles = [None] * joint.ADOF
-        joint.controllers = [lmj.pid.Controller(kp=120) for i in range(joint.ADOF)]
+        joint.controllers = [lmj.pid.Controller(**self.pid_params) for i in range(joint.ADOF)]
 
         return token
 
@@ -164,28 +167,28 @@ class Parser(object):
             except:
                 self.error('internal error')
                 raise
-        return self.root
+        return self.roots
 
 
 class Skeleton(object):
     '''
     '''
 
-    def __init__(self, world, filename):
+    def __init__(self, world, filename, pid_params=None):
         '''
         '''
         self.world = world
         self.filename = filename
         self.jointgroup = ode.JointGroup()
 
-        parser = Parser(world, filename, self.jointgroup)
-        self.root = world.get_body(parser.create())
+        parser = Parser(world, filename, self.jointgroup, pid_params=pid_params)
+        self.roots = [world.get_body(r) for r in parser.create()]
         self.bodies = parser.bodies
         self.joints = parser.joints
 
     @property
     def num_dofs(self):
-        return sum(j.ADOF + j.LDOF for j in self.joints)
+        return sum(j.ADOF for j in self.joints)
 
     @property
     def max_force(self):
@@ -238,6 +241,14 @@ class Skeleton(object):
             values.extend(joint.amotor.feedback[-1][:joint.ADOF])
         return values
 
+    def indices_for(self, name):
+        j = 0
+        for joint in self.joints:
+            if joint.name == name:
+                return list(range(j, j + joint.ADOF))
+            j += joint.ADOF
+        return []
+
     def rmse(self):
         deltas = []
         for joint in self.joints:
@@ -266,7 +277,7 @@ class Skeleton(object):
         for joint in self.joints:
             joint.velocities = target
 
-    def enable_motors(self, max_force=1000):
+    def enable_motors(self, max_force):
         self.max_force = max_force
         self.feedback = True
 
@@ -338,19 +349,19 @@ class Markers(Frames):
     DEFAULT_CFM = 1e-4
     DEFAULT_ERP = 0.3
 
-    def __init__(self, world, filename, channels=None):
+    def __init__(self, world):
         self.world = world
         self.jointgroup = ode.JointGroup()
         self.joints = []
+
         self.cfm = Markers.DEFAULT_CFM
         self.erp = Markers.DEFAULT_ERP
+        self.root_attachment_factor = 1.
 
         self.marker_bodies = {}
         self.attach_bodies = {}
         self.attach_offsets = {}
-
-        self.channels = self._interpret_channels(channels)
-        self.load(filename)
+        self.channels = {}
 
     @property
     def num_markers(self):
@@ -363,7 +374,7 @@ class Markers(Frames):
             return dict((c, i) for i, c in enumerate(channels))
         return channels or {}
 
-    def load(self, filename, channels=None):
+    def load(self, filename, channels=None, max_frames=1e100):
         if not filename.lower().endswith('.c3d'):
             self.channels = self._interpret_channels(channels or self.channels)
             super(Markers, self).load(filename)
@@ -382,7 +393,12 @@ class Markers(Frames):
             self.channels = self._interpret_channels(labels)
 
             # read the actual c3d data into a numpy array.
-            self.data = np.array([f for _, f, _ in reader.read_frames()])
+            data = []
+            for _, frame, _ in reader.read_frames():
+                data.append(frame)
+                if len(data) > max_frames:
+                    break
+            self.data = np.array(data)
 
             # scale the data to meters -- mm is a very common C3D unit.
             if reader['POINT:UNITS'].string_value.strip().lower() == 'mm':
@@ -404,7 +420,7 @@ class Markers(Frames):
             self.marker_bodies[label] = body
 
     def load_attachments(self, source, skeleton):
-        self.root = skeleton.root
+        self.roots = skeleton.roots
 
         self.attach_bodies = {}
         self.attach_offsets = {}
@@ -440,16 +456,16 @@ class Markers(Frames):
         self.jointgroup.empty()
         self.joints = []
 
-    def attach(self, frame_no, root_factor=10.):
+    def attach(self, frame_no):
         for label, j in self.channels.iteritems():
-            if label not in self.attach_bodies:
+            target = self.attach_bodies.get(label)
+            if target is None:
                 continue
             if self.data[frame_no, j, 4] < 0:
                 continue
-            f = root_factor if self.attach_bodies[label] is self.root else 1.
+            f = self.root_attachment_factor if target in self.roots else 1.
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
-            joint.attach(self.marker_bodies[label].ode_body,
-                         self.attach_bodies[label].ode_body)
+            joint.attach(self.marker_bodies[label].ode_body, target.ode_body)
             joint.setAnchor1Rel([0, 0, 0])
             joint.setAnchor2Rel(self.attach_offsets[label])
             joint.setParam(ode.ParamCFM, self.cfm / f)
@@ -485,21 +501,23 @@ class Markers(Frames):
 
 
 class World(physics.World):
-    def load_skeleton(self, filename):
-        self.skeleton = Skeleton(self, filename)
+    def load_skeleton(self, filename, pid_params=None):
+        self.skeleton = Skeleton(self, filename, pid_params)
 
-    def load_markers(self, filename, attachments):
-        self.markers = Markers(self, filename=filename)
+    def load_markers(self, filename, attachments, max_frames=1e100):
+        self.markers = Markers(self)
+        self.markers.load(filename, max_frames=max_frames)
         self.markers.load_attachments(attachments, self.skeleton)
 
     def step(self, substeps=2):
         # by default we step by following our loaded marker data.
-        if not hasattr(self, 'follower'):
-            self.follower = iter(self.follow())
         try:
             next(self.follower)
-        except StopIteration:
-            self.follower = iter(self.follow())
+        except (AttributeError, StopIteration) as err:
+            self.reset()
+
+    def reset(self):
+        self.follower = self.follow()
 
     def settle(self, min_frame=0, max_frame=0, max_rmse=0.06, pose=None):
         self.markers.cfm = Markers.DEFAULT_CFM
@@ -549,12 +567,18 @@ class World(physics.World):
             # clear out contact joints to prepare for the next frame.
             self.ode_contactgroup.empty()
 
-    def inverse_kinematics(self, start=0, states=None):
+    def inverse_kinematics(self, start=0, states=None, max_force=100):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
+        zeros = None
+        if max_force > 0:
+            self.skeleton.enable_motors(max_force)
+            zeros = np.zeros(self.skeleton.num_dofs)
         for _ in self.follow(start, states):
+            if zeros is not None:
+                self.skeleton.set_angles(zeros)
             yield self.skeleton.angles
 
-    def inverse_dynamics(self, angles, start=0, states=None):
+    def inverse_dynamics(self, angles, start=0, states=None, max_force=300):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
         for i, states in enumerate(self.follow(start, states)):
             # joseph's stability fix: step to compute torques, then reset the
@@ -563,7 +587,7 @@ class World(physics.World):
             # stepping using angle constraints will be removed, because we
             # will be stepping the model using the computed torques.
 
-            self.skeleton.enable_motors()
+            self.skeleton.enable_motors(max_force)
             self.skeleton.set_angles(angles[i])
 
             self.ode_world.step(self.dt)
