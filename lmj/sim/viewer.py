@@ -78,7 +78,7 @@ def box_vertices():
     ], vtx.flatten(), nrm.flatten()
 
 
-def sphere_vertices(n=2):
+def sphere_vertices(n=3):
     idx = [[0, 1, 2], [0, 5, 1], [0, 2, 4], [0, 4, 5],
            [3, 2, 1], [3, 4, 2], [3, 5, 4], [3, 1, 5]]
     vtx = list(np.array([
@@ -136,8 +136,7 @@ class GL(pyglet.window.Window):
         except pyglet.window.NoSuchConfigException:
             config = screen.get_best_config(Config())
 
-        super(GL, self).__init__(
-            width=1000, height=600, resizable=True, vsync=False, config=config)
+        super(GL, self).__init__(resizable=True, config=config)
 
         self.world = world
         self.trace = trace
