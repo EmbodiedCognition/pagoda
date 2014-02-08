@@ -6,7 +6,7 @@ TakeoMonday:LBHD head -0.70710678 -0.70710678 0
 TakeoMonday:C7   neck    0   -1 -0.3
 TakeoMonday:CLAV u-torso 0    1  0.8
 TakeoMonday:STRN l-torso 0    1  1
-TakeoMonday:RBAC u-torso 0.3  0  0
+TakeoMonday:RBAC u-torso 0.3 -1  0
 TakeoMonday:T10  l-torso 0   -1  1
 
 TakeoMonday:RBWT pelvis  0.3 -1 0.5
