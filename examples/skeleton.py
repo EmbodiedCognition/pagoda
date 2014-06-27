@@ -28,9 +28,6 @@ import lmj.sim.viewer
 @climate.annotate(
     asf='load skeleton data from this file',
     amc='load motion data from this file',
-    frame_rate=('frame rate of the simulation', 'option', None, float),
-    friction=('coefficient of friction', 'option', None, float),
-    elasticity=('elasticity constant for collisions', 'option', None, float),
     )
 def main(asf, amc):
     w = lmj.sim.skeleton.World(dt=1. / 60)

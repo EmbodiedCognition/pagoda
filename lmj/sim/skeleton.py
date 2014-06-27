@@ -46,7 +46,7 @@ class World(physics.World):
     def add_skeleton(self, asf, name=None, translate=(0, 1, 0)):
         skeleton = parse_asf(asf)
         skeleton.create_bodies(self, translate=translate)
-        skeleton.create_joints(self)
+        #skeleton.create_joints(self)
         if name is None:
             name = skeleton.name
         self.skeletons[name] = skeleton
@@ -186,8 +186,8 @@ class Bone(object):
     def create_body(self, world, rank=0):
         return world.create_body('box',
                                  name=self.name,
-                                 color=(rank, 0.7, 0.3),
-                                 lengths=(0.05, 0.03, self.length))
+                                 color=tuple(np.random.rand(3)) + (0.9, ),#(rank, 0.7, 0.3, 0.9),
+                                 lengths=(0.06, 0.03, self.length))
 
 
 class Tokenizer(list):
@@ -362,7 +362,7 @@ def parse_asf(data):
         try:
             assert token.startswith(':')
             PARSERS[token[1:].lower()](tok, asf)
-        except Exception, e:
+        except Exception as e:
             logging.critical(tok.error())
             raise
         tok.end()
@@ -403,11 +403,11 @@ def parse_amc(data):
                     frame = {}
                 continue
             name, dofs = line.split(None, 1)
-            dofs = np.array(map(float, dofs.split()))
+            dofs = np.array(list(map(float, dofs.split())))
             if convert_degrees:
                 dofs *= TAU / 360
             frame[name] = dofs
-        except Exception, e:
+        except Exception as e:
             logging.critical('error at line %d, frame %d: %r', i + 1, count, line)
             raise
     logging.info('parsed %d frames of motion data', count)
