@@ -252,7 +252,7 @@ class Skeleton:
     def body_velocities(self):
         values = []
         for body in self.bodies:
-            values.extend(body.velocity)
+            values.extend(body.linear_velocity)
         return values
 
     def indices_for(self, name):
