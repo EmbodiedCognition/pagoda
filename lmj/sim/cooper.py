@@ -16,7 +16,7 @@ logging = climate.get_logger(__name__)
 TAU = 2 * np.pi
 
 
-class Parser(object):
+class Parser:
     def __init__(self, world, source, jointgroup=None, pid_params=None):
         self.world = world
         self.filename = source
@@ -170,7 +170,7 @@ class Parser(object):
         return self.roots
 
 
-class Skeleton(object):
+class Skeleton:
     '''
     '''
 
@@ -303,46 +303,7 @@ class Skeleton(object):
             j += joint.ADOF
 
 
-class Frames(object):
-    def __init__(self, filename=None, num_frames=0, num_dofs=0):
-        self.data = None
-        if filename:
-            self.load(filename)
-        elif num_frames:
-            self.data = np.zeros((num_frames, num_dofs), float)
-
-    @property
-    def num_frames(self):
-        return self.data.shape[0]
-
-    @property
-    def num_dofs(self):
-        return self.data.shape[1]
-
-    def __iter__(self):
-        return iter(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx]
-
-    def load(self, filename):
-        if filename.lower().endswith('.npy'):
-            self.data = np.load(filename)
-        else:
-            self.data = np.loadtxt(filename)
-
-    def save(self, filename):
-        if filename.endswith('.npy'):
-            np.save(filename, self.data)
-        else:
-            np.savetxt(filename, self.data)
-
-    @classmethod
-    def like(cls, frames):
-        return cls(num_frames=len(frames), num_dofs=frames.num_dofs)
-
-
-class Markers(Frames):
+class Markers:
     '''
     '''
 
@@ -364,8 +325,18 @@ class Markers(Frames):
         self.channels = {}
 
     @property
+    def num_frames(self):
+        return self.data.shape[0]
+
+    @property
     def num_markers(self):
         return self.data.shape[1]
+
+    def __iter__(self):
+        return iter(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx]
 
     def _interpret_channels(self, channels):
         if isinstance(channels, str):
@@ -449,7 +420,7 @@ class Markers(Frames):
                 continue
             b = self.attach_bodies[label] = bodies[0]
             o = self.attach_offsets[label] = \
-                np.array(map(float, tokens)) * b.dimensions / 2
+                np.array(list(map(float, tokens))) * b.dimensions / 2
             logging.info('%s <--> %s, offset %s', label, b.name, o)
 
     def detach(self):
@@ -457,7 +428,7 @@ class Markers(Frames):
         self.joints = []
 
     def attach(self, frame_no):
-        for label, j in self.channels.iteritems():
+        for label, j in self.channels.items():
             target = self.attach_bodies.get(label)
             if target is None:
                 continue
@@ -481,7 +452,7 @@ class Markers(Frames):
             for c in range(self.num_markers):
                 if prev[c, 4] > -1 and next[c, 4] > -1:
                     delta[c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
-        for label, j in self.channels.iteritems():
+        for label, j in self.channels.items():
             body = self.marker_bodies[label]
             body.position = frame[j]
             body.linear_velocity = delta[j]
