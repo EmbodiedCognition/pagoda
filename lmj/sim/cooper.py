@@ -241,6 +241,20 @@ class Skeleton:
             values.extend(joint.amotor.feedback[-1][:joint.ADOF])
         return values
 
+    @property
+    def body_positions(self):
+        values = []
+        for body in self.bodies:
+            values.extend(body.position)
+        return values
+
+    @property
+    def body_velocities(self):
+        values = []
+        for body in self.bodies:
+            values.extend(body.velocity)
+        return values
+
     def indices_for(self, name):
         j = 0
         for joint in self.joints:
