@@ -373,7 +373,7 @@ class Markers:
             assert self.world.dt == 1. / reader.frame_rate()
 
             # set up a map from marker label to index in the data stream.
-            labels = [s.strip() for s in reader['POINT:LABELS'].string_array]
+            labels = [s.strip() for s in reader.point_labels()]
             logging.info('%s: loaded marker labels %s', filename, labels)
             self.channels = self._interpret_channels(labels)
 
