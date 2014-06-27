@@ -630,7 +630,7 @@ class Ball(Joint):
 
         # we augment ball joints with an additional motor that allows us to set
         # rotation limits.
-        kw = {k: v for k, v in kwargs.iteritems() if k != 'anchor'}
+        kw = {k: v for k, v in kwargs.items() if k != 'anchor'}
         self.alimit = AMotor(args[0] + ':alimit', *args[1:],
                              dof=self.ADOF, mode='euler', **kw)
 
