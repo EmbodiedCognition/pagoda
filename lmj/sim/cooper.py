@@ -249,7 +249,7 @@ class Skeleton:
         return values
 
     @property
-    def body_velocities(self):
+    def body_linear_velocities(self):
         values = []
         for body in self.bodies:
             values.extend(body.linear_velocity)
@@ -496,6 +496,7 @@ class World(physics.World):
 
     def step(self, substeps=2):
         # by default we step by following our loaded marker data.
+        self.frame_no += 1
         try:
             next(self.follower)
         except (AttributeError, StopIteration) as err:
@@ -504,53 +505,52 @@ class World(physics.World):
     def reset(self):
         self.follower = self.follow()
 
-    def settle(self, min_frame=0, max_frame=0, max_rmse=0.06, pose=None):
+    def settle(self, frame_no=0, max_rmse=0.06, pose=None):
         self.markers.cfm = Markers.DEFAULT_CFM
         self.markers.erp = Markers.DEFAULT_ERP
-        frame_no = states = rmse = None
-        for frame_no, states in enumerate(self.follow(0, None)):
+        if pose is not None:
+            self.skeleton.set_body_states(pose)
+        while True:
+            states = next(self._step_to_frame(frame_no))
             rmse = self.markers.rmse()
-            logging.debug('settling at frame %d: marker rmse %.3f',
-                          frame_no, rmse)
-            if frame_no < min_frame:
-                if pose is not None:
-                    self.skeleton.set_body_states(pose)
-                continue
-            if frame_no > max_frame > 0 or max_rmse > rmse:
-                break
-        logging.info('settled to markers at frame %d with rmse %.3f',
-                     frame_no, rmse)
-        return frame_no, states
+            logging.debug('settling at frame %d: marker rmse %.3f', frame_no, rmse)
+            if rmse < max_rmse:
+                return states
 
-    def follow(self, start=0, states=None):
+    def follow(self, start=0, end=1e100, states=None):
         '''Iterate over a set of marker data, dragging its skeleton along.'''
-        if states is not None:
+        if states is None:
+            self.settle(start)
+        else:
             self.skeleton.set_body_states(states)
-
         for frame_no, frame in enumerate(self.markers):
-            if frame_no < start:
-                continue
+            if start <= frame_no < end:
+                for states in self._step_to_frame(frame_no):
+                    yield states
 
-            # update the positions and velocities of the markers.
-            self.markers.detach()
-            self.markers.reposition(frame_no)
-            self.markers.attach(frame_no)
+    def _step_to_frame(self, frame_no):
+        '''
+        '''
+        # update the positions and velocities of the markers.
+        self.markers.detach()
+        self.markers.reposition(frame_no)
+        self.markers.attach(frame_no)
 
-            # detect collisions
-            self.ode_space.collide(None, self.on_collision)
+        # detect collisions
+        self.ode_space.collide(None, self.on_collision)
 
-            # record the state of each skeleton body.
-            states = self.skeleton.get_body_states()
-            self.skeleton.set_body_states(states)
+        # record the state of each skeleton body.
+        states = self.skeleton.get_body_states()
+        self.skeleton.set_body_states(states)
 
-            # yield the current simulation state to our caller.
-            yield states
+        # yield the current simulation state to our caller.
+        yield states
 
-            # update the ode world.
-            self.ode_world.step(self.dt)
+        # update the ode world.
+        self.ode_world.step(self.dt)
 
-            # clear out contact joints to prepare for the next frame.
-            self.ode_contactgroup.empty()
+        # clear out contact joints to prepare for the next frame.
+        self.ode_contactgroup.empty()
 
     def inverse_kinematics(self, start=0, states=None, max_force=100):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
