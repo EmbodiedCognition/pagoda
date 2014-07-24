@@ -349,7 +349,7 @@ def parse_asf(data):
     if os.path.exists(data):
         logging.info('%s: loading skeleton data', data)
         data = open(data)
-    if isinstance(data, file):
+    if hasattr(data, 'read'):
         data = data.read()
     tok = Tokenizer(data)
     while True:
