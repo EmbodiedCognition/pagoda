@@ -39,7 +39,7 @@ class Body(object):
     equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
+    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 0.5), density=1000., **shape):
         self.name = name
         self.shape = shape
         self.color = color
@@ -697,7 +697,7 @@ class World(base.World):
         self.ode_floor = ode.GeomPlane(self.ode_space, (0, 0, 1), 0)
         self.ode_contactgroup = ode.JointGroup()
 
-        self.frame = 0
+        self.frame_no = 0
         self.dt = dt
         self.elasticity = 0.1
         self.friction = 2000
@@ -821,7 +821,7 @@ class World(base.World):
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.'''
-        self.frame += 1
+        self.frame_no += 1
         dt = self.dt / substeps
         for _ in range(substeps):
             self.ode_contactgroup.empty()
@@ -832,7 +832,7 @@ class World(base.World):
         '''Trace world bodies and joints.'''
         bodies = ' '.join(b.trace() for b in self.bodies)
         joints = ' '.join(j.trace() for j in self.joints)
-        print('{} {} {}'.format(self.frame, bodies, joints), file=handle)
+        print('{} {} {}'.format(self.frame_no, bodies, joints), file=handle)
 
     def are_connected(self, body_a, body_b):
         '''Return True iff the given bodies are currently connected.'''
