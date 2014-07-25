@@ -20,11 +20,14 @@
 
 '''OpenGL world viewer.'''
 
+import climate
 import contextlib
 import numpy as np
 import pyglet
 
 from pyglet.gl import *
+
+logging = climate.get_logger(__name__)
 
 from . import physics
 
@@ -37,7 +40,6 @@ class Null(object):
 
     def run(self):
         while not self.world.step():
-            self.world.trace()
             if self.world.needs_reset():
                 self.world.reset()
 
@@ -121,8 +123,32 @@ def cylinder_vertices(n=14):
     return idx, vtx, nrm
 
 
+class EventLoop(pyglet.app.EventLoop):
+    def run(self):
+        self.has_exit = False
+        self._legacy_setup()
+        platform_event_loop = pyglet.app.platform_event_loop
+        platform_event_loop.start()
+        self.dispatch_event('on_enter')
+        self.is_running = True
+        while not self.has_exit:
+            self.clock.tick()
+            platform_event_loop.step(self.clock.get_sleep_time(True))
+        self.is_running = False
+        self.dispatch_event('on_exit')
+        platform_event_loop.stop()
+
+# use our event loop implementation rather than the default pyglet one.
+pyglet.options['debug_gl'] = False
+pyglet.app.event_loop = EventLoop()
+
+
 class GL(pyglet.window.Window):
-    def __init__(self, world, trace=None, paused=False):
+    '''
+    '''
+
+    def __init__(self, world, dt=1. / 30, paused=False, save_frames=None):
+        # first, set up the pyglet screen, window, and display variables.
         platform = pyglet.window.get_platform()
         display = platform.get_default_display()
         screen = display.get_default_screen()
@@ -135,20 +161,19 @@ class GL(pyglet.window.Window):
                 samples=4))
         except pyglet.window.NoSuchConfigException:
             config = screen.get_best_config(Config())
+        super(GL, self).__init__(resizable=True, config=config, vsync=False)
 
-        super(GL, self).__init__(resizable=True, config=config)
-
+        # then, set up our own view parameters related to the simulator.
+        self.dt = dt
         self.world = world
-        self.trace = trace
         self.paused = paused
+        self.save_frames = save_frames
 
         self.zoom = 10
         self.ty = 0.05
         self.tz = -0.8
         self.ry = 35
         self.rz = -60
-
-        #self.fps = pyglet.clock.ClockDisplay()
 
         self.on_resize(self.width, self.height)
 
@@ -176,6 +201,15 @@ class GL(pyglet.window.Window):
         self.box = build_vertex_list(*box_vertices())
         self.sphere = build_vertex_list(*sphere_vertices())
         self.cylinder = build_vertex_list(*cylinder_vertices(32))
+
+    def _update_view(self):
+        # http://njoubert.com/teaching/cs184_fa08/section/sec09_camera.pdf
+        glMatrixMode(GL_MODELVIEW)
+        glLoadIdentity()
+        gluLookAt(1, 0, 0, 0, 0, 0, 0, 0, 1)
+        glTranslatef(-self.zoom, self.ty, self.tz)
+        glRotatef(self.ry, 0, 1, 0)
+        glRotatef(self.rz, 0, 0, 1)
 
     def on_mouse_scroll(self, x, y, dx, dy):
         if dy == 0: return
@@ -210,38 +244,38 @@ class GL(pyglet.window.Window):
             self.paused = False if self.paused else True
         if key == keymap.ENTER:
             self.world.reset()
+        if key == keymap.F and self.save_frames:
+            self.save_frame()
         if key == keymap.RIGHT:
             steps = int(1 / self.world.dt)
             if modifiers & keymap.MOD_SHIFT:
                 steps *= 10
             [self.update(self.world.dt) for _ in range(steps)]
 
-    def on_draw(self):
-        self.clear()
-        glMatrixMode(GL_MODELVIEW)
-        self.draw()
+    def save_frame(self):
+        bn = 'frame-{:05d}.png'.format(self.world.frame_no)
+        pyglet.image.get_buffer_manager().get_color_buffer().save(
+            os.path.join(self.save_frames, bn))
 
-    def _update_view(self):
-        # http://njoubert.com/teaching/cs184_fa08/section/sec09_camera.pdf
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
-        gluLookAt(1, 0, 0, 0, 0, 0, 0, 0, 1)
-        glTranslatef(-self.zoom, self.ty, self.tz)
-        glRotatef(self.ry, 0, 1, 0)
-        glRotatef(self.rz, 0, 0, 1)
+    def redraw(self, dt):
+        self.switch_to()
+        self.clear()
+        self.draw()
+        self.flip()
 
     def update(self, dt):
         if self.paused:
             return
         if self.world.step():
             pyglet.app.exit()
-        if self.trace:
-            self.world.trace(self.trace)
         if self.world.needs_reset():
             self.world.reset()
+        if not self.world.frame_no % 100:
+            logging.info('frame %d', self.world.frame_no)
 
     def run(self):
         pyglet.clock.schedule_interval(self.update, self.world.dt)
+        pyglet.clock.schedule_interval(self.redraw, self.dt)
         pyglet.app.run()
 
     def draw(self):
@@ -251,9 +285,9 @@ class GL(pyglet.window.Window):
 class Physics(GL):
     def __init__(self, *args, **kwargs):
         super(Physics, self).__init__(*args, **kwargs)
-        BLK = [100, 100, 100] * 6
-        WHT = [150, 150, 150] * 6
-        N = 10
+        BLK = [150, 150, 150] * 6
+        WHT = [160, 160, 160] * 6
+        N = 20
         z = kwargs.get('floor_z', 0)
         vtx = []
         for i in range(N, -N, -1):
