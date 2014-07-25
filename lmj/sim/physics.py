@@ -39,7 +39,7 @@ class Body(object):
     equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 0.5), density=1000., **shape):
+    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
         self.name = name
         self.shape = shape
         self.color = color
