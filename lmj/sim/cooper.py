@@ -505,26 +505,28 @@ class World(physics.World):
     def reset(self):
         self.follower = self.follow()
 
-    def settle(self, frame_no=0, max_rmse=0.06, pose=None):
+    def settle(self, frame_no=0, max_rmse=0.10, pose=None):
         self.markers.cfm = Markers.DEFAULT_CFM
         self.markers.erp = Markers.DEFAULT_ERP
         if pose is not None:
             self.skeleton.set_body_states(pose)
         while True:
-            states = next(self._step_to_frame(frame_no))
+            for states in self._step_to_frame(frame_no):
+                pass
             rmse = self.markers.rmse()
-            logging.debug('settling at frame %d: marker rmse %.3f', frame_no, rmse)
+            logging.info('settling at frame %d: marker rmse %.3f', frame_no, rmse)
             if rmse < max_rmse:
                 return states
 
-    def follow(self, start=0, end=1e100, states=None):
+    def follow(self, start=0, end=1e100, states=None, settle=None):
         '''Iterate over a set of marker data, dragging its skeleton along.'''
-        if states is None:
-            self.settle(start)
-        else:
+        if states is not None:
             self.skeleton.set_body_states(states)
+        elif settle is not None:
+            self.settle(start)
         for frame_no, frame in enumerate(self.markers):
             if start <= frame_no < end:
+                # TODO: replace with "yield from" for full py3k goodness
                 for states in self._step_to_frame(frame_no):
                     yield states
 
