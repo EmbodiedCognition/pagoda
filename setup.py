@@ -2,7 +2,7 @@ import os
 import setuptools
 
 setuptools.setup(
-    name='gymnasium',
+    name='lmj.sim',
     version='0.0.2',
     packages=setuptools.find_packages(),
     author='Leif Johnson',
