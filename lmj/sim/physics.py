@@ -134,14 +134,6 @@ class Body(object):
     def follows_gravity(self, follows_gravity):
         self.ode_body.setGravity(follows_gravity)
 
-    def trace(self):
-        args = [self.name]
-        args.extend(self.position)
-        args.extend(self.quaternion)
-        args.extend(self.linear_velocity)
-        args.extend(self.angular_velocity)
-        return '{} p {} {} {} q {} {} {} {} lv {} {} {} av {} {} {}'.format(*args)
-
     def rotate_to_body(self, x):
         return np.dot(x, np.array(self.rotation).reshape((3, 3)))
 
@@ -566,15 +558,6 @@ class Joint(object):
     def add_torques(self, torques):
         self.amotor.add_torques(torques)
 
-    def trace(self):
-        feedback = self.feedback
-        if not feedback:
-            return ''
-        parts = [self.name]
-        for n, (x, y, z) in zip(('f1', 't1', 'f2', 't2'), feedback):
-            parts.append('{} {} {} {}'.format(n, x, y, z))
-        return ' '.join(parts)
-
 
 class Fixed(Joint):
     ADOF = 0
@@ -827,12 +810,6 @@ class World(base.World):
             self.ode_contactgroup.empty()
             self.ode_space.collide(None, self.on_collision)
             self.ode_world.step(dt)
-
-    def trace(self, handle):
-        '''Trace world bodies and joints.'''
-        bodies = ' '.join(b.trace() for b in self.bodies)
-        joints = ' '.join(j.trace() for j in self.joints)
-        print('{} {} {}'.format(self.frame_no, bodies, joints), file=handle)
 
     def are_connected(self, body_a, body_b):
         '''Return True iff the given bodies are currently connected.'''
