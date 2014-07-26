@@ -22,7 +22,9 @@
 
 import climate
 import contextlib
+import copy
 import numpy as np
+import os
 import pyglet
 
 from pyglet.gl import *
@@ -168,6 +170,7 @@ class GL(pyglet.window.Window):
         self.world = world
         self.paused = paused
         self.save_frames = save_frames
+        self.frozen_bodies = []
 
         self.zoom = 10
         self.ty = 0.05
@@ -244,6 +247,8 @@ class GL(pyglet.window.Window):
             self.paused = False if self.paused else True
         if key == keymap.ENTER:
             self.world.reset()
+        if key == keymap.B:
+            self.freeze_bodies()
         if key == keymap.F and self.save_frames:
             self.save_frame()
         if key == keymap.RIGHT:
@@ -252,10 +257,32 @@ class GL(pyglet.window.Window):
                 steps *= 10
             [self.update(self.world.dt) for _ in range(steps)]
 
+    def freeze_bodies(self):
+        bodies = []
+        for b in self.world.bodies:
+            if b.name.startswith('table'):
+                continue
+            shape = {}
+            if isinstance(b, physics.Sphere):
+                shape = dict(radius=b.radius)
+            if isinstance(b, physics.Box):
+                shape = dict(lengths=b.lengths)
+            if isinstance(b, physics.Cylinder):
+                shape = dict(radius=b.radius, length=b.length)
+            if isinstance(b, physics.Capsule):
+                shape = dict(radius=b.radius, length=b.length)
+            bp = b.__class__(b.name, self.world.ode_world, self.world.ode_space, color=b.color, **shape)
+            bp.position = b.position
+            bp.quaternion = b.quaternion
+            bp.is_kinematic = True
+            bodies.append(bp)
+        self.frozen_bodies.append(bodies)
+
     def save_frame(self):
         bn = 'frame-{:05d}.png'.format(self.world.frame_no)
-        pyglet.image.get_buffer_manager().get_color_buffer().save(
-            os.path.join(self.save_frames, bn))
+        fn = os.path.join(self.save_frames, bn)
+        logging.info('saving frame %s', fn)
+        pyglet.image.get_buffer_manager().get_color_buffer().save(fn)
 
     def redraw(self, dt):
         self.switch_to()
@@ -272,6 +299,8 @@ class GL(pyglet.window.Window):
             self.world.reset()
         if not self.world.frame_no % 100:
             logging.info('frame %d', self.world.frame_no)
+        if not self.world.frame_no % 300:
+            self.freeze_bodies()
 
     def run(self):
         pyglet.clock.schedule_interval(self.update, self.world.dt)
@@ -304,39 +333,46 @@ class Physics(GL):
     def draw(self, color=None):
         '''Draw all bodies in the world.'''
         self.floor.draw(GL_TRIANGLES)
+        for frame in self.frozen_bodies:
+            for body in frame:
+                self.draw_body(body)
         for body in self.world.bodies:
-            x, y, z = body.position
-            r = body.rotation
-            glColor4f(*(color if color is not None else body.color))
-            with gl_context(mat=(r[0], r[3], r[6], 0.,
-                                 r[1], r[4], r[7], 0.,
-                                 r[2], r[5], r[8], 0.,
-                                 x, y, z, 1.)):
-                if isinstance(body, physics.Box):
-                    x, y, z = body.lengths
-                    glScalef(x / 2., y / 2., z / 2.)
-                    self.box.draw(GL_TRIANGLES)
-                elif isinstance(body, physics.Sphere):
-                    r = body.radius
-                    glScalef(r, r, r)
-                    self.sphere.draw(GL_TRIANGLES)
-                elif isinstance(body, physics.Cylinder):
-                    l = body.length
-                    r = body.radius
-                    glScalef(r, r, l / 2)
+            self.draw_body(body, color=color)
+
+    def draw_body(self, body, color=None):
+        ''''''
+        x, y, z = body.position
+        r = body.rotation
+        glColor4f(*(color if color is not None else body.color))
+        with gl_context(mat=(r[0], r[3], r[6], 0.,
+                             r[1], r[4], r[7], 0.,
+                             r[2], r[5], r[8], 0.,
+                             x, y, z, 1.)):
+            if isinstance(body, physics.Box):
+                x, y, z = body.lengths
+                glScalef(x / 2., y / 2., z / 2.)
+                self.box.draw(GL_TRIANGLES)
+            elif isinstance(body, physics.Sphere):
+                r = body.radius
+                glScalef(r, r, r)
+                self.sphere.draw(GL_TRIANGLES)
+            elif isinstance(body, physics.Cylinder):
+                l = body.length
+                r = body.radius
+                glScalef(r, r, l / 2)
+                self.cylinder.draw(GL_TRIANGLES)
+            elif isinstance(body, physics.Capsule):
+                r = body.radius
+                l = body.length
+                with gl_context(scale=(r, r, l / 2)):
                     self.cylinder.draw(GL_TRIANGLES)
-                elif isinstance(body, physics.Capsule):
-                    r = body.radius
-                    l = body.length
-                    with gl_context(scale=(r, r, l / 2)):
-                        self.cylinder.draw(GL_TRIANGLES)
-                    with gl_context(mat=(r, 0, 0, 0,
-                                         0, r, 0, 0,
-                                         0, 0, r, 0,
-                                         0, 0, -l / 2, 1)):
-                        self.sphere.draw(GL_TRIANGLES)
-                    with gl_context(mat=(r, 0, 0, 0,
-                                         0, r, 0, 0,
-                                         0, 0, r, 0,
-                                         0, 0, l / 2, 1)):
-                        self.sphere.draw(GL_TRIANGLES)
+                with gl_context(mat=(r, 0, 0, 0,
+                                     0, r, 0, 0,
+                                     0, 0, r, 0,
+                                     0, 0, -l / 2, 1)):
+                    self.sphere.draw(GL_TRIANGLES)
+                with gl_context(mat=(r, 0, 0, 0,
+                                     0, r, 0, 0,
+                                     0, 0, r, 0,
+                                     0, 0, l / 2, 1)):
+                    self.sphere.draw(GL_TRIANGLES)
