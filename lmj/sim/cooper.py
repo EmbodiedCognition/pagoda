@@ -518,12 +518,10 @@ class World(physics.World):
             if rmse < max_rmse:
                 return states
 
-    def follow(self, start=0, end=1e100, states=None, settle=None):
+    def follow(self, start=0, end=1e100, states=None):
         '''Iterate over a set of marker data, dragging its skeleton along.'''
         if states is not None:
             self.skeleton.set_body_states(states)
-        elif settle is not None:
-            self.settle(start)
         for frame_no, frame in enumerate(self.markers):
             if start <= frame_no < end:
                 # TODO: replace with "yield from" for full py3k goodness
@@ -554,20 +552,20 @@ class World(physics.World):
         # clear out contact joints to prepare for the next frame.
         self.ode_contactgroup.empty()
 
-    def inverse_kinematics(self, start=0, states=None, max_force=100):
+    def inverse_kinematics(self, start=0, end=1e100, states=None, max_force=100):
         '''Follow a set of marker data, yielding kinematic joint angles.'''
         zeros = None
         if max_force > 0:
             self.skeleton.enable_motors(max_force)
             zeros = np.zeros(self.skeleton.num_dofs)
-        for _ in self.follow(start, states):
+        for _ in self.follow(start, end, states):
             if zeros is not None:
                 self.skeleton.set_angles(zeros)
             yield self.skeleton.angles
 
     def inverse_dynamics(self, angles, start=0, states=None, max_force=300):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
-        for i, states in enumerate(self.follow(start, states)):
+        for i, states in enumerate(self.follow(start, len(angles), states)):
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
             # torques. thus any numerical errors between the body states after
