@@ -565,7 +565,7 @@ class World(physics.World):
 
     def inverse_dynamics(self, angles, start=0, states=None, max_force=300):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
-        for i, states in enumerate(self.follow(start, len(angles), states)):
+        for i, states in enumerate(self.follow(start, start + len(angles), states)):
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
             # torques. thus any numerical errors between the body states after
