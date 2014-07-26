@@ -28,7 +28,7 @@ import ode
 from . import base
 
 
-class Body(object):
+class Body:
     '''This class wraps things that participate in the ODE physics simulation.
 
     The primary attribute of this class is "ode_body" -- a PyODE Body object. In
@@ -245,7 +245,7 @@ def _set_params(target, param, values, dof):
         target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
 
 
-class Motor(object):
+class Motor:
     '''This class wraps an ODE motor -- either an LMotor or an AMotor.
 
     The class has read-write properties for :
@@ -408,7 +408,7 @@ class LMotor(Motor):
         return self.ode_motor.getNumAxes()
 
 
-class Joint(object):
+class Joint:
     '''This class wraps the ODE Joint class with some Python properties.
 
     The class has read-write properties for :
@@ -670,6 +670,18 @@ def make_quaternion(theta, *axis):
     return [x * st / r, y * st / r, z * st / r, ct]
 
 
+def center_of_mass(bodies):
+    '''Given a set of bodies, compute their center of mass in world coordinates.
+    '''
+    x = np.zeros(3.)
+    t = 0.
+    for b in bodies:
+        m = b.mass
+        x += np.asarray(b.body_to_world(m.c)) * m.mass
+        t += m.mass
+    return x / t
+
+
 class World(base.World):
     '''A wrapper for an ODE World object, for running in a simulator.'''
 
@@ -724,16 +736,6 @@ class World(base.World):
     def joints(self):
         for k in sorted(self._joints):
             yield self._joints[k]
-
-    @property
-    def center_of_mass(self):
-        x = np.zeros(3.)
-        t = 0.
-        for b in self.bodies:
-            m = b.mass
-            x += np.asarray(b.body_to_world(m.c)) * m.mass
-            t += m.mass
-        return x / t
 
     def get_body(self, name):
         return self._bodies[name]
