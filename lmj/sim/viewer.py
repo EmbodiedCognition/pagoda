@@ -297,10 +297,6 @@ class GL(pyglet.window.Window):
             pyglet.app.exit()
         if self.world.needs_reset():
             self.world.reset()
-        if not self.world.frame_no % 100:
-            logging.info('frame %d', self.world.frame_no)
-        if not self.world.frame_no % 300:
-            self.freeze_bodies()
 
     def run(self):
         pyglet.clock.schedule_interval(self.update, self.world.dt)
