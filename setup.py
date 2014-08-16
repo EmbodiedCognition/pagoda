@@ -16,7 +16,7 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['climate', 'numpy', 'pyglet', 'Open-Dynamics-Engine'],
+    install_requires=['c3d', 'climate', 'numpy', 'pyglet', 'Open-Dynamics-Engine'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
