@@ -29,7 +29,7 @@ def main(n=20):
             capsule=dict(radius=g(3), length=g(10)),
             cylinder=dict(radius=g(2), length=g(10)),
             sphere=dict(radius=g(2)),
-            ).iteritems())[rng.randint(4)]
+            ).items())[rng.randint(4)]
         kw['color'] = tuple(rng.uniform(0, 1, size=3)) + (0.9, )
         w.create_body(s, **kw)
     w.reset()
