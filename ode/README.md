@@ -1,5 +1,3 @@
-# -*- mode: markdown -*-
-
 This file contains notes on how to build ODE for use in our physics simulator.
 
 First, check out the version of ODE that corresponds to the patch revision we
