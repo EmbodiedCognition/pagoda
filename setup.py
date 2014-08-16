@@ -2,15 +2,15 @@ import os
 import setuptools
 
 setuptools.setup(
-    name='lmj.sim',
+    name='pagoda',
     version='0.0.2',
     packages=setuptools.find_packages(),
     author='Leif Johnson',
-    author_email='leif@leifjohnson.net',
+    author_email='leif@cs.utexas.edu',
     description='yet another OpenGL-with-physics simulation framework',
     long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.md')).read(),
     license='MIT',
-    url='http://github.com/lmjohns3/py-sim/',
+    url='http://github.com/EmbodiedCognition/py-sim/',
     keywords=('simulation '
               'physics '
               'ode '
