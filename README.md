@@ -1,18 +1,23 @@
 # py-sim
 
-Yet another simulator framework for Python !
+Yet another simulator framework for Python!
 
 Install using this source repository, or with `pip`:
 
 ```shell
-pip install lmj.sim
+pip install pagoda
 ```
+
+You'll also need a patched version of the Open Dynamics Engine. To install,
+follow the instructions in the
+[`ode/README.md`](https://github.com/EmbodiedCognition/py-sim/tree/master/ode)
+file in the source repository.
 
 # License
 
 (MIT license)
 
-Copyright (c) 2013 Leif Johnson <leif@leifjohnson.net>
+Copyright (c) 2013 Leif Johnson <leif@cs.utexas.edu>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
