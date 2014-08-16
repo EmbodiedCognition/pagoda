@@ -10,9 +10,54 @@ from . import physics
 
 logging = climate.get_logger(__name__)
 
+def pid(kp=0., ki=0., kd=0., smooth=0.1):
+    '''Create a callable that implements a PID controller.
+
+    A PID controller returns a control signal u(t) given a history of error
+    measurements e(0) ... e(t), using proportional (P), integral (I), and
+    derivative (D) terms, according to:
+
+    u(t) = kp * e(t) + ki * \int_{s=0}^t e(s) ds + kd * \frac{de(s)}{ds}(t)
+
+    The proportional term is just the current error, the integral term is the
+    sum of all error measurements, and the derivative term is the instantaneous
+    derivative of the error measurement.
+
+    Parameters
+    ----------
+    kp : float
+        The weight associated with the proportional term of the PID controller.
+    ki : float
+        The weight associated with the integral term of the PID controller.
+    kd : float
+        The weight associated with the derivative term of the PID controller.
+    smooth : float in [0, 1]
+        Derivative values will be smoothed with this exponential average. A
+        value of 1 never incorporates new derivative information, a value of 0.5
+        uses the mean of the historic and new information, and a value of 0
+        discards historic information (i.e., the derivative in this case will be
+        unsmoothed). The default is 0.1.
+
+    Returns
+    -------
+    (error, dt) -> control
+        Returns a function that accepts an error measurement and a delta-time
+        value since the previous measurement, and returns a control signal.
+    '''
+    state = dict(p=0, i=0, d=0)
+    def control(error, dt=1):
+        state['d'] = smooth * state['d'] + (1 - smooth) * (error - state['p']) / dt
+        state['i'] += error * dt
+        state['p'] = error
+        return kp * state['p'] + ki * state['i'] + kd * state['d']
+    return control
+
 
 class Skeleton:
-    '''
+    '''A skeleton is a group of rigid bodies connected with articulated joints.
+
+    Commonly, the skeleton is used to represent an articulated body that is
+    capable of mimicking the motion of the human body.
     '''
 
     def __init__(self, world, filename, pid_params=None):
@@ -27,14 +72,12 @@ class Skeleton:
         self.bodies = p.bodies
         self.joints = p.joints
 
-        '''
-        self.pid_params = dict(kp=1. / self.world.dt)
-        self.pid_params.update(**(pid_params or {}))
-
-        # we add some additional attributes for controlling this joint
-        joint.target_angles = [None] * joint.ADOF
-        joint.controllers = [lmj.pid.Controller(**self.pid_params) for i in range(joint.ADOF)]
-        '''
+        # we add some additional attributes for controlling skeleton joints
+        kwargs = dict(kp=1. / world.dt)
+        kwargs.update(**(pid_params or {}))
+        for joint in self.joints:
+            joint.target_angles = [None] * joint.ADOF
+            joint.controllers = [pid(**kwargs) for i in range(joint.ADOF)]
 
     @property
     def num_dofs(self):
