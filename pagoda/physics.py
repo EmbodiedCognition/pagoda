@@ -449,6 +449,7 @@ class Joint:
         self.ode_joint.setAnchor(anchor)
         self.ode_joint.setFeedback(feedback)
         self.ode_joint.setParam(ode.ParamCFM, 0)
+        self.is_passive = False
 
         # we augment angular joints with a motor that allows us to monitor the
         # necessary joint forces, independent of the kinematic state.
@@ -513,6 +514,7 @@ class Joint:
 
     @max_forces.setter
     def max_forces(self, max_forces):
+        if self.is_passive: return
         if self.ADOF > 0: self.amotor.max_forces = max_forces
 
     @property

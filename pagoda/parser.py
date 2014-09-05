@@ -52,9 +52,9 @@ class Parser:
       coordinates. Typically this is only given for one object. By default
       bodies are all created at the origin.
 
-    - quaternion W X Y Z -- specifies the angle and axis of the rotation for the
-      body. By default bodies are created without any rotation (i.e., with a 0 1
-      0 0 quaternion).
+    - quaternion W X Y Z -- specifies the angle (in degrees) and axis of
+      rotation for the body. By default bodies are created without any rotation
+      (i.e., with a 0 1 0 0 quaternion).
 
     - root -- indicates that this body is a root in the skeleton.
 
@@ -71,8 +71,8 @@ class Parser:
       well as the body-relative offsets (on each body) where the joint will be
       anchored.
 
-    Additionally, joints may specify information about their axes and rotation
-    limits.
+    Additionally, joints may specify information about their axes, rotation
+    limits, etc.
 
     - axisN X [Y [Z]] -- specifies that axis number N (either 0, 1, or 2, and
       depending on the type of joint) points along the vector X Y Z. By default,
@@ -83,6 +83,12 @@ class Parser:
 
     - hi_stops A [B [C]] -- specifies the maximum permitted rotation (in
       degrees) for this joint along its respective axes.
+
+    - passive -- indicates that this joint's motor must remains disabled.
+
+    - cfm N -- set the lo- and hi-stop CFM for DOFs on this joint.
+
+    - erp N -- set the lo- and hi-stop ERP for DOFs on this joint.
 
     Example
     -------
@@ -121,6 +127,7 @@ class Parser:
 
     - The center of bar is joined to the point on baz with the largest Z
       coordinate using an unconstrained ball joint.
+
     '''
 
     def __init__(self, world, jointgroup=None):
@@ -296,8 +303,8 @@ class Parser:
 
         token = self._next_token()
         axes = [(1, 0, 0), (0, 1, 0)]
-        lo_stops = None
-        hi_stops = None
+        lo_stops = hi_stops = cfm = erp = None
+        is_passive = False
         while token:
             if token in ('body', 'join'):
                 break
@@ -307,6 +314,12 @@ class Parser:
                 lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'hi_stops':
                 hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
+            if token == 'passive':
+                is_passive = True
+            if token == 'cfm':
+                cfm = self._next_float()
+            if token == 'erp':
+                erp = self._next_float()
             token = self._next_token()
 
         logging.info('joining %s %s %s', shape, body1, body2)
@@ -314,10 +327,15 @@ class Parser:
         joint = self.world.join(
             shape, body1, body2, anchor=anchor, jointgroup=self.jointgroup)
         joint.axes = axes[:joint.ADOF]
+        joint.is_passive = is_passive
         if lo_stops is not None:
             joint.lo_stops = lo_stops
         if hi_stops is not None:
             joint.hi_stops = hi_stops
+        if cfm is not None:
+            joint.cfms = cfm
+        if erp is not None:
+            joint.erps = erp
 
         self.joints.append(joint)
 
