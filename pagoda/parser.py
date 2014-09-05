@@ -14,9 +14,11 @@ TAU = 2 * np.pi
 class Parser:
     '''This parser class reads a text configuration of a pagoda simulation.
 
-    The format for the configuration file is based on keywords. Each keyword
-    indicates the start of a new configuration section. The recognized keywords
-    are:
+    The format for the configuration file follows basic Unix conventions. A
+    preprocessor discards any text on a line following the pound (#) character.
+    Blank lines are skipped. The remainder of the file is chunked into sections
+    based on keywords; each keyword in the file indicates the start of a new
+    section. The recognized keywords are:
 
     - body -- indicates the definition of a new rigid body;
     - join -- indicates that two bodies will be joined together.
@@ -127,15 +129,20 @@ class Parser:
 
         self.joints = []
         self.bodies = []
+        self.roots = []
 
         self.filename = None
         self.tokens = []
         self.index = 0
-        self.roots = []
 
     def load(self, source):
         '''Load body information from a file-like source.
 
+        Parameters
+        ----------
+        source : str or file
+            A filename or file-like object that contains text information
+            describing a skeleton.
         '''
         if isinstance(source, str):
             self.filename = source
@@ -148,61 +155,120 @@ class Parser:
                     self.tokens.append((i, j, token))
         source.close()
 
-    def error(self, msg):
+    def _error(self, msg):
+        '''Log a parsing error of some sort.
+
+        Parameters
+        ----------
+        msg : str
+            The specific error message to log.
+        '''
         lineno, tokenno, token = self.tokens[self.index - 1]
         logging.fatal('%s:%d:%d: error parsing "%s": %s',
                       self.filename, lineno+1, tokenno+1, token, msg)
 
-    def next_token(self, expect=None, lower=True, dtype=None):
+    def _next_token(self, expect=None, lower=True, dtype=None):
+        '''Get the next token in our parsing state, and update the state.
+
+        Parameters
+        ----------
+        expect : regexp, optional
+            If given, require the next token to match the given expression.
+        lower : bool, optional
+            Convert the token to lowercase. True by default.
+        dtype : callable, optional
+            If provided, call this method with the given token. Used to convert
+            tokens to int or float automatically.
+
+        Return
+        ------
+        str or number :
+            The next token in the file being parsed.
+        '''
         if self.index < len(self.tokens):
             _, _, token = self.tokens[self.index]
             self.index += 1
             if lower:
                 token = token.lower()
             if expect and re.match(expect, token) is None:
-                return self.error('expected {}'.format(expect))
+                return self._error('expected {}'.format(expect))
             if callable(dtype):
                 token = dtype(token)
             return token
         return None
 
-    def peek_token(self):
+    def _peek_token(self):
+        '''Get the next token in our parsing state, but do not update the state.
+
+        Return
+        ------
+        str :
+            The next token in the file being parsed.
+        '''
         if self.index < len(self.tokens):
             return self.tokens[self.index][-1]
         return None
 
-    def next_float(self):
-        return self.next_token(expect=r'^-?\d+(\.\d*)?$', dtype=float)
+    def _next_float(self):
+        '''Get a floating-point token and update the parsing state.
 
-    def floats(self, n=3):
-        return [self.next_float() for _ in range(n)]
+        Return
+        ------
+        float :
+            The floating-point value of the next token in the source.
 
-    def handle_body(self):
-        shape = self.next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
-        name = self.next_token(lower=False)
+        Raise
+        -----
+            Logs an error if the next token does not match a float regexp.
+        '''
+        return self._next_token(expect=r'^-?\d+(\.\d*)?$', dtype=float)
+
+    def _floats(self, n=3):
+        '''Get a number of floats and update the parsing state.
+
+        Parameters
+        ----------
+        n : int
+            The number of floating-point values to retrieve and return.
+
+        Return
+        ------
+        list of float :
+            The floating-point value of the next token in the source.
+
+        Raise
+        -----
+            Logs an error if the next n tokens do not match a float regexp.
+        '''
+        return [self._next_float() for _ in range(n)]
+
+    def _handle_body(self):
+        '''Parse the entirety of a "body" section in the source.'''
+        shape = self._next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
+        name = self._next_token(lower=False)
 
         kwargs = {}
         quaternion = None
         position = None
-        token = self.next_token()
+        token = self._next_token()
         while token:
             if token in ('body', 'join'):
                 break
             if token == 'lengths':
-                kwargs[token] = self.floats()
+                kwargs[token] = self._floats()
             if token == 'radius':
-                kwargs[token] = self.next_float()
+                kwargs[token] = self._next_float()
             if token == 'length':
-                kwargs[token] = self.next_float()
+                kwargs[token] = self._next_float()
             if token == 'quaternion':
-                theta, x, y, z = self.floats(4)
+                theta, x, y, z = self._floats(4)
                 quaternion = physics.make_quaternion(TAU * theta / 360, x, y, z)
             if token == 'position':
-                position = self.floats()
+                position = self._floats()
             if token == 'root':
                 logging.info('"%s" will be used as a root', name)
                 self.roots.append(name)
-            token = self.next_token()
+            token = self._next_token()
 
         logging.info('creating %s %s %s', shape, name, kwargs)
 
@@ -218,16 +284,17 @@ class Parser:
 
         return token
 
-    def handle_joint(self):
-        shape = self.next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
-        body1 = self.next_token(lower=False)
-        offset1 = self.floats()
-        body2 = self.next_token(lower=False)
-        offset2 = self.floats()
+    def _handle_joint(self):
+        '''Parse the entirety of a "join" section in the source.'''
+        shape = self._next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
+        body1 = self._next_token(lower=False)
+        offset1 = self._floats()
+        body2 = self._next_token(lower=False)
+        offset2 = self._floats()
 
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
 
-        token = self.next_token()
+        token = self._next_token()
         axes = [(1, 0, 0), (0, 1, 0)]
         lo_stops = None
         hi_stops = None
@@ -235,12 +302,12 @@ class Parser:
             if token in ('body', 'join'):
                 break
             if token.startswith('axis'):
-                axes[int(token.replace('axis', ''))] = self.floats()
+                axes[int(token.replace('axis', ''))] = self._floats()
             if token == 'lo_stops':
-                lo_stops = np.deg2rad(self.floats(physics.JOINTS[shape].ADOF))
+                lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'hi_stops':
-                hi_stops = np.deg2rad(self.floats(physics.JOINTS[shape].ADOF))
-            token = self.next_token()
+                hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
+            token = self._next_token()
 
         logging.info('joining %s %s %s', shape, body1, body2)
 
@@ -257,18 +324,24 @@ class Parser:
         return token
 
     def parse(self, source):
+        '''Load and parse a source file.
+
+        Parameters
+        ----------
+        source : str or file
+            A filename or file-like object that contains text information
+            describing a skeleton.
+        '''
         self.load(source)
-        token = self.next_token(expect='^(body|joint)$')
+        token = self._next_token(expect='^(body|joint)$')
         while token is not None:
             try:
                 if token == 'body':
-                    token = self.handle_body()
+                    token = self._handle_body()
                 elif token == 'join':
-                    token = self.handle_joint()
+                    token = self._handle_joint()
                 else:
-                    self.error('unexpected token')
+                    self._error('unexpected token')
             except:
-                self.error('internal error')
+                self._error('internal error')
                 raise
-
-
