@@ -1,4 +1,4 @@
-'''Parser for configuring objects and joints in a simulation.'''
+'''Parser for configuring objects and joints in a pagoda simulation.'''
 
 import climate
 import numpy as np
@@ -15,36 +15,41 @@ class Parser:
     '''
     '''
 
-    def __init__(self, world, source, jointgroup=None):
+    def __init__(self, world, jointgroup=None):
         self.world = world
-        self.filename = source
         self.jointgroup = jointgroup
 
         self.joints = []
         self.bodies = []
 
-        self.config = []
+        self.filename = None
+        self.tokens = []
         self.index = 0
         self.roots = []
 
+    def load(self, source):
+        '''Load body information from a file-like source.
+
+        '''
         if isinstance(source, str):
+            self.filename = source
             source = open(source)
         else:
-            self.filename = '(file)'
+            self.filename = '(file-{:r})'.format(source)
         for i, line in enumerate(source):
             for j, token in enumerate(line.split('#')[0].strip().split()):
                 if token.strip():
-                    self.config.append((i, j, token))
+                    self.tokens.append((i, j, token))
         source.close()
 
     def error(self, msg):
-        lineno, tokenno, token = self.config[self.index - 1]
+        lineno, tokenno, token = self.tokens[self.index - 1]
         logging.fatal('%s:%d:%d: error parsing "%s": %s',
                       self.filename, lineno+1, tokenno+1, token, msg)
 
     def next_token(self, expect=None, lower=True, dtype=None):
-        if self.index < len(self.config):
-            _, _, token = self.config[self.index]
+        if self.index < len(self.tokens):
+            _, _, token = self.tokens[self.index]
             self.index += 1
             if lower:
                 token = token.lower()
@@ -56,8 +61,8 @@ class Parser:
         return None
 
     def peek_token(self):
-        if self.index < len(self.config):
-            return self.config[self.index][-1]
+        if self.index < len(self.tokens):
+            return self.tokens[self.index][-1]
         return None
 
     def next_float(self):
@@ -145,7 +150,8 @@ class Parser:
 
         return token
 
-    def create(self):
+    def parse(self, source):
+        self.load(source)
         token = self.next_token(expect='^(body|joint)$')
         while token is not None:
             try:
@@ -158,6 +164,5 @@ class Parser:
             except:
                 self.error('internal error')
                 raise
-        return self.roots
 
 
