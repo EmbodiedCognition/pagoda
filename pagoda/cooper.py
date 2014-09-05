@@ -5,7 +5,6 @@ import climate
 import numpy as np
 import ode
 
-from . import parser
 from . import physics
 from . import skeleton
 
@@ -255,8 +254,8 @@ class World(physics.World):
             zeros = np.zeros(self.skeleton.num_dofs)
         for _ in self.follow(start, end, states):
             if zeros is not None:
-                self.skeleton.set_angles(zeros)
-            yield self.skeleton.angles
+                self.skeleton.set_target_angles(zeros)
+            yield self.skeleton.joint_angles
 
     def inverse_dynamics(self, angles, start=0, states=None, max_force=300):
         '''Follow a set of angle data, yielding dynamic joint torques.'''
@@ -268,11 +267,11 @@ class World(physics.World):
             # will be stepping the model using the computed torques.
 
             self.skeleton.enable_motors(max_force)
-            self.skeleton.set_angles(angles[i])
+            self.skeleton.set_target_angles(angles[i])
 
             self.ode_world.step(self.dt)
 
-            torques = self.skeleton.torques
+            torques = self.skeleton.joint_torques
             self.skeleton.disable_motors()
             self.skeleton.set_body_states(states)
             self.skeleton.add_torques(torques)
