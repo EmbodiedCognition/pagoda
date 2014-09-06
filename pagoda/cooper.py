@@ -33,6 +33,8 @@ class Markers:
         self.attach_offsets = {}
         self.channels = {}
 
+        self.data = None
+
     @property
     def num_frames(self):
         return self.data.shape[0]
@@ -60,7 +62,7 @@ class Markers:
             header = reader.next()
             data = []
             for row in reader:
-                data.append(row[])
+                data.append(row)
             self.data = np.array(data)
         self.channels = self._interpret_channels(channels or self.channels)
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
