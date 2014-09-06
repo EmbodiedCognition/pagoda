@@ -118,16 +118,16 @@ axis0 1 0 0
 lo_stops -1
 hi_stops  1
 passive
-cfm 1e-5
-erp 0.5
+stop_cfm 1e-5
+stop_erp 0.9
 
 join hinge  r-toe 0 0 1  r-foot 0 1 -1
 axis0 1 0 0
 lo_stops -1
 hi_stops  1
 passive
-cfm 1e-5
-erp 0.5
+stop_cfm 0.01
+stop_erp 0.5
 
 # left leg
 join ball  pelvis -0.6 0 -0.9  lu-leg 0 0 0.9
@@ -150,13 +150,13 @@ axis0 1 0 0
 lo_stops -1
 hi_stops  1
 passive
-cfm 1e-5
-erp 0.5
+stop_cfm 1e-5
+stop_erp 0.9
 
 join hinge  l-toe 0 0 1  l-foot 0 1 -1
 axis0 1 0 0
 lo_stops -1
 hi_stops  1
 passive
-cfm 1e-5
-erp 0.5
+stop_cfm 0.01
+stop_erp 0.5

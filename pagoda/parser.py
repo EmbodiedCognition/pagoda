@@ -84,11 +84,11 @@ class Parser:
     - hi_stops A [B [C]] -- specifies the maximum permitted rotation (in
       degrees) for this joint along its respective axes.
 
-    - passive -- indicates that this joint's motor must remains disabled.
+    - stop_cfm N -- set the lo- and hi-stop CFM for DOFs on this joint.
 
-    - cfm N -- set the lo- and hi-stop CFM for DOFs on this joint.
+    - stop_erp N -- set the lo- and hi-stop ERP for DOFs on this joint.
 
-    - erp N -- set the lo- and hi-stop ERP for DOFs on this joint.
+    - passive -- indicates that this joint's motor remains disabled.
 
     Example
     -------
@@ -304,7 +304,7 @@ class Parser:
 
         token = self._next_token()
         axes = [(1, 0, 0), (0, 1, 0)]
-        lo_stops = hi_stops = cfm = erp = None
+        lo_stops = hi_stops = stop_cfm = stop_erp = None
         is_passive = False
         while token:
             if token in ('body', 'join'):
@@ -317,10 +317,10 @@ class Parser:
                 hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'passive':
                 is_passive = True
-            if token == 'cfm':
-                cfm = self._next_float()
-            if token == 'erp':
-                erp = self._next_float()
+            if token == 'stop_cfm':
+                stop_cfm = self._next_float()
+            if token == 'stop_erp':
+                stop_erp = self._next_float()
             token = self._next_token()
 
         logging.info('joining %s %s %s', shape, body1, body2)
@@ -333,10 +333,10 @@ class Parser:
             joint.lo_stops = lo_stops
         if hi_stops is not None:
             joint.hi_stops = hi_stops
-        if cfm is not None:
-            joint.cfms = cfm
-        if erp is not None:
-            joint.erps = erp
+        if stop_cfm is not None:
+            joint.stop_cfms = stop_cfm
+        if stop_erp is not None:
+            joint.stop_erps = stop_erp
 
         self.joints.append(joint)
 
