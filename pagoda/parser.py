@@ -173,6 +173,7 @@ class Parser:
         lineno, tokenno, token = self.tokens[self.index - 1]
         logging.fatal('%s:%d:%d: error parsing "%s": %s',
                       self.filename, lineno+1, tokenno+1, token, msg)
+        raise RuntimeError
 
     def _next_token(self, expect=None, lower=True, dtype=None):
         '''Get the next token in our parsing state, and update the state.
@@ -228,7 +229,7 @@ class Parser:
         -----
             Logs an error if the next token does not match a float regexp.
         '''
-        return self._next_token(expect=r'^-?\d+(\.\d*)?$', dtype=float)
+        return self._next_token(expect=r'^[-+]?\d+(\.\d*)?([efgEFG][-+]?\d+(\.\d*)?)?$', dtype=float)
 
     def _floats(self, n=3):
         '''Get a number of floats and update the parsing state.
@@ -353,13 +354,9 @@ class Parser:
         self.load(source)
         token = self._next_token(expect='^(body|joint)$')
         while token is not None:
-            try:
-                if token == 'body':
-                    token = self._handle_body()
-                elif token == 'join':
-                    token = self._handle_joint()
-                else:
-                    self._error('unexpected token')
-            except:
-                self._error('internal error')
-                raise
+            if token == 'body':
+                token = self._handle_body()
+            elif token == 'join':
+                token = self._handle_joint()
+            else:
+                self._error('unexpected token')
