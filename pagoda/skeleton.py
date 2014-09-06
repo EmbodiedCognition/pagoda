@@ -112,6 +112,20 @@ class Skeleton:
         self.bodies = []
         self.joints = []
 
+    def load(self, source):
+        '''Load a skeleton definition from a file.
+
+        Parameters
+        ----------
+        source : str or file
+            A filename or file-like object that contains text information
+            describing a skeleton. See :class:`pagoda.parser.Parser` for more
+            information about the format of the text file.
+        '''
+        if hasattr(source, 'endswith') and source.lower().endswith('.asf'):
+            return self.load_asf(source)
+        self.load_skel(source)
+
     def load_skel(self, source):
         '''Load a skeleton definition from a text file.
 
@@ -125,7 +139,7 @@ class Skeleton:
         logging.info('%s: parsing skeleton configuration', source)
         p = parser.Parser(self.world, self.jointgroup)
         p.parse(source)
-        self.roots = [world.get_body(r) for r in p.roots]
+        self.roots = [self.world.get_body(r) for r in p.roots]
         self.bodies = p.bodies
         self.joints = p.joints
         self.set_pid_params(kp=(1 - 1e4) / self.world.dt)
