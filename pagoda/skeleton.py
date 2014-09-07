@@ -52,7 +52,7 @@ def pid(kp=0., ki=0., kd=0., smooth=0.1):
     return control
 
 
-def flat_array(iterables):
+def as_flat_array(iterables):
     '''Given a sequence of sequences, return a flat numpy array.
 
     Parameters
@@ -79,8 +79,10 @@ class Skeleton:
     capable of mimicking the motion of the human body.
 
     Most often, skeletons are configured by parsing information from a text file
-    of some sort. See :class:`pagoda.parser.Parser` for more information about
-    the format of the text file.
+    of some sort. See :class:`pagoda.parser.SkelParser` for more information
+    about the format of the text file. Skeletons can also be loaded from text
+    files in ASF format; see :class:`pagoda.parser.AsfParser` for more
+    information.
 
     Parameters
     ----------
@@ -137,7 +139,7 @@ class Skeleton:
             information about the format of the text file.
         '''
         logging.info('%s: parsing skeleton configuration', source)
-        p = parser.Parser(self.world, self.jointgroup)
+        p = parser.SkelParser(self.world, self.jointgroup)
         p.parse(source)
         self.roots = [self.world.get_body(r) for r in p.roots]
         self.bodies = p.bodies
@@ -174,37 +176,37 @@ class Skeleton:
     @property
     def joint_angles(self):
         '''Get a list of all current joint angles in the skeleton.'''
-        return flat_array(j.angles for j in self.joints)
+        return as_flat_array(j.angles for j in self.joints)
 
     @property
     def joint_velocities(self):
         '''Get a list of all current joint velocities in the skeleton.'''
-        return flat_array(j.velocities for j in self.joints)
+        return as_flat_array(j.velocities for j in self.joints)
 
     @property
     def joint_torques(self):
         '''Get a list of all current joint torques in the skeleton.'''
-        return flat_array(j.amotor.feedback[-1][:j.ADOF] for j in self.joints)
+        return as_flat_array(j.amotor.feedback[-1][:j.ADOF] for j in self.joints)
 
     @property
     def body_positions(self):
         '''Get a list of all current body positions in the skeleton.'''
-        return flat_array(b.position for b in self.bodies)
+        return as_flat_array(b.position for b in self.bodies)
 
     @property
     def body_rotations(self):
         '''Get a list of all current body rotations in the skeleton.'''
-        return flat_array(b.quaternion for b in self.bodies)
+        return as_flat_array(b.quaternion for b in self.bodies)
 
     @property
     def body_linear_velocities(self):
         '''Get a list of all current body velocities in the skeleton.'''
-        return flat_array(b.linear_velocity for b in self.bodies)
+        return as_flat_array(b.linear_velocity for b in self.bodies)
 
     @property
     def body_angular_velocities(self):
         '''Get a list of all current body angular velocities in the skeleton.'''
-        return flat_array(b.angular_velocity for b in self.bodies)
+        return as_flat_array(b.angular_velocity for b in self.bodies)
 
     def indices_for_joint(self, name):
         '''Get a list of the indices for a specific joint.
@@ -290,8 +292,8 @@ class Skeleton:
 
         Parameters
         ----------
-        target : float
-            The target velocity for all joints in the skeleton.
+        target : float, optional
+            The target velocity for all joints in the skeleton. Defaults to 0.
         '''
         for joint in self.joints:
             joint.velocities = target
