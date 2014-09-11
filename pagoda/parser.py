@@ -9,6 +9,7 @@ from . import physics
 logging = climate.get_logger(__name__)
 
 TAU = 2 * np.pi
+FLOAT_RE = r'^[-+]?\d+(\.\d*)?([efgEFG][-+]?\d+(\.\d*)?)?$'
 
 
 class Parser:
@@ -23,9 +24,9 @@ class Parser:
         self.bodies = []
         self.roots = []
 
-        self.filename = None
-        self.tokens = []
-        self.index = 0
+        self._filename = None
+        self._tokens = []
+        self._index = 0
 
     def load(self, source):
         '''Load body information from a file-like source.
@@ -37,14 +38,14 @@ class Parser:
             describing a skeleton.
         '''
         if isinstance(source, str):
-            self.filename = source
+            self._filename = source
             source = open(source)
         else:
-            self.filename = '(file-{:r})'.format(source)
-        for i, line in enumerate(source):
-            for j, token in enumerate(line.split('#')[0].strip().split()):
+            self._filename = '(file-{:r})'.format(source)
+        for lineno, line in enumerate(source):
+            for tokenno, token in enumerate(line.split('#')[0].strip().split()):
                 if token.strip():
-                    self.tokens.append((i, j, token))
+                    self._tokens.append((lineno, tokenno, token))
         source.close()
 
     def _error(self, msg):
@@ -55,9 +56,9 @@ class Parser:
         msg : str
             The specific error message to log.
         '''
-        lineno, tokenno, token = self.tokens[self.index - 1]
+        lineno, tokenno, token = self._tokens[self._index - 1]
         logging.fatal('%s:%d:%d: error parsing "%s": %s',
-                      self.filename, lineno+1, tokenno+1, token, msg)
+                      self._filename, lineno+1, tokenno+1, token, msg)
         raise RuntimeError
 
     def _next_token(self, expect=None, lower=True, dtype=None):
@@ -78,9 +79,9 @@ class Parser:
         str or number :
             The next token in the file being parsed.
         '''
-        if self.index < len(self.tokens):
-            _, _, token = self.tokens[self.index]
-            self.index += 1
+        if self._index < len(self._tokens):
+            _, _, token = self._tokens[self._index]
+            self._index += 1
             if lower:
                 token = token.lower()
             if expect and re.match(expect, token) is None:
@@ -98,8 +99,8 @@ class Parser:
         str :
             The next token in the file being parsed.
         '''
-        if self.index < len(self.tokens):
-            return self.tokens[self.index][-1]
+        if self._index < len(self._tokens):
+            return self._tokens[self._index][-1]
         return None
 
     def _next_float(self):
@@ -114,7 +115,7 @@ class Parser:
         -----
             Logs an error if the next token does not match a float regexp.
         '''
-        return self._next_token(expect=r'^[-+]?\d+(\.\d*)?([efgEFG][-+]?\d+(\.\d*)?)?$', dtype=float)
+        return self._next_token(expect=FLOAT_RE, dtype=float)
 
     def _floats(self, n=3):
         '''Get a number of floats and update the parsing state.
@@ -265,6 +266,25 @@ class SkelParser(Parser):
       coordinate using an unconstrained ball joint.
     '''
 
+    def parse(self, source):
+        '''Load and parse a source file.
+
+        Parameters
+        ----------
+        source : str or file
+            A filename or file-like object that contains text information
+            describing a skeleton.
+        '''
+        self.load(source)
+        token = self._next_token(expect='^(body|joint)$')
+        while token is not None:
+            if token == 'body':
+                token = self._handle_body()
+            elif token == 'join':
+                token = self._handle_joint()
+            else:
+                self._error('unexpected token')
+
     def _handle_body(self):
         '''Parse the entirety of a "body" section in the source.'''
         shape = self._next_token(expect='^({})$'.format('|'.join(physics.BODIES)))
@@ -357,6 +377,23 @@ class SkelParser(Parser):
 
         return token
 
+
+class AsfParser(Parser):
+    '''Parse a skeleton definition in ASF format.
+
+    For a description of the file format, see
+    http://research.cs.wisc.edu/graphics/Courses/cs-838-1999/Jeff/ASF-AMC.html
+
+    The format describes only the configuration of joints in an articulated
+    body. It notably omits the dimensions and masses of the rigid bodies that
+    connect the joints together, so we need additional information to construct
+    a skeleton in the physics simulator.
+
+    '''
+
+    TOPLEVEL_TOKENS = 'version name units documentation root bonedata hierarchy'.split()
+    TOPLEVEL_TOKEN_RE = r'^:({})$'.format('|'.join(TOPLEVEL_TOKENS))
+
     def parse(self, source):
         '''Load and parse a source file.
 
@@ -366,18 +403,62 @@ class SkelParser(Parser):
             A filename or file-like object that contains text information
             describing a skeleton.
         '''
+        toplevel = AsfParser.TOPLEVEL_TOKEN_RE
         self.load(source)
-        token = self._next_token(expect='^(body|joint)$')
+        token = self._next_token(expect=toplevel)
         while token is not None:
-            if token == 'body':
-                token = self._handle_body()
-            elif token == 'join':
-                token = self._handle_joint()
+            if token == ':version':
+                self.version = self._next_token()
+                token = self._next_token(expect=toplevel)
+            elif token == ':name':
+                self.name = self._next_token()
+                token = self._next_token(expect=toplevel)
+            elif token == ':units':
+                token = self._handle_units()
+            elif token == ':documentation':
+                token = self._handle_documentation()
+            elif token == ':root':
+                token = self._handle_root()
+            elif token == ':bonedata':
+                token = self._handle_bonedata()
+            elif token == ':hierarchy':
+                token = self._handle_hierarchy()
             else:
                 self._error('unexpected token')
 
+    def _handle_units(self):
+        units = {}
+        token = self._next_token()
+        while token:
+            value = self._next_token()
+            if re.match(FLOAT_RE, value):
+                value = float(value)
+            units[token] = value
+            token = self._next_token()
+            if re.match(AsfParser.TOPLEVEL_TOKEN_RE, token):
+                break
+        self.units = units
+        return token
 
-class AsfParser(Parser):
-    '''Parse a skeleton definition in ASF format.
-    '''
-    pass
+    def _handle_documentation(self):
+        token = self._next_token()
+        tokens = []
+        while token:
+            if re.match(AsfParser.TOPLEVEL_TOKEN_RE, token):
+                break
+            tokens.append(token)
+            token = self._next_token()
+        self.documentation = ' '.join(tokens)
+        return token
+
+    def _handle_root(self):
+        raise NotImplementedError
+
+    def _handle_bonedata(self):
+        raise NotImplementedError
+
+    def _handle_bone(self):
+        raise NotImplementedError
+
+    def _handle_hierarchy(self):
+        raise NotImplementedError
