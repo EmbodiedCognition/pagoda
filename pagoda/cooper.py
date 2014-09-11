@@ -1,4 +1,58 @@
-'''Python implementation of forward-dynamics solver by Joseph Cooper.'''
+'''Python implementation of forward-dynamics solver by Joseph Cooper.
+
+The "Cooper" method uses a forward physics simulator (the Open Dynamics Engine;
+ODE) to compute inverse motion quantities like torques, using motion-capture
+data and a structured, articulated model of the human skeleton. The
+prerequisites for this method are:
+
+- Record some motion-capture data from a human. This is expected to result in
+  the locations, in world coordinates, of several motion-capture markers at
+  regularly-spaced intervals over time.
+
+- Construct a simulated skeleton that matches the size and shape of the human to
+  some reasonable degree of accuracy. The more accurate the skeleton, the more
+  accurate the resulting measurements.
+
+In broad strokes, the Cooper method proceeds in two stages:
+
+1. Inverse Kinematics. The motion-capture data are attached to the simulated
+   skeleton using ball joints. These ball joints are configured so that their
+   constraints (namely, placing both anchor points of the joint at the same
+   location in space) are allowed to slip; ODE implements this slippage using a
+   spring dynamics, which provides a natural mechanism for the articulated
+   skeleton to interpolate the marker data as well as possible.
+
+   At each frame during the first pass, the motion-capture markers are placed at
+   the appropriate location in space, and the attached articulated skeleton
+   "snaps" toward the markers using its inertia (from the motion in preceding
+   frames) as well as the spring constraints provided by the marker joint
+   slippage.
+
+   At each frame of this process, the articulated skeleton can be queried to
+   obtain joint angles for each degree of freedom. In addition, the markers can
+   be queried to find their constraint slippage.
+
+2. Inverse Dynamics. The marker constraints are weakened significantly, and the
+   joint angles computed in the first pass are then used to constrain the
+   skeleton's movements.
+
+   At each frame during the second pass, the joints in the skeleton attempt to
+   follow the angles computed in the first pass; a PID controller is used to
+   convert the angular error value into a target angular velocity for each
+   joint.
+
+   In addition, because joint-local optimization discards orientation in world
+   coordinates, the articulated skeleton needs additional constraints to avoid
+   falling over. To this end, some marker attachments (specifically, markers
+   attached to "root" bodies in the skeleton) are maintained at full strength.
+
+   The torques that ODE computes to solve this forward angle-following problem
+   are returned as a result of the second pass.
+
+Further comments and documentation are available in this source file. Eventually
+I hope to integrate these comments into some sort of online documentation for
+the package as a whole.
+'''
 
 import c3d
 import climate
@@ -37,10 +91,12 @@ class Markers:
 
     @property
     def num_frames(self):
+        '''Return the number of frames of marker data.'''
         return self.data.shape[0]
 
     @property
     def num_markers(self):
+        '''Return the number of markers in each frame of data.'''
         return self.data.shape[1]
 
     def __iter__(self):
@@ -59,13 +115,19 @@ class Markers:
     def load_csv(self, filename, channels=None, max_frames=1e100):
         with open(filename) as handle:
             reader = csv.reader(handle)
+
             header = reader.next()
+            self.channels = self._interpret_channels(channels or self.channels)
+            logging.info('%s: loaded marker labels %s', filename, labels)
+
             data = []
             for row in reader:
                 data.append(row)
+                if len(data) > max_frames:
+                    break
             self.data = np.array(data)
-        self.channels = self._interpret_channels(channels or self.channels)
-        logging.info('%s: loaded marker data %s', filename, self.data.shape)
+            logging.info('%s: loaded marker data %s', filename, self.data.shape)
+
         self.create_bodies()
 
     def load_c3d(self, filename, channels=None, max_frames=1e100):
@@ -121,12 +183,12 @@ class Markers:
             marker-name body-name X Y Z
 
         The marker name must correspond to an existing "channel" in our marker
-        data. The body name must correspond to a rigid body in the given
-        skeleton. The X, Y, and Z coordinates specify the body-relative offsets
-        where the marker should be attached: 0 corresponds to the center of the
-        body along the given axis, while -1 and 1 correspond to the minimal
-        (maximal, respectively) extent of the body's bounding box along the
-        corresponding dimension.
+        data. The body name must correspond to a rigid body in the skeleton. The
+        X, Y, and Z coordinates specify the body-relative offsets where the
+        marker should be attached: 0 corresponds to the center of the body along
+        the given axis, while -1 and 1 correspond to the minimal (maximal,
+        respectively) extent of the body's bounding box along the corresponding
+        dimension.
 
         Parameters
         ----------
@@ -137,7 +199,6 @@ class Markers:
 
         skeleton : :class:`pagoda.skeleton.Skeleton`
             The skeleton to attach our marker data to.
-
         '''
         self.roots = skeleton.roots
 
