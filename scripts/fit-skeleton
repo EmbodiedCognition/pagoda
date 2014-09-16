@@ -1,0 +1,80 @@
+#!/usr/bin/env python
+
+import climate
+import cma
+import io
+import os
+import pagoda
+import pagoda.cooper
+
+logging = climate.get_logger('fit-skeleton')
+
+g = climate.add_group('skeleton fitting')
+g.add_argument('-s', '--skeleton', metavar='FILE',
+               help='load skeleton definition from FILE')
+g.add_argument('-a', '--markers', metavar='FILE',
+               help='load marker attachments from FILE')
+g.add_argument('-m', '--motion', metavar='FILE',
+               help='load motion data from FILE')
+g.add_argument('-f', '--fps', type=float, default=120, metavar='N',
+               help='set world to run at N frames per second')
+g.add_argument('-o', '--output', default=os.curdir, metavar='DIR',
+               help='write optimized output files to DIR')
+
+
+class Template:
+    def __init__(self, filename):
+        with open(filename) as handle:
+            self.content = handle.read()
+        self.fields = []
+        for match in re.findall(r'(?<=\{)\d+(?=\})', self.content):
+            self.fields.append(match)
+
+    @property
+    def num_values(self):
+        return len(self.fields)
+
+    def fill(self, values):
+        return self.content.format(**dict(enumerate(values)))
+
+    def as_file(self, values):
+        return StringIO(self.fill(values))
+
+
+def build_cost(args, skeleton, markers):
+    def cost(x):
+        w = pagoda.cooper.World(1. / args.fps)
+        w.load_skeleton(skeleton.as_file(x[:skeleton.num_params]))
+        w.load_markers(args.motion, markers.as_file(x[skeleton.num_params:]))
+        states = w.settle_to_markers(frame_no)
+        follow = w.follow_markers(start=frame_no, states=states)
+        distances = [w.markers.rms_distance() for _ in follow]
+        logging.info('cost %.2f +/- %.2f', np.mean(distances), np.std(distances))
+        return np.mean(distances)
+    return cost
+
+
+def main(args):
+    skeleton = Template(args.skeleton)
+    markers = Template(args.markers)
+
+    f = build_cost(args, skeleton, markers)
+
+    x0 = 0.1 * np.random.rand(len(skeleton) + len(markers))
+
+    upper = np.ones_like(x0)
+    lower = np.zeros_like(x0)
+    lower[len(skeleton):] = -1
+
+    opts = dict(tolfun=1, bounds=[lower, upper])
+
+    values = cma.fmin(f, x0=x0, sigma0=0.5, options=opts)[0]
+
+    with open('optimized-skeleton.txt', 'w') as handle:
+        handle.write(skeleton.fill(values[:len(skeleton)]))
+    with open('optimized-markers.txt', 'w') as handle:
+        handle.write(markers.fill(values[len(skeleton):]))
+
+
+if __name__ == '__main__':
+    climate.call(main)
