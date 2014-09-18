@@ -41,7 +41,7 @@ class Parser:
             self._filename = source
             source = open(source)
         else:
-            self._filename = '(file-{:r})'.format(source)
+            self._filename = '(raw)'
         for lineno, line in enumerate(source):
             for tokenno, token in enumerate(line.split('#')[0].strip().split()):
                 if token.strip():
