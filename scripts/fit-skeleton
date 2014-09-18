@@ -3,52 +3,60 @@
 import climate
 import cma
 import io
-import os
+import numpy as np
 import pagoda
 import pagoda.cooper
+import re
 
 logging = climate.get_logger('fit-skeleton')
 
-g = climate.add_group('skeleton fitting')
-g.add_argument('-s', '--skeleton', metavar='FILE',
-               help='load skeleton definition from FILE')
-g.add_argument('-a', '--markers', metavar='FILE',
-               help='load marker attachments from FILE')
-g.add_argument('-m', '--motion', metavar='FILE',
-               help='load motion data from FILE')
-g.add_argument('-f', '--fps', type=float, default=120, metavar='N',
+climate.add_arg('-a', '--markers', metavar='FILE',
+                help='load marker attachments from FILE')
+climate.add_arg('-m', '--motion', metavar='FILE',
+                help='load motion data from FILE')
+climate.add_arg('-o', '--output', default='optimized-', metavar='PREFIX',
+                help='name optimized output files starting with PREFIX')
+climate.add_arg('-s', '--skeleton', metavar='FILE',
+                help='load skeleton definition from FILE')
+
+g = climate.add_arg_group('simulation options')
+g.add_argument('-r', '--fps', type=float, default=120, metavar='N',
                help='set world to run at N frames per second')
-g.add_argument('-o', '--output', default=os.curdir, metavar='DIR',
-               help='write optimized output files to DIR')
+g.add_argument('-f', '--start-frame', type=int, default=0, metavar='N',
+               help='optimize on motion starting at frame N')
+g.add_argument('-F', '--end-frame', type=int, metavar='N',
+               help='optimize on motion ending at frame N')
 
 
 class Template:
     def __init__(self, filename):
         with open(filename) as handle:
             self.content = handle.read()
-        self.fields = []
-        for match in re.findall(r'(?<=\{)\d+(?=\})', self.content):
-            self.fields.append(match)
+        self.fields = set()
+        for match in re.findall(r'(?<=\{)[^\}]+(?=\})', self.content):
+            self.fields.add(match)
+        logging.info('%s: loaded %d fields to optimize', filename, len(self))
 
-    @property
-    def num_values(self):
+    def __len__(self):
         return len(self.fields)
 
     def fill(self, values):
-        return self.content.format(**dict(enumerate(values)))
+        return self.content.format(**dict(zip(self.fields, values)))
 
     def as_file(self, values):
-        return StringIO(self.fill(values))
+        return io.StringIO(self.fill(values))
 
 
 def build_cost(args, skeleton, markers):
     def cost(x):
         w = pagoda.cooper.World(1. / args.fps)
-        w.load_skeleton(skeleton.as_file(x[:skeleton.num_params]))
-        w.load_markers(args.motion, markers.as_file(x[skeleton.num_params:]))
-        states = w.settle_to_markers(frame_no)
-        follow = w.follow_markers(start=frame_no, states=states)
-        distances = [w.markers.rms_distance() for _ in follow]
+        w.load_skeleton(skeleton.as_file(x[:len(skeleton)]))
+        w.load_markers(args.motion, markers.as_file(x[len(skeleton):]))
+        states = w.settle_to_markers(args.start_frame)
+        distances = [w.markers.rms_distance() for _ in
+                     w.follow_markers(start=args.start_frame,
+                                      end=args.end_frame,
+                                      states=states)]
         logging.info('cost %.2f +/- %.2f', np.mean(distances), np.std(distances))
         return np.mean(distances)
     return cost
@@ -63,16 +71,17 @@ def main(args):
     x0 = 0.1 * np.random.rand(len(skeleton) + len(markers))
 
     upper = np.ones_like(x0)
+    upper[:len(skeleton)] = 0.4
     lower = np.zeros_like(x0)
     lower[len(skeleton):] = -1
 
     opts = dict(tolfun=1, bounds=[lower, upper])
 
-    values = cma.fmin(f, x0=x0, sigma0=0.5, options=opts)[0]
+    values = cma.fmin(f, x0=x0, sigma0=0.1, options=opts)[0]
 
-    with open('optimized-skeleton.txt', 'w') as handle:
+    with open(args.prefix + 'skeleton.txt', 'w') as handle:
         handle.write(skeleton.fill(values[:len(skeleton)]))
-    with open('optimized-markers.txt', 'w') as handle:
+    with open(args.prefix + 'markers.txt', 'w') as handle:
         handle.write(markers.fill(values[len(skeleton):]))
 
 
