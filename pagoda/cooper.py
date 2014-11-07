@@ -158,7 +158,21 @@ class Markers:
                 self.data[:, :, :4] /= 1000.
 
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
+
+        self.process_data()
         self.create_bodies()
+
+    def process_data(self):
+        '''Process data to produce velocity and dropout information.'''
+        self.positions = self.data[:, :, :3]
+        self.visibility = self.data[:, :, 4]
+        self.velocities = np.zeros_like(self.positions)
+        for frame_no in range(1, len(self.data) - 1):
+            prev = self.data[frame_no - 1]
+            next = self.data[frame_no + 1]
+            for c in range(self.num_markers):
+                if prev[c, 4] > -1 and next[c, 4] > -1:
+                    self.velocities[frame_no, c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
 
     def create_bodies(self):
         '''Create physics bodies corresponding to each marker in our data.'''
@@ -252,7 +266,7 @@ class Markers:
             target = self.attach_bodies.get(label)
             if target is None:
                 continue
-            if self.data[frame_no, j, 4] < 0:
+            if self.visibility[frame_no, j] < 0:
                 continue
             f = self.root_attachment_factor if target in self.roots else 1.
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
@@ -274,18 +288,10 @@ class Markers:
             In addition, linear velocities of the markers will be set according
             to the data as long as there are no dropouts in neighboring frames.
         '''
-        frame = self.data[frame_no, :, :3]
-        delta = np.zeros_like(frame)
-        if 0 < frame_no < self.num_frames - 1:
-            prev = self.data[frame_no - 1]
-            next = self.data[frame_no + 1]
-            for c in range(self.num_markers):
-                if prev[c, 4] > -1 and next[c, 4] > -1:
-                    delta[c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
         for label, j in self.channels.items():
             body = self.marker_bodies[label]
-            body.position = frame[j]
-            body.linear_velocity = delta[j]
+            body.position = self.positions[frame_no, j]
+            body.linear_velocity = self.velocities[frame_no, j]
 
     def rms_distance(self):
         '''Return the RMS distance between markers and their attachment points.
