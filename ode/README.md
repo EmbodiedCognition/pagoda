@@ -3,7 +3,7 @@ This file contains notes on how to build ODE for use in our physics simulator.
 First, check out the version of ODE that corresponds to the patch revision we
 have:
 
-    svn checkout -r 1939 http://svn.code.sf.net/p/opende/code/trunk opende
+    svn checkout -r 1939 https://svn.code.sf.net/p/opende/code/trunk opende
 
 Then, apply the patch to your checked-out copy of ODE:
 
