@@ -28,7 +28,7 @@ import ode
 from . import base
 
 
-class Body:
+class Body(object):
     '''This class wraps things that participate in the ODE physics simulation.
 
     The primary attribute of this class is "ode_body" -- a PyODE Body object. In
@@ -245,7 +245,7 @@ def _set_params(target, param, values, dof):
         target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
 
 
-class Motor:
+class Motor(object):
     '''This class wraps an ODE motor -- either an LMotor or an AMotor.
 
     The class has read-write properties for :
@@ -408,7 +408,7 @@ class LMotor(Motor):
         return self.ode_motor.getNumAxes()
 
 
-class Joint:
+class Joint(object):
     '''This class wraps the ODE Joint class with some Python properties.
 
     The class has read-write properties for :
