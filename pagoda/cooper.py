@@ -1,9 +1,10 @@
-'''Python implementation of forward-dynamics solver by Joseph Cooper.
+'''This module contains a Python implementation of a forward-dynamics solver.
 
-The "Cooper" method uses a forward physics simulator (the Open Dynamics Engine;
-ODE) to compute inverse motion quantities like torques, using motion-capture
-data and a structured, articulated model of the human skeleton. The
-prerequisites for this method are:
+The "cooper" method, originally described by Cooper & Ballard (2012 Proc. Motion
+in Games), uses a forward physics simulator (here, the Open Dynamics Engine;
+ODE) to compute inverse motion quantities like angles and torques using
+motion-capture data and a structured, articulated model of the human skeleton.
+The prerequisites for this method are:
 
 - Record some motion-capture data from a human. This is expected to result in
   the locations, in world coordinates, of several motion-capture markers at
@@ -13,7 +14,7 @@ prerequisites for this method are:
   some reasonable degree of accuracy. The more accurate the skeleton, the more
   accurate the resulting measurements.
 
-In broad strokes, the Cooper method proceeds in two stages:
+In broad strokes, the cooper method proceeds in two stages:
 
 1. Inverse Kinematics. The motion-capture data are attached to the simulated
    skeleton using ball joints. These ball joints are configured so that their
@@ -304,6 +305,9 @@ class Markers:
 
 
 class World(physics.World):
+    '''
+    '''
+
     def load_skeleton(self, filename, pid_params=None):
         '''Create and configure a skeleton in our model.
 
