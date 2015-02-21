@@ -471,13 +471,6 @@ class Viewer(Window):
                 glVertex3f(*j.getAnchor2())
                 glEnd()
 
-            # draw marker labels.
-            for label in self.world.markers.channels:
-                body = self.world.markers.marker_bodies.get(label)
-                if body:
-                    with gl_context(translate=body.position, scale=(0.001, 0.001, 0.001)):
-                        pyglet.text.Label(label).draw()
-
     def draw_body(self, body):
         ''''''
         x, y, z = body.position
