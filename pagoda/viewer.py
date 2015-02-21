@@ -385,13 +385,28 @@ class Null(object):
 
 
 class Viewer(Window):
-    '''
+    '''A viewer window for pagoda worlds.
+
+    This viewer adds the following default keybindings:
+    - F: freeze state of current bodies in the world
+    - RIGHT-ARROW: advance world state by 1 frame (10 if SHIFT)
+    - ENTER: reset the world
+
+    Parameters
+    ----------
+    world : :class:`pagoda.World`
+        A world object to view in this window.
+
+    Attributes
+    ----------
+    world : :class:`pagoda.World`
+        The world object being viewed in this window.
     '''
 
-    def __init__(self, *args, **kwargs):
-        super(Physics, self).__init__(*args, **kwargs)
+    def __init__(self, world, *args, **kwargs):
+        super(Viewer, self).__init__(*args, **kwargs)
         self.world = world
-        self.frozen_bodies = []
+        self._frozen = []
 
     def grab_key_press(self, key, modifiers, keymap):
         if key == keymap.ENTER:
@@ -406,6 +421,10 @@ class Viewer(Window):
                 steps *= 10
             [self.step(self.world.dt) for _ in range(steps)]
             return True
+
+    def run(self, render_dt=1 / 30, movie=None):
+        super(Viewer, self).run(
+            step_dt=self.world.dt, render_dt=1 / 60, movie=movie)
 
     def step(self, dt):
         if self.world.step():
@@ -432,43 +451,38 @@ class Viewer(Window):
             bp.quaternion = b.quaternion
             bp.is_kinematic = True
             bodies.append(bp)
-        self.frozen_bodies.append(bodies)
+        self._frozen.append(bodies)
 
     def render(self, dt):
         '''Draw all bodies in the world.'''
-        for frame in self.frozen_bodies:
+        for frame in self._frozen:
             for body in frame:
                 self.draw_body(body)
         for body in self.world.bodies:
             self.draw_body(body)
 
-        return
+        if hasattr(self.world, 'markers'):
+            # draw line between anchor1 and anchor2 for marker joints.
+            glColor4f(0.9, 0.1, 0.1, 0.9)
+            glLineWidth(3)
+            for j in self.world.markers.joints:
+                glBegin(GL_LINES)
+                glVertex3f(*j.getAnchor())
+                glVertex3f(*j.getAnchor2())
+                glEnd()
 
-        # draw marker labels.
-        for label in self.world.markers.channels:
-            body = self.world.markers.marker_bodies.get(label)
-            if body:
-                with gl_context(translate=body.position, scale=(0.001, 0.001, 0.001)):
-                    pyglet.text.Label(label).draw()
-
-        # draw line between anchor1 and anchor2 for marker joints.
-        glColor4f(1, 0.1, 0.1, 0.9)
-        glLineWidth(3)
-        for joint in self.world.markers.joints:
-            glBegin(GL_LINES)
-            glVertex3f(*joint.getAnchor())
-            glVertex3f(*joint.getAnchor2())
-            glEnd()
-
-        # draw frame label.
-        with gl_context(scale=(0.1, 0.1, 0.1), translate=(0, 0, 1)):
-            pyglet.text.Label('Frame {}'.format(self.world.frame_no), x=0, y=0).draw()
+            # draw marker labels.
+            for label in self.world.markers.channels:
+                body = self.world.markers.marker_bodies.get(label)
+                if body:
+                    with gl_context(translate=body.position, scale=(0.001, 0.001, 0.001)):
+                        pyglet.text.Label(label).draw()
 
     def draw_body(self, body):
         ''''''
         x, y, z = body.position
         r = body.rotation
-        self.set_color(*body.color)
+        glColor4f(*body.color)
         with gl_context(mat=(r[0], r[3], r[6], 0.,
                              r[1], r[4], r[7], 0.,
                              r[2], r[5], r[8], 0.,
