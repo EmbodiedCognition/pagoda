@@ -141,23 +141,19 @@ class Window(pyglet.window.Window):
 
     Parameters
     ----------
-    dt : float, optional
-        Time interval between successive frames. Defaults to 0.033333 (30 fps).
     paused : bool, optional
         Start the window with time paused. Defaults to False.
     floor_z : float, optional
         Height for a checkerboard floor in the rendered world. Defaults to 0.
         Set this to None to disable the floor.
+    width : int, optional
+        Initial width of the window. Defaults to 1027.
+    height : int, optional
+        Initial height of the window. Defaults to 603.
 
     Attributes
     ----------
-    step_dt : float
-        Time interval between successive calls to :func:`step`. Defaults to the
-        value of `dt`.
-    render_dt : float
-        Time interval between successive calls to :func:`render`. Defaults to the
-        value of `dt`.
-    save_frames : str
+    saved_frames : str
         Saved frames will be stored in this directory.
     paused : bool
         Current paused state of the renderer.
@@ -168,7 +164,7 @@ class Window(pyglet.window.Window):
         An object holding view parameters for the renderer.
     '''
 
-    def __init__(self, dt=1. / 30, paused=False, floor_z=0):
+    def __init__(self, paused=False, floor_z=0, width=1072, height=603):
         # first, set up the pyglet screen, window, and display variables.
         platform = pyglet.window.get_platform()
         display = platform.get_default_display()
@@ -184,13 +180,12 @@ class Window(pyglet.window.Window):
             config = screen.get_best_config(Config())
 
         super(Window, self).__init__(
-            width=1000, height=600, resizable=True, vsync=False, config=config)
+            width=width, height=height, resizable=True, vsync=False, config=config)
 
         # then, set up our own view parameters.
-        self.step_dt = self.render_dt = dt
         self.frame_no = 0
         self.paused = paused
-        self.save_frames = None
+        self.saved_frames = None
         self.view = View(zoom=4.666, ty=0.23, tz=-0.5, ry=27, rz=-50)
 
         self.on_resize(self.width, self.height)
@@ -279,14 +274,14 @@ class Window(pyglet.window.Window):
             pyglet.app.exit()
         if key == keymap.SPACE:
             self.paused = False if self.paused else True
-        if key == keymap.S and self.save_frames:
+        if key == keymap.S and self.saved_frames:
             self.save_frame()
 
     def save_frame(self, dt=None):
-        if self.save_frames is None:
+        if self.saved_frames is None:
             return
         bn = 'frame-{:05d}.png'.format(self.frame_no)
-        fn = os.path.join(self.save_frames, bn)
+        fn = os.path.join(self.saved_frames, bn)
         logging.info('saving frame %s', fn)
         pyglet.image.get_buffer_manager().get_color_buffer().save(fn)
 
@@ -341,12 +336,25 @@ class Window(pyglet.window.Window):
     def exit(self):
         pyglet.app.exit()
 
-    def run(self, movie=None):
-        pyglet.clock.schedule_interval(self._step, self.step_dt)
-        pyglet.clock.schedule_interval(self._render, self.render_dt)
+    def run(self, step_dt=1 / 30, render_dt=1 / 30, movie=None):
+        '''Run the pyglet window.
+
+        Parameters
+        ----------
+        step_dt : float, optional
+            Time interval between successive calls to :func:`step`. Defaults to
+            0.033333 (30 fps).
+        render_dt : float, optional
+            Time interval between successive calls to :func:`render`. Defaults
+            to 0.033333 (30 fps).
+        movie : str, optional
+            If given, save rendered frames to images in this directory.
+        '''
+        pyglet.clock.schedule_interval(self._step, step_dt)
+        pyglet.clock.schedule_interval(self._render, render_dt)
         if movie is not None:
-            self.save_frames = movie
-            pyglet.clock.schedule_interval(self.save_frame, self.render_dt)
+            self.saved_frames = movie
+            pyglet.clock.schedule_interval(self.save_frame, render_dt)
         pyglet.app.run()
 
     def grab_key_press(self, key, modifiers, keymap):
