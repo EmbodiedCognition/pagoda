@@ -55,9 +55,7 @@ I hope to integrate these comments into some sort of online documentation for
 the package as a whole.
 '''
 
-import c3d
 import climate
-import csv
 import numpy as np
 import ode
 
@@ -113,27 +111,29 @@ class Markers:
             return dict((c, i) for i, c in enumerate(channels))
         return channels or {}
 
-    def load_csv(self, filename, channels=None, max_frames=1e100):
-        with open(filename) as handle:
-            reader = csv.reader(handle)
+    def load_csv(self, filename):
+        import pandas as pd
 
-            header = reader.next()
-            self.channels = self._interpret_channels(channels or self.channels)
-            logging.info('%s: loaded marker labels %s', filename, labels)
+        df = pd.read_csv(filename)
 
-            data = []
-            for row in reader:
-                data.append(row)
-                if len(data) > max_frames:
-                    break
-            self.data = np.array(data)
-            logging.info('%s: loaded marker data %s', filename, self.data.shape)
+        markers = [c[8:-2] for c in df.columns
+                   if c.startswith('marker') and c.endswith('-c')]
+
+        self.channels = self._interpret_channels(markers)
+
+        cols = [c for c in df.columns
+                if c.startswith('marker')
+                and c[-2] == '-' and c[-1] in 'xyzc']
+        self.data = df[cols].values.reshape((len(df), len(markers), 4))
+
+        logging.info('%s: loaded marker data %s', filename, self.data.shape)
 
         self.create_bodies()
 
     def load_c3d(self, filename, channels=None, max_frames=1e100):
         '''Load marker data from a C3D file.
         '''
+        import c3d
         with open(filename, 'rb') as handle:
             reader = c3d.Reader(handle)
 
