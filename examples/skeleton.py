@@ -12,7 +12,7 @@ import pagoda.viewer
 def main(asf, amc):
     w = pagoda.skeleton.World(dt=1. / 60)
     w.add_motion(amc, name=w.add_skeleton(asf))
-    pagoda.viewer.Physics(w, paused=True).run()
+    pagoda.viewer.Viewer(w).run()
 
 
 if __name__ == '__main__':

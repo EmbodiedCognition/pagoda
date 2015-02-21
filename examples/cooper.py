@@ -15,7 +15,7 @@ def main():
     w.cfm = 1e-6
     w.load_skeleton(full('cooper-skeleton.txt'))
     w.load_markers(full('cooper-motion.c3d'), full('cooper-markers.txt'))
-    pagoda.viewer.Physics(w, paused=True).run()
+    pagoda.viewer.Viewer(w).run()
 
 
 if __name__ == '__main__':

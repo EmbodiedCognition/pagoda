@@ -33,7 +33,7 @@ def main(n=20):
         kw['color'] = tuple(rng.uniform(0, 1, size=3)) + (0.9, )
         w.create_body(s, **kw)
     w.reset()
-    pagoda.viewer.Physics(w).run()
+    pagoda.viewer.Viewer(w).run()
 
 
 if __name__ == '__main__':
