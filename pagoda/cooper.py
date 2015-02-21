@@ -262,6 +262,7 @@ class Markers:
             joint.setAnchor2Rel(self.attach_offsets[label])
             joint.setParam(ode.ParamCFM, self.cfm / f)
             joint.setParam(ode.ParamERP, self.erp)
+            joint.setFeedback(True)
             self.joints.append(joint)
 
     def reposition(self, frame_no):
@@ -293,6 +294,16 @@ class Markers:
             delta = np.array(joint.getAnchor()) - joint.getAnchor2()
             deltas.append(np.sqrt((delta * delta).sum()))
         return deltas
+
+    def forces(self):
+        '''Return an array of the forces exerted by marker springs.
+
+        Returns
+        -------
+        forces : list of float
+            A list of the force exerted by each marker spring attachment.
+        '''
+        return [j.getFeedback()[0] for j in self.joints]
 
 
 class World(physics.World):
