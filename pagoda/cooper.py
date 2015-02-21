@@ -1,54 +1,9 @@
+# -*- coding: utf-8 -*-
+
 '''This module contains a Python implementation of a forward-dynamics solver.
 
-The "cooper" method, originally described by Cooper & Ballard (2012 Proc. Motion
-in Games), uses a forward physics simulator (here, the Open Dynamics Engine;
-ODE) to compute inverse motion quantities like angles and torques using
-motion-capture data and a structured, articulated model of the human skeleton.
-The prerequisites for this method are:
-
-- Record some motion-capture data from a human. This is expected to result in
-  the locations, in world coordinates, of several motion-capture markers at
-  regularly-spaced intervals over time.
-
-- Construct a simulated skeleton that matches the size and shape of the human to
-  some reasonable degree of accuracy. The more accurate the skeleton, the more
-  accurate the resulting measurements.
-
-In broad strokes, the cooper method proceeds in two stages:
-
-1. Inverse Kinematics. The motion-capture data are attached to the simulated
-   skeleton using ball joints. These ball joints are configured so that their
-   constraints (namely, placing both anchor points of the joint at the same
-   location in space) are allowed to slip; ODE implements this slippage using a
-   spring dynamics, which provides a natural mechanism for the articulated
-   skeleton to interpolate the marker data as well as possible.
-
-   At each frame during the first pass, the motion-capture markers are placed at
-   the appropriate location in space, and the attached articulated skeleton
-   "snaps" toward the markers using its inertia (from the motion in preceding
-   frames) as well as the spring constraints provided by the marker joint
-   slippage.
-
-   At each frame of this process, the articulated skeleton can be queried to
-   obtain joint angles for each degree of freedom. In addition, the markers can
-   be queried to find their constraint slippage.
-
-2. Inverse Dynamics. The marker constraints are weakened significantly, and the
-   joint angles computed in the first pass are then used to constrain the
-   skeleton's movements.
-
-   At each frame during the second pass, the joints in the skeleton attempt to
-   follow the angles computed in the first pass; a PID controller is used to
-   convert the angular error value into a target angular velocity for each
-   joint.
-
-   In addition, because joint-local optimization discards orientation in world
-   coordinates, the articulated skeleton needs additional constraints to avoid
-   falling over. To this end, some marker attachments (specifically, markers
-   attached to "root" bodies in the skeleton) are maintained at full strength.
-
-   The torques that ODE computes to solve this forward angle-following problem
-   are returned as a result of the second pass.
+For detailed information about the solver, its raison d'être, and how it works,
+please see the documentation for the :class:`World` class.
 
 Further comments and documentation are available in this source file. Eventually
 I hope to integrate these comments into some sort of online documentation for
@@ -305,7 +260,64 @@ class Markers:
 
 
 class World(physics.World):
-    '''
+    '''Simulate a physics world that includes an articulated skeleton model.
+
+    The "cooper" method, originally described by Cooper & Ballard (2012 Proc.
+    Motion in Games), uses a forward physics simulator (here, the Open Dynamics
+    Engine; ODE) to compute inverse motion quantities like angles and torques
+    using motion-capture data and a structured, articulated model of the human
+    skeleton. The prerequisites for this method are:
+
+    - Record some motion-capture data from a human. This is expected to result
+      in the locations, in world coordinates, of several motion-capture markers
+      at regularly-spaced intervals over time.
+
+    - Construct a simulated skeleton that matches the size and shape of the
+      human to some reasonable degree of accuracy. The more accurate the
+      skeleton, the more accurate the resulting measurements.
+
+    In broad strokes, the cooper method proceeds in two stages:
+
+    1. :func:`Inverse Kinematics <inverse_kinematics>`. The motion-capture data
+       are attached to the simulated skeleton using ball joints. These ball
+       joints are configured so that their constraints (namely, placing both
+       anchor points of the joint at the same location in space) are allowed to
+       slip; ODE implements this slippage using a spring dynamics, which
+       provides a natural mechanism for the articulated skeleton to interpolate
+       the marker data as well as possible.
+
+       At each frame during the first pass, the motion-capture markers are
+       placed at the appropriate location in space, and the attached articulated
+       skeleton "snaps" toward the markers using its inertia (from the motion in
+       preceding frames) as well as the spring constraints provided by the
+       marker joint slippage.
+
+       At each frame of this process, the articulated skeleton can be queried to
+       obtain joint angles for each degree of freedom. In addition, the markers
+       can be queried to find their constraint slippage.
+
+    2. :func:`Inverse Dynamics <inverse_dynamics>`. The marker constraints are
+       weakened significantly, and the joint angles computed in the first pass
+       are then used to constrain the skeleton's movements.
+
+       At each frame during the second pass, the joints in the skeleton attempt
+       to follow the angles computed in the first pass; a PID controller is used
+       to convert the angular error value into a target angular velocity for
+       each joint.
+
+       In addition, because joint-local optimization discards orientation in
+       world coordinates, the articulated skeleton needs additional constraints
+       to avoid falling over. To this end, some marker attachments
+       (specifically, markers attached to "root" bodies in the skeleton) are
+       maintained at full strength.
+
+       The torques that ODE computes to solve this forward angle-following
+       problem are returned as a result of the second pass.
+
+    In general, the cooper model is a useful way of getting a physics simulator,
+    a model of a human skeleton, and some motion-capture data to interact
+    smoothly. Particularly useful for almost any simulations of human motion are
+    the :func:`settle_to_markers` and :func:`follow_markers` methods.
     '''
 
     def load_skeleton(self, filename, pid_params=None):
@@ -315,7 +327,6 @@ class World(physics.World):
         ----------
         filename : str
             The name of a file containing skeleton configuration data.
-
         pid_params : dict, optional
             If given, use this dictionary to set the PID controller
             parameters on each joint in the skeleton. See
@@ -333,20 +344,21 @@ class World(physics.World):
         ----------
         filename : str
             The name of a file containing marker data. This currently needs to
-            be either a .C3D or a .CSV file.
-
+            be either a .C3D or a .CSV file. CSV files must adhere to a fairly
+            strict column naming convention; see :func:`Markers.load_csv` for
+            more information.
         attachments : str
             The name of a text file specifying how markers are attached to
             skeleton bodies.
-
         max_frames : number, optional
             Only read in this many frames of marker data. By default, the entire
             data file is read into memory.
 
         Returns
         -------
-        Returns a :class:`Markers` object containing loaded marker data as well
-        as skeleton attachment configuration.
+        markers : :class:`Markers`
+            Returns a markers object containing loaded marker data as well as
+            skeleton attachment configuration.
         '''
         self.markers = Markers(self)
         if filename.lower().endswith('.c3d'):
@@ -388,14 +400,12 @@ class World(physics.World):
         ----------
         frame_no : int, optional
             Settle the skeleton to marker data at this frame. Defaults to 0.
-
         max_rms_distance : float, optional
             The settling process will stop when the RMS marker distance falls
             below this threshold. Defaults to 0.1m (10cm). Setting this too
             small prevents the settling process from finishing (it will loop
             indefinitely), and setting it too large prevents the skeleton from
             settling to a stable state near the markers.
-
         states : list of body states, optional
             If given, set the bodies in our skeleton to these kinematic states
             before starting the settling process.
@@ -417,11 +427,9 @@ class World(physics.World):
         ----------
         start : int, optional
             Start following marker data after this frame. Defaults to 0.
-
         end : int, optional
             Stop following marker data after this frame. Defaults to the end of
             the marker data.
-
         states : list of body states, optional
             If given, set the states of the skeleton bodies to these values
             before starting to follow the marker data.
@@ -458,8 +466,9 @@ class World(physics.World):
 
         Returns
         -------
-        A generator of a sequence of one body state for the skeleton. This
-        generator must be exhausted for the simulation to work properly.
+        states : sequence of state tuples
+            A generator of a sequence of one body state for the skeleton. This
+            generator must be exhausted for the simulation to work properly.
         '''
         # update the positions and velocities of the markers.
         self.markers.detach()
@@ -489,15 +498,12 @@ class World(physics.World):
         ----------
         start : int, optional
             Start following marker data after this frame. Defaults to 0.
-
         end : int, optional
             Stop following marker data after this frame. Defaults to the end of
             the marker data.
-
         states : list of body states, optional
             If given, set the states of the skeleton bodies to these values
             before starting to follow the marker data.
-
         max_force : float, optional
             Allow each degree of freedom in the skeleton to exert at most this
             force when attempting to maintain its equilibrium position. This
@@ -506,9 +512,10 @@ class World(physics.World):
 
         Return
         ------
-        Returns a generator of joint angle data for the skeleton. One set of
-        joint angles will be generated for each frame of marker data between
-        `start` and `end`.
+        angles : sequence of angle frames
+            Returns a generator of joint angle data for the skeleton. One set of
+            joint angles will be generated for each frame of marker data between
+            `start` and `end`.
         '''
         zeros = None
         if max_force > 0:
@@ -526,18 +533,14 @@ class World(physics.World):
         ----------
         angles : ndarray (num-frames x num-dofs)
             Follow angle data provided by this array of angle values.
-
         start : int, optional
             Start following angle data after this frame. Defaults to 0.
-
         end : int, optional
             Stop following angle data after this frame. Defaults to the end of
             the angle data.
-
         states : list of body states, optional
             If given, set the states of the skeleton bodies to these values
             before starting to follow the marker data.
-
         max_force : float, optional
             Allow each degree of freedom in the skeleton to exert at most this
             force when attempting to follow the given joint angles. Defaults to
@@ -545,11 +548,12 @@ class World(physics.World):
             following but can cause oscillations in the PID controllers,
             resulting in noisy torques.
 
-        Return
-        ------
-        Returns a generator of joint torque data for the skeleton. One set of
-        joint torques will be generated for each frame of angle data between
-        `start` and `end`.
+        Returns
+        -------
+        torques : sequence of torque frames
+            Returns a generator of joint torque data for the skeleton. One set
+            of joint torques will be generated for each frame of angle data
+            between `start` and `end`.
         '''
         angles = angles[start:end]
         for i, states in enumerate(self.follow_markers(start, end, states)):
