@@ -13,6 +13,7 @@ the package as a whole.
 import climate
 import numpy as np
 import ode
+import re
 
 from . import physics
 from . import skeleton
@@ -66,27 +67,57 @@ class Markers:
             return dict((c, i) for i, c in enumerate(channels))
         return channels or {}
 
-    def load_csv(self, filename):
+    def load_csv(self, filename, start_frame=0, max_frames=int(1e300)):
+        '''Load marker data from a CSV file.
+
+        The file will be imported using Pandas, which must be installed to use
+        this method. (``pip install pandas``)
+
+        The first line of the CSV file will be used for header information. The
+        "time" column will be used as the index for the data frame. There must
+        be columns named 'markerAB-foo-x','markerAB-foo-y','markerAB-foo-z', and
+        'markerAB-foo-c' for marker 'foo' to be included in the model.
+
+        Parameters
+        ----------
+        filename : str
+            Name of the CSV file to load.
+        '''
         import pandas as pd
 
-        df = pd.read_csv(filename)
+        df = pd.read_csv(filename).set_index('time')
 
-        markers = [c[8:-2] for c in df.columns
-                   if c.startswith('marker') and c.endswith('-c')]
+        # make sure the data frame's time index matches our world.
+        assert self.world.dt == df.index.diff().mean()
 
+        markers = []
+        for c in df.columns:
+            m = re.match(r'^marker\d\d-(.*)-c$', c)
+            if m: markers.append(m.group(1))
         self.channels = self._interpret_channels(markers)
 
-        cols = [c for c in df.columns
-                if c.startswith('marker')
-                and c[-2] == '-' and c[-1] in 'xyzc']
-        self.data = df[cols].values.reshape((len(df), len(markers), 4))
+        cols = [c for c in df.columns if re.match(r'^marker\d\d-.*-[xyzc]$', c)]
+        self.data = df[cols].values.reshape((len(df), len(markers), 4))[
+            start_frame:start_frame+max_frames]
 
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
-
+        self.process_data()
         self.create_bodies()
 
-    def load_c3d(self, filename, channels=None, max_frames=1e100):
+    def load_c3d(self, filename, start_frame=0, max_frames=int(1e300)):
         '''Load marker data from a C3D file.
+
+        The file will be imported using the c3d module, which must be installed
+        to use this method. (``pip install c3d``)
+
+        Parameters
+        ----------
+        filename : str
+            Name of the C3D file to load.
+        start_frame : int, optional
+            Discard the first N frames. Defaults to 0.
+        max_frames : int, optional
+            Maximum number of frames to load. Defaults to loading all frames.
         '''
         import c3d
         with open(filename, 'rb') as handle:
@@ -102,8 +133,9 @@ class Markers:
 
             # read the actual c3d data into a numpy array.
             data = []
-            for _, frame, _ in reader.read_frames():
-                data.append(frame)
+            for i, (_, frame, _) in enumerate(reader.read_frames()):
+                if i >= start_frame:
+                    data.append(frame)
                 if len(data) > max_frames:
                     break
             self.data = np.array(data)
@@ -114,7 +146,6 @@ class Markers:
                 self.data[:, :, :4] /= 1000.
 
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
-
         self.process_data()
         self.create_bodies()
 
