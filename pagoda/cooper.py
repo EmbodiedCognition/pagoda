@@ -280,14 +280,19 @@ class Markers:
             body.position = self.positions[frame_no, j]
             body.linear_velocity = self.velocities[frame_no, j]
 
-    def rms_distance(self):
-        '''Return the RMS distance between markers and their attachment points.
+    def distances(self):
+        '''Get a list of the distances between markers and their attachments.
+
+        Returns
+        -------
+        distances : list of float
+            List of distances for each marker joint in our attachment setup.
         '''
         deltas = []
         for joint in self.joints:
             delta = np.array(joint.getAnchor()) - joint.getAnchor2()
-            deltas.append((delta * delta).sum())
-        return np.sqrt(np.mean(deltas))
+            deltas.append(np.sqrt((delta * delta).sum()))
+        return deltas
 
 
 class World(physics.World):
@@ -424,15 +429,15 @@ class World(physics.World):
         '''
         self.follower = self.follow_markers()
 
-    def settle_to_markers(self, frame_no=0, max_rms_distance=0.1, states=None):
+    def settle_to_markers(self, frame_no=0, max_distance=0.1, states=None):
         '''Settle the skeleton to our marker data at a specific frame.
 
         Parameters
         ----------
         frame_no : int, optional
             Settle the skeleton to marker data at this frame. Defaults to 0.
-        max_rms_distance : float, optional
-            The settling process will stop when the RMS marker distance falls
+        max_distance : float, optional
+            The settling process will stop when the mean marker distance falls
             below this threshold. Defaults to 0.1m (10cm). Setting this too
             small prevents the settling process from finishing (it will loop
             indefinitely), and setting it too large prevents the skeleton from
@@ -446,9 +451,9 @@ class World(physics.World):
         while True:
             for states in self._step_to_marker_frame(frame_no):
                 pass
-            rmsd = self.markers.rms_distance()
-            logging.info('settling at frame %d: marker rmsd %.3f', frame_no, rmsd)
-            if rmsd < max_rmsd:
+            dist = np.mean(self.markers.distances())
+            logging.info('settling at frame %d: marker distance %.3f', frame_no, dist)
+            if dist < max_distance:
                 return states
 
     def follow_markers(self, start=0, end=1e100, states=None):
