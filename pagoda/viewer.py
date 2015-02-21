@@ -17,16 +17,6 @@ from . import physics
 TAU = 2 * np.pi
 
 
-class Null(object):
-    def __init__(self, world):
-        self.world = world
-
-    def run(self):
-        while not self.world.step():
-            if self.world.needs_reset():
-                self.world.reset()
-
-
 @contextlib.contextmanager
 def gl_context(scale=None, translate=None, rotate=None, mat=None):
     glPushMatrix()
@@ -107,6 +97,8 @@ def cylinder_vertices(n=14):
 
 
 class EventLoop(pyglet.app.EventLoop):
+    '''Pyglet event loop, prevents attribute changes from triggering redraws.'''
+
     def run(self):
         self.has_exit = False
         self._legacy_setup()
@@ -126,11 +118,57 @@ pyglet.options['debug_gl'] = False
 pyglet.app.event_loop = EventLoop()
 
 
-class GL(pyglet.window.Window):
-    '''
+class View(object):
+    '''A POD class for, in this case, holding view parameters.
+
+    Any keyword arguments passed to the constructor will be set as attributes on
+    the instance. This is used in the :class:`Window` class for holding
+    parameters related to the view (i.e., zoom, translation, etc.).
     '''
 
-    def __init__(self, world, dt=1. / 30, paused=False, save_frames=None):
+    def __init__(self, **kwargs):
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+class Window(pyglet.window.Window):
+    '''This class wraps pyglet's Window for simple rendering of an OpenGL world.
+
+    Default key bindings:
+    - ESCAPE: close the window
+    - SPACE: toggle pause
+    - S: save a frame
+
+    Parameters
+    ----------
+    dt : float, optional
+        Time interval between successive frames. Defaults to 0.033333 (30 fps).
+    paused : bool, optional
+        Start the window with time paused. Defaults to False.
+    floor_z : float, optional
+        Height for a checkerboard floor in the rendered world. Defaults to 0.
+        Set this to None to disable the floor.
+
+    Attributes
+    ----------
+    step_dt : float
+        Time interval between successive calls to :func:`step`. Defaults to the
+        value of `dt`.
+    render_dt : float
+        Time interval between successive calls to :func:`render`. Defaults to the
+        value of `dt`.
+    save_frames : str
+        Saved frames will be stored in this directory.
+    paused : bool
+        Current paused state of the renderer.
+    frame_no : bool
+        Number of the currently rendered frame, starting at 0. Increases by one
+        with each call to :func:`render`.
+    view : :class:`View`
+        An object holding view parameters for the renderer.
+    '''
+
+    def __init__(self, dt=1. / 30, paused=False, floor_z=0):
         # first, set up the pyglet screen, window, and display variables.
         platform = pyglet.window.get_platform()
         display = platform.get_default_display()
@@ -144,20 +182,16 @@ class GL(pyglet.window.Window):
                 samples=4))
         except pyglet.window.NoSuchConfigException:
             config = screen.get_best_config(Config())
-        super(GL, self).__init__(resizable=True, config=config, vsync=False)
 
-        # then, set up our own view parameters related to the simulator.
-        self.dt = dt
-        self.world = world
+        super(Window, self).__init__(
+            width=1000, height=600, resizable=True, vsync=False, config=config)
+
+        # then, set up our own view parameters.
+        self.step_dt = self.render_dt = dt
+        self.frame_no = 0
         self.paused = paused
-        self.save_frames = save_frames
-        self.frozen_bodies = []
-
-        self.zoom = 10
-        self.ty = 0.05
-        self.tz = -0.8
-        self.ry = 35
-        self.rz = -60
+        self.save_frames = None
+        self.view = View(zoom=4.666, ty=0.23, tz=-0.5, ry=27, rz=-50)
 
         self.on_resize(self.width, self.height)
 
@@ -186,29 +220,48 @@ class GL(pyglet.window.Window):
         self.sphere = build_vertex_list(*sphere_vertices())
         self.cylinder = build_vertex_list(*cylinder_vertices(32))
 
+        self.floor = None
+        if floor_z is not None:
+            # set up a chessboard floor.
+            BLK = [150, 150, 150] * 6
+            WHT = [160, 160, 160] * 6
+            N = 20
+            z = floor_z
+            vtx = []
+            for i in range(N, -N, -1):
+                for j in range(-N, N, 1):
+                    vtx.extend((j,   i, z, j, i-1, z, j+1, i,   z,
+                                j+1, i, z, j, i-1, z, j+1, i-1, z))
+            self.floor = pyglet.graphics.vertex_list(
+                len(vtx) // 3,
+                ('v3f/static', vtx),
+                ('c3B/static', ((BLK + WHT) * N + (WHT + BLK) * N) * N),
+                ('n3i/static', [0, 0, 1] * (len(vtx) // 3)))
+
     def _update_view(self):
         # http://njoubert.com/teaching/cs184_fa08/section/sec09_camera.pdf
         glMatrixMode(GL_MODELVIEW)
         glLoadIdentity()
         gluLookAt(1, 0, 0, 0, 0, 0, 0, 0, 1)
-        glTranslatef(-self.zoom, self.ty, self.tz)
-        glRotatef(self.ry, 0, 1, 0)
-        glRotatef(self.rz, 0, 0, 1)
+        glTranslatef(-self.view.zoom, self.view.ty, self.view.tz)
+        glRotatef(self.view.ry, 0, 1, 0)
+        glRotatef(self.view.rz, 0, 0, 1)
+        #print(self.view)
 
     def on_mouse_scroll(self, x, y, dx, dy):
         if dy == 0: return
-        self.zoom *= 1.1 ** (-1 if dy > 0 else 1)
+        self.view.zoom *= 1.1 ** (-1 if dy > 0 else 1)
         self._update_view()
 
     def on_mouse_drag(self, x, y, dx, dy, buttons, modifiers):
         if buttons == pyglet.window.mouse.LEFT:
             # pan
-            self.ty += 0.03 * dx
-            self.tz += 0.03 * dy
+            self.view.ty += 0.03 * dx
+            self.view.tz += 0.03 * dy
         else:
             # roll
-            self.ry += 0.2 * -dy
-            self.rz += 0.2 * dx
+            self.view.ry += 0.2 * -dy
+            self.view.rz += 0.2 * dx
         self._update_view()
 
     def on_resize(self, width, height):
@@ -220,23 +273,137 @@ class GL(pyglet.window.Window):
 
     def on_key_press(self, key, modifiers):
         keymap = pyglet.window.key
-        if self.world.on_key_press(key, keymap):
+        if self.grab_key_press(key, modifiers, keymap):
             return
         if key == keymap.ESCAPE:
             pyglet.app.exit()
         if key == keymap.SPACE:
             self.paused = False if self.paused else True
+        if key == keymap.S and self.save_frames:
+            self.save_frame()
+
+    def save_frame(self, dt=None):
+        if self.save_frames is None:
+            return
+        bn = 'frame-{:05d}.png'.format(self.frame_no)
+        fn = os.path.join(self.save_frames, bn)
+        logging.info('saving frame %s', fn)
+        pyglet.image.get_buffer_manager().get_color_buffer().save(fn)
+
+    def _render(self, dt):
+        self.switch_to()
+        self.clear()
+        '''
+        glMatrixMode(GL_PROJECTION)
+        glPushMatrix()
+        glLoadIdentity()
+        gluOrtho2D(0, 100, 0, 100)
+        glMatrixMode(GL_MODELVIEW)
+        pyglet.text.Label('Frame {}'.format(self.world.frame_no), x=0, y=0).draw()
+        glMatrixMode(GL_PROJECTION)
+        glPopMatrix()
+        '''
+        self.floor.draw(GL_TRIANGLES)
+        self.render(dt)
+        self.flip()
+
+    def _step(self, dt):
+        if not self.paused:
+            self.frame_no += 1
+            self.step(dt)
+
+    def draw_sphere(self, *args, **kwargs):
+        if 'color' in kwargs:
+            glColor4f(*kwargs.pop('color'))
+        with gl_context(*args, **kwargs):
+            self.sphere.draw(GL_TRIANGLES)
+
+    def draw_box(self, *args, **kwargs):
+        if 'color' in kwargs:
+            glColor4f(*kwargs.pop('color'))
+        with gl_context(*args, **kwargs):
+            self.box.draw(GL_TRIANGLES)
+
+    def draw_cylinder(self, *args, **kwargs):
+        if 'color' in kwargs:
+            glColor4f(*kwargs.pop('color'))
+        with gl_context(*args, **kwargs):
+            self.cylinder.draw(GL_TRIANGLES)
+
+    def draw_lines(self, vertices):
+        glBegin(GL_LINES)
+        for v in vertices:
+            glVertex3f(*v)
+        glEnd()
+
+    set_color = glColor4f
+
+    def exit(self):
+        pyglet.app.exit()
+
+    def run(self, movie=None):
+        pyglet.clock.schedule_interval(self._step, self.step_dt)
+        pyglet.clock.schedule_interval(self._render, self.render_dt)
+        if movie is not None:
+            self.save_frames = movie
+            pyglet.clock.schedule_interval(self.save_frame, self.render_dt)
+        pyglet.app.run()
+
+    def grab_key_press(self, key, modifiers, keymap):
+        pass
+
+    def step(self, dt):
+        pass
+
+    def render(self, dt):
+        pass
+
+
+class Null(object):
+    '''This viewer does nothing!
+
+    It is here for headless simulation runs, i.e., where the world does not need
+    to be rendered to a graphics window but some measurements or other
+    side-effects of repeatedly stepping the world are useful.
+    '''
+
+    def __init__(self, world):
+        self.world = world
+
+    def run(self):
+        while not self.world.step():
+            if self.world.needs_reset():
+                self.world.reset()
+
+
+class Viewer(Window):
+    '''
+    '''
+
+    def __init__(self, *args, **kwargs):
+        super(Physics, self).__init__(*args, **kwargs)
+        self.world = world
+        self.frozen_bodies = []
+
+    def grab_key_press(self, key, modifiers, keymap):
         if key == keymap.ENTER:
             self.world.reset()
-        if key == keymap.B:
+            return True
+        if key == keymap.F:
             self.freeze_bodies()
-        if key == keymap.F and self.save_frames:
-            self.save_frame()
+            return True
         if key == keymap.RIGHT:
             steps = int(1 / self.world.dt)
             if modifiers & keymap.MOD_SHIFT:
                 steps *= 10
-            [self.update(self.world.dt) for _ in range(steps)]
+            [self.step(self.world.dt) for _ in range(steps)]
+            return True
+
+    def step(self, dt):
+        if self.world.step():
+            self.exit()
+        if self.world.needs_reset():
+            self.world.reset()
 
     def freeze_bodies(self):
         bodies = []
@@ -259,68 +426,41 @@ class GL(pyglet.window.Window):
             bodies.append(bp)
         self.frozen_bodies.append(bodies)
 
-    def save_frame(self):
-        bn = 'frame-{:05d}.png'.format(self.world.frame_no)
-        fn = os.path.join(self.save_frames, bn)
-        logging.info('saving frame %s', fn)
-        pyglet.image.get_buffer_manager().get_color_buffer().save(fn)
-
-    def redraw(self, dt):
-        self.switch_to()
-        self.clear()
-        self.draw()
-        self.flip()
-
-    def update(self, dt):
-        if self.paused:
-            return
-        if self.world.step():
-            pyglet.app.exit()
-        if self.world.needs_reset():
-            self.world.reset()
-
-    def run(self):
-        pyglet.clock.schedule_interval(self.update, self.world.dt)
-        pyglet.clock.schedule_interval(self.redraw, self.dt)
-        pyglet.app.run()
-
-    def draw(self):
-        raise NotImplementedError
-
-
-class Physics(GL):
-    def __init__(self, *args, **kwargs):
-        super(Physics, self).__init__(*args, **kwargs)
-        BLK = [150, 150, 150] * 6
-        WHT = [160, 160, 160] * 6
-        N = 20
-        z = kwargs.get('floor_z', 0)
-        vtx = []
-        for i in range(N, -N, -1):
-            for j in range(-N, N, 1):
-                vtx.extend((j,   i, z, j, i-1, z, j+1, i,   z,
-                            j+1, i, z, j, i-1, z, j+1, i-1, z))
-
-        self.floor = pyglet.graphics.vertex_list(
-            len(vtx) // 3,
-            ('v3f/static', vtx),
-            ('c3B/static', ((BLK + WHT) * N + (WHT + BLK) * N) * N),
-            ('n3i/static', [0, 0, 1] * (len(vtx) // 3)))
-
-    def draw(self, color=None):
+    def render(self, dt):
         '''Draw all bodies in the world.'''
-        self.floor.draw(GL_TRIANGLES)
         for frame in self.frozen_bodies:
             for body in frame:
                 self.draw_body(body)
         for body in self.world.bodies:
-            self.draw_body(body, color=color)
+            self.draw_body(body)
 
-    def draw_body(self, body, color=None):
+        return
+
+        # draw marker labels.
+        for label in self.world.markers.channels:
+            body = self.world.markers.marker_bodies.get(label)
+            if body:
+                with gl_context(translate=body.position, scale=(0.001, 0.001, 0.001)):
+                    pyglet.text.Label(label).draw()
+
+        # draw line between anchor1 and anchor2 for marker joints.
+        glColor4f(1, 0.1, 0.1, 0.9)
+        glLineWidth(3)
+        for joint in self.world.markers.joints:
+            glBegin(GL_LINES)
+            glVertex3f(*joint.getAnchor())
+            glVertex3f(*joint.getAnchor2())
+            glEnd()
+
+        # draw frame label.
+        with gl_context(scale=(0.1, 0.1, 0.1), translate=(0, 0, 1)):
+            pyglet.text.Label('Frame {}'.format(self.world.frame_no), x=0, y=0).draw()
+
+    def draw_body(self, body):
         ''''''
         x, y, z = body.position
         r = body.rotation
-        glColor4f(*(color if color is not None else body.color))
+        self.set_color(*body.color)
         with gl_context(mat=(r[0], r[3], r[6], 0.,
                              r[1], r[4], r[7], 0.,
                              r[2], r[5], r[8], 0.,
