@@ -1,8 +1,9 @@
 '''This module contains OpenGL code for rendering a world.'''
 
+from __future__ import division
+
 import climate
 import contextlib
-import copy
 import numpy as np
 import os
 import pyglet
