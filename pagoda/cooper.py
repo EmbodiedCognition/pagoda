@@ -100,8 +100,8 @@ class Markers:
         self.channels = self._interpret_channels(markers)
 
         cols = [c for c in df.columns if re.match(r'^marker\d\d-.*-[xyzc]$', c)]
-        self.data = df[cols].values.reshape((len(df), len(markers), 4))[
-            start_frame:start_frame+max_frames]
+        self.data = df[cols].values.reshape((len(df), len(markers), 4))[start_frame:]
+        self.data[:, :, [1, 2]] = self.data[:, :, [2, 1]]
 
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
         self.process_data()
