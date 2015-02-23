@@ -164,7 +164,7 @@ class Window(pyglet.window.Window):
         An object holding view parameters for the renderer.
     '''
 
-    def __init__(self, paused=False, floor_z=0, width=1072, height=603):
+    def __init__(self, paused=False, floor_z=0, width=1200, height=675):
         # first, set up the pyglet screen, window, and display variables.
         platform = pyglet.window.get_platform()
         display = platform.get_default_display()
