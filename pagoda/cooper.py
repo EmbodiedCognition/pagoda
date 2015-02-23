@@ -85,10 +85,13 @@ class Markers:
         '''
         import pandas as pd
 
-        df = pd.read_csv(filename).set_index('time')
+        compression = None
+        if filename.endswith('.gz'):
+            compression = 'gzip'
+        df = pd.read_csv(filename, compression=compression).set_index('time')
 
         # make sure the data frame's time index matches our world.
-        assert self.world.dt == df.index.diff().mean()
+        assert self.world.dt == pd.Series(df.index).diff().mean()
 
         markers = []
         for c in df.columns:
@@ -408,9 +411,10 @@ class World(physics.World):
             skeleton attachment configuration.
         '''
         self.markers = Markers(self)
-        if filename.lower().endswith('.c3d'):
+        fn = filename.lower()
+        if fn.endswith('.c3d'):
             self.markers.load_c3d(filename, max_frames=max_frames)
-        elif filename.lower().endswith('.csv'):
+        elif fn.endswith('.csv') or fn.endswith('.csv.gz'):
             self.markers.load_csv(filename, max_frames=max_frames)
         else:
             logging.fatal('%s: not sure how to load markers!', filename)
