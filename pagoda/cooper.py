@@ -258,6 +258,8 @@ class Markers:
                 continue
             if self.visibility[frame_no, j] < 0:
                 continue
+            if np.linalg.norm(self.velocities[frame_no, j]) > 10:
+                continue
             f = self.root_attachment_factor if target in self.roots else 1.
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
             joint.attach(self.marker_bodies[label].ode_body, target.ode_body)
