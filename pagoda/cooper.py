@@ -138,7 +138,7 @@ class Markers:
             data = []
             for i, (_, frame, _) in enumerate(reader.read_frames()):
                 if i >= start_frame:
-                    data.append(frame)
+                    data.append(frame[[0, 1, 2, 4]])
                 if len(data) > max_frames:
                     break
             self.data = np.array(data)
@@ -146,7 +146,7 @@ class Markers:
             # scale the data to meters -- mm is a very common C3D unit.
             if reader['POINT:UNITS'].string_value.strip().lower() == 'mm':
                 logging.info('scaling point data from mm to m')
-                self.data[:, :, :4] /= 1000.
+                self.data[:, :, :3] /= 1000.
 
         logging.info('%s: loaded marker data %s', filename, self.data.shape)
         self.process_data()
@@ -154,14 +154,14 @@ class Markers:
 
     def process_data(self):
         '''Process data to produce velocity and dropout information.'''
+        self.visibility = self.data[:, :, 3]
         self.positions = self.data[:, :, :3]
-        self.visibility = self.data[:, :, 4]
-        self.velocities = np.zeros_like(self.positions)
+        self.velocities = np.zeros_like(self.positions) + 10
         for frame_no in range(1, len(self.data) - 1):
             prev = self.data[frame_no - 1]
             next = self.data[frame_no + 1]
             for c in range(self.num_markers):
-                if prev[c, 4] > -1 and next[c, 4] > -1:
+                if -1 < prev[c, 3] < 100 and -1 < next[c, 3] < 100:
                     self.velocities[frame_no, c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
 
     def create_bodies(self):
