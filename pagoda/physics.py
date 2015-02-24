@@ -149,6 +149,10 @@ class Box(Body):
     def dimensions(self):
         return np.array(self.lengths).squeeze()
 
+    @property
+    def volume(self):
+        return np.prod(self.lengths)
+
     def init_mass(self, m, density):
         m.setBox(density, *self.lengths)
 
@@ -162,6 +166,10 @@ class Sphere(Body):
     def dimensions(self):
         d = 2 * self.radius
         return np.array([d, d, d]).squeeze()
+
+    @property
+    def volume(self):
+        return 4 / 3 * np.pi * self.radius ** 3
 
     def init_mass(self, m, density):
         m.setSphere(density, self.radius)
@@ -181,6 +189,10 @@ class Cylinder(Body):
         d = self.radius
         return np.array([d, d, self.length]).squeeze()
 
+    @property
+    def volume(self):
+        return self.length * np.pi * self.radius ** 2
+
     def init_mass(self, m, density):
         m.setCylinder(density, 3, self.radius, self.length)
 
@@ -198,6 +210,11 @@ class Capsule(Body):
     def dimensions(self):
         d = 2 * self.radius
         return np.array([d, d, d + self.length]).squeeze()
+
+    @property
+    def volume(self):
+        return 4 / 3 * np.pi * self.radius ** 3 + \
+            self.length * np.pi * self.radius ** 2
 
     def init_mass(self, m, density):
         m.setCapsule(density, 3, self.radius, self.length)
