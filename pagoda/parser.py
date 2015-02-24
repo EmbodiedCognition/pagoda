@@ -284,6 +284,10 @@ class SkelParser(Parser):
                 token = self._handle_joint()
             else:
                 self._error('unexpected token')
+        mass = sum(b.mass.mass for b in self.bodies)
+        vol = sum(b.volume for b in self.bodies)
+        logging.info('%.1f mass / %f volume = %.1f overall density',
+                     mass, vol, mass / vol)
 
     def _handle_body(self):
         '''Parse the entirety of a "body" section in the source.'''
