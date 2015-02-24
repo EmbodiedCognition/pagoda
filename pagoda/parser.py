@@ -307,6 +307,8 @@ class SkelParser(Parser):
                 kwargs[token] = self._next_float()
             if token == 'length':
                 kwargs[token] = self._next_float()
+            if token == 'density':
+                kwargs[token] = self._next_float()
             if token == 'quaternion':
                 theta, x, y, z = self._floats(4)
                 quaternion = physics.make_quaternion(TAU * theta / 360, x, y, z)
