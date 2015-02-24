@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 
 import climate
-import cma
 import io
 import numpy as np
 import pagoda
 import pagoda.cooper
 import re
+import scipy.optimize
 
 logging = climate.get_logger('fit-skeleton')
 
@@ -68,16 +68,18 @@ def main(args):
 
     f = build_cost(args, skeleton, markers)
 
-    x0 = 0.1 * np.random.rand(len(skeleton) + len(markers))
+    S = len(skeleton)
+    N = S + len(markers)
 
-    upper = np.ones_like(x0)
-    upper[:len(skeleton)] = 0.4
-    lower = np.zeros_like(x0)
-    lower[len(skeleton):] = -1
+    upper = np.zeros((N, ), 'f')
+    upper[:S] = 0.4
+    upper[S:] = 1
 
-    opts = dict(tolfun=1, bounds=[lower, upper])
+    lower = np.zeros((N, ), 'f')
+    lower[:S] = 0.03
+    lower[S:] = -1
 
-    values = cma.fmin(f, x0=x0, sigma0=0.1, options=opts)[0]
+    res = scipy.optimize.differential_evolution(f, list(zip(lower, upper)))
 
     with open(args.prefix + 'skeleton.txt', 'w') as handle:
         handle.write(skeleton.fill(values[:len(skeleton)]))
