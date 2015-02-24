@@ -446,7 +446,7 @@ class World(physics.World):
         '''
         self.follower = self.follow_markers()
 
-    def settle_to_markers(self, frame_no=0, max_distance=0.1, states=None):
+    def settle_to_markers(self, frame_no=0, max_distance=0.1, max_iters=300, states=None):
         '''Settle the skeleton to our marker data at a specific frame.
 
         Parameters
@@ -459,19 +459,24 @@ class World(physics.World):
             small prevents the settling process from finishing (it will loop
             indefinitely), and setting it too large prevents the skeleton from
             settling to a stable state near the markers.
+        max_iters : int, optional
+            Attempt to settle markers for at most this many iterations. Defaults
+            to 1000.
         states : list of body states, optional
             If given, set the bodies in our skeleton to these kinematic states
             before starting the settling process.
         '''
         if states is not None:
             self.skeleton.set_body_states(states)
-        while True:
+        dist = None
+        for _ in range(max_iters):
             for states in self._step_to_marker_frame(frame_no):
                 pass
             dist = np.mean(self.markers.distances())
-            logging.info('settling at frame %d: marker distance %.3f', frame_no, dist)
+            logging.info('settling to frame %d: marker distance %.3f', frame_no, dist)
             if dist < max_distance:
                 return states
+        return states
 
     def follow_markers(self, start=0, end=1e100, states=None):
         '''Iterate over a set of marker data, dragging its skeleton along.
