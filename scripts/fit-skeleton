@@ -32,9 +32,7 @@ class Template:
     def __init__(self, filename):
         with open(filename) as handle:
             self.content = handle.read()
-        self.fields = set()
-        for match in re.findall(r'(?<=\{)[^\}]+(?=\})', self.content):
-            self.fields.add(match)
+        self.fields = sorted(set(re.findall(r'\{([^\}]+)\}', self.content)))
         logging.info('%s: loaded %d fields to optimize', filename, len(self))
 
     def __len__(self):
