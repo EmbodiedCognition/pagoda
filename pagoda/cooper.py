@@ -172,7 +172,7 @@ class Markers:
                 'sphere',
                 name='marker:{}'.format(label),
                 radius=0.02,
-                color=(1, 1, 1, 0.5))
+                color=(0.9, 0.1, 0.1, 0.5))
             body.is_kinematic = True
             self.marker_bodies[label] = body
 
