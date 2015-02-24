@@ -19,7 +19,7 @@ climate.add_arg('-o', '--output', default='optimized-', metavar='PREFIX',
 climate.add_arg('-s', '--skeleton', metavar='FILE',
                 help='load skeleton definition from FILE')
 
-g = climate.add_arg_group('simulation options')
+g = climate.add_group('simulation options')
 g.add_argument('-r', '--fps', type=float, default=120, metavar='N',
                help='set world to run at N frames per second')
 g.add_argument('-f', '--start-frame', type=int, default=0, metavar='N',
