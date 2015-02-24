@@ -53,12 +53,12 @@ def build_cost(args, skeleton, markers):
         w.load_skeleton(skeleton.as_file(x[:len(skeleton)]))
         w.load_markers(args.motion, markers.as_file(x[len(skeleton):]))
         states = w.settle_to_markers(args.start_frame)
-        distances = [w.markers.rms_distance() for _ in
-                     w.follow_markers(start=args.start_frame,
-                                      end=args.end_frame,
-                                      states=states)]
-        logging.info('cost %.2f +/- %.2f', np.mean(distances), np.std(distances))
-        return np.mean(distances)
+        distances = [np.nanmean(w.markers.distances())
+                     for _ in w.follow_markers(start=args.start_frame,
+                                               end=args.end_frame,
+                                               states=states)]
+        logging.info('cost %.2f +/- %.2f', np.nanmean(distances), np.nanstd(distances))
+        return np.nanmean(distances) + np.nanstd(distances)
     return cost
 
 
