@@ -804,7 +804,7 @@ class World(base.World):
         shape = shape.lower()
         if name is None:
             name = '{}^{}^{}'.format(ba.name, shape, bb.name if bb else '')
-        joint = JOINTS[shape](name, self.ode_world, ba, bb, **kwargs)
+        joint = JOINTS[shape](name, self.ode_world, body_a=ba, body_b=bb, **kwargs)
         self._joints[name] = joint
         return joint
 
