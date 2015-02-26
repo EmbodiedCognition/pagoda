@@ -458,8 +458,9 @@ class Joint(object):
     body_b : :class:`Body`, optional
         Wrapper for the second body that this joint connects. If this is None,
         the joint will connect ``body_a`` to the ``world``.
-    anchor : (float, float, float), optional
-        Anchor in world coordinates for the joint.
+    anchor : 3-tuple of floats, optional
+        Anchor in world coordinates for the joint. Optional for :class:`Fixed`
+        joint.
     feedback : bool, optional
         If this is True, a force feedback structure will be enabled for this
         joint, which will make it possible to record the forces that this joint
@@ -471,34 +472,34 @@ class Joint(object):
     def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False, jointgroup=None):
         '''Create a new joint connecting two bodies in the world.'''
         self.name = name
-        self.world = world
-        self.jointgroup = jointgroup
         if isinstance(world, World):
             world = world.ode_world
         self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(
             world, jointgroup=jointgroup)
         self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.ode_joint.setAnchor(anchor)
-        self.ode_joint.setFeedback(feedback)
-        self.ode_joint.setParam(ode.ParamCFM, 0)
+        if anchor is not None:
+            self.ode_joint.setAnchor(anchor)
+            self.ode_joint.setFeedback(feedback)
+            self.ode_joint.setParam(ode.ParamCFM, 0)
         self.amotor = None
-
-    def add_motor(self, feedback=False, jointgroup=None):
-        '''Augment angular joints with a motor.
-
-        This allows us to monitor the necessary joint forces, independent of the
-        kinematic state.
-        '''
-        assert self.ADOF > 0
-        self.amotor = AMotor(
-            self.name + ':amotor',
-            self.world,
-            body_a=self.ode_joint.getBody1(),
-            body_b=self.ode_joint.getBody2(),
-            dof=self.ADOF,
-            mode='user',
-            feedback=feedback,
-            jointgroup=jointgroup or self.jointgroup)
+        if self.ADOF > 0:
+            self.amotor = AMotor(name=name + ':amotor',
+                                 world=world,
+                                 body_a=body_a,
+                                 body_b=body_b,
+                                 feedback=feedback,
+                                 jointgroup=jointgroup,
+                                 dof=self.ADOF,
+                                 mode='euler')
+        self.lmotor = None
+        if self.LDOF > 0:
+            self.lmotor = LMotor(name=name + ':lmotor',
+                                 world=world,
+                                 body_a=body_a,
+                                 body_b=body_b,
+                                 feedback=feedback,
+                                 jointgroup=jointgroup,
+                                 dof=self.LDOF)
 
     def __str__(self):
         return self.name
@@ -530,16 +531,6 @@ class Joint(object):
     @property
     def position_rate(self):
         return self.ode_joint.getPositionRate()
-
-    @property
-    def axes(self):
-        return (self.ode_joint.getAxis(), )
-
-    @axes.setter
-    def axes(self, axes):
-        if self.amotor is not None:
-            self.amotor.axes = (dict(rel=1, axis=axes[0]), )
-        self.ode_joint.setAxis(axes[0])
 
     @property
     def velocities(self):
@@ -607,15 +598,43 @@ class Slider(Joint):
     ADOF = 0
     LDOF = 1
 
+    @property
+    def axes(self):
+        return (self.ode_joint.getAxis(), )
+
+    @axes.setter
+    def axes(self, axes):
+        self.lmotor.axes = (dict(rel=1, axis=axes[0]), )
+        self.ode_joint.setAxis(axes[0])
+
 
 class Hinge(Joint):
     ADOF = 1
     LDOF = 0
 
+    @property
+    def axes(self):
+        return (self.ode_joint.getAxis(), )
+
+    @axes.setter
+    def axes(self, axes):
+        self.amotor.axes = (dict(rel=1, axis=axes[0]), )
+        self.ode_joint.setAxis(axes[0])
+
 
 class Piston(Joint):
     ADOF = 1
     LDOF = 1
+
+    @property
+    def axes(self):
+        return (self.ode_joint.getAxis(), )
+
+    @axes.setter
+    def axes(self, axes):
+        self.amotor.axes = (dict(rel=1, axis=axes[0]), )
+        self.lmotor.axes = (dict(rel=1, axis=axes[0]), )
+        self.ode_joint.setAxis(axes[0])
 
 
 class Universal(Joint):
