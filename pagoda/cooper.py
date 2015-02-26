@@ -138,7 +138,7 @@ class Markers:
             data = []
             for i, (_, frame, _) in enumerate(reader.read_frames()):
                 if i >= start_frame:
-                    data.append(frame[[0, 1, 2, 4]])
+                    data.append(frame[:, [0, 1, 2, 4]])
                 if len(data) > max_frames:
                     break
             self.data = np.array(data)
