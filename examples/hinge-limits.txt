@@ -9,7 +9,7 @@ join hinge
 fix  1 0 0
 arm -1 0 0
 axis0 0 1 0
-lo_stops -10
-hi_stops  80
-stop_cfm 0.2
-stop_erp 0.2
+lo_stops  0
+hi_stops 80
+stop_cfm 1e-1
+stop_erp 0.9

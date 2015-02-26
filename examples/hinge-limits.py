@@ -24,6 +24,7 @@ def main():
     w = pagoda.physics.World(dt=0.01)
     p = pagoda.parser.BodyParser(w)
     p.parse(full('hinge-limits.txt'))
+    w.get_body('arm').add_force((0, 0, 100), relative_position=(1, 0, 0))
     Viewer(w).run()
 
 
