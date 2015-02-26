@@ -433,9 +433,30 @@ class Joint(object):
     all degrees of freedom, or with a sequence whose length must match the
     number of angular DOFs in the joint. (All joints in ODE have at most one
     linear axis of displacement, so the linear properties are scalars.)
+
+    Parameters
+    ----------
+    name : str
+        Name of the joint to create. This is only to make the joint discoverable
+        in the world.
+    world : :class:`World`
+        Wrapper for the world in which this joint exists.
+    body_a : :class:`Body`
+        Wrapper for the first body that this joint connects.
+    body_b : :class:`Body`, optional
+        Wrapper for the second body that this joint connects. If this is None,
+        the joint will connect ``body_a`` to the ``world``.
+    anchor : (float, float, float), optional
+        Anchor in world coordinates for the joint.
+    feedback : bool, optional
+        If this is True, a force feedback structure will be enabled for this
+        joint, which will make it possible to record the forces that this joint
+        exerts on its two bodies. By default, no structure will be allocated.
+    jointgroup : ODE joint group, optional
+        Add the joint to this group. Defaults to the default world joint group.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, anchor=None, jointgroup=None):
+    def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False, jointgroup=None):
         '''Create a new joint connecting two bodies in the world.'''
         self.name = name
         self.world = world
