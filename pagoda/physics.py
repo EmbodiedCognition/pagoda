@@ -284,6 +284,14 @@ class Motor(object):
         return self.ode_motor.getNumAxes()
 
     @property
+    def positions(self):
+        return [self.ode_motor.getPosition(i) for i in range(self.dof)]
+
+    @property
+    def position_rates(self):
+        return [self.ode_motor.getPositionRate(i) for i in range(self.dof)]
+
+    @property
     def angles(self):
         return [self.ode_motor.getAngle(i) for i in range(self.dof)]
 
