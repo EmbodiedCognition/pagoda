@@ -359,19 +359,19 @@ class Motor(object):
 
     @property
     def stop_cfms(self):
-        return _get_params(self.ode_joint, 'StopCFM', self.ADOF)
+        return _get_params(self.ode_motor, 'StopCFM', self.ADOF)
 
     @stop_cfms.setter
     def stop_cfms(self, stop_cfms):
-        _set_params(self.ode_joint, 'StopCFM', stop_cfms, self.ADOF)
+        _set_params(self.ode_motor, 'StopCFM', stop_cfms, self.ADOF)
 
     @property
     def stop_erps(self):
-        return _get_params(self.ode_joint, 'StopERP', self.ADOF)
+        return _get_params(self.ode_motor, 'StopERP', self.ADOF)
 
     @stop_erps.setter
     def stop_erps(self, stop_erps):
-        _set_params(self.ode_joint, 'StopERP', stop_erps, self.ADOF)
+        _set_params(self.ode_motor, 'StopERP', stop_erps, self.ADOF)
 
 
 class AMotor(Motor):
