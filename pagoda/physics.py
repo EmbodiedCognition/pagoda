@@ -379,7 +379,9 @@ class AMotor(Motor):
         super(AMotor, self).__init__(*args, **kwargs)
         mode = kwargs.get('mode', 'user')
         if isinstance(mode, str):
-            mode = ode.AMotorEuler if mode.lower().startswith('e') else ode.AMotorUser
+            mode = ode.AMotorUser
+            if mode.lower().startswith('e'):
+                mode = ode.AMotorEuler
         self.ode_motor.setMode(mode)
 
     @property
@@ -433,11 +435,11 @@ class Joint(object):
     linear axis of displacement, so the linear properties are scalars.)
     '''
 
-    def __init__(self, name, world, body_a, body_b=None,
-                 anchor=None, feedback=False, jointgroup=None):
-        '''Create a new joint connecting two bodies in the world.
-        '''
+    def __init__(self, name, world, body_a, body_b=None, anchor=None, jointgroup=None):
+        '''Create a new joint connecting two bodies in the world.'''
         self.name = name
+        self.world = world
+        self.jointgroup = jointgroup
         if isinstance(world, World):
             world = world.ode_world
         self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(
@@ -446,16 +448,24 @@ class Joint(object):
         self.ode_joint.setAnchor(anchor)
         self.ode_joint.setFeedback(feedback)
         self.ode_joint.setParam(ode.ParamCFM, 0)
-        self.is_passive = False
-
-        # we augment angular joints with a motor that allows us to monitor the
-        # necessary joint forces, independent of the kinematic state.
         self.amotor = None
-        if self.ADOF > 0:
-            self.amotor = AMotor(
-                name + ':amotor', world, body_a,
-                body_b=body_b, dof=self.ADOF, mode='user',
-                feedback=feedback, jointgroup=jointgroup)
+
+    def add_motor(self, feedback=False, jointgroup=None):
+        '''Augment angular joints with a motor.
+
+        This allows us to monitor the necessary joint forces, independent of the
+        kinematic state.
+        '''
+        assert self.ADOF > 0
+        self.amotor = AMotor(
+            self.name + ':amotor',
+            self.world,
+            body_a=self.ode_joint.getBody1(),
+            body_b=self.ode_joint.getBody2(),
+            dof=self.ADOF,
+            mode='user',
+            feedback=feedback,
+            jointgroup=jointgroup or self.jointgroup)
 
     def __str__(self):
         return self.name
@@ -494,33 +504,36 @@ class Joint(object):
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = (dict(rel=1, axis=axes[0]), )
+        if self.amotor is not None:
+            self.amotor.axes = (dict(rel=1, axis=axes[0]), )
         self.ode_joint.setAxis(axes[0])
 
     @property
     def velocities(self):
-        return self.amotor.velocities if self.ADOF > 0 else ()
+        return self.amotor.velocities if self.amotor is not None else ()
 
     @velocities.setter
     def velocities(self, velocities):
-        if self.ADOF > 0: self.amotor.velocities = velocities
+        if self.amotor is not None:
+            self.amotor.velocities = velocities
 
     @property
     def max_forces(self):
-        return self.amotor.max_forces if self.ADOF > 0 else ()
+        return self.amotor.max_forces if self.amotor is not None else ()
 
     @max_forces.setter
     def max_forces(self, max_forces):
-        if self.is_passive: return
-        if self.ADOF > 0: self.amotor.max_forces = max_forces
+        if self.amotor is not None:
+            self.amotor.max_forces = max_forces
 
     @property
     def cfms(self):
-        return self.amotor.cfms if self.ADOF > 0 else ()
+        return self.amotor.cfms if self.amotor is not None else ()
 
     @cfms.setter
     def cfms(self, cfms):
-        if self.ADOF > 0: self.amotor.cfms = cfms
+        if self.amotor is not None:
+            self.amotor.cfms = cfms
 
     @property
     def lo_stops(self):
@@ -555,7 +568,8 @@ class Joint(object):
         _set_params(self.ode_joint, 'StopERP', stop_erps, self.ADOF)
 
     def add_torques(self, torques):
-        self.amotor.add_torques(torques)
+        if self.amotor is not None:
+            self.amotor.add_torques(torques)
 
 
 class Fixed(Joint):

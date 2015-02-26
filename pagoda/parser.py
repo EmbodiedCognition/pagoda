@@ -211,7 +211,7 @@ class BodyParser(Parser):
     Additionally, joints may specify information about their axes, rotation
     limits, etc.
 
-    - axisN X [Y [Z]] -- specifies that axis number N (either 0, 1, or 2, and
+    - axisN X Y Z -- specifies that axis number N (either 0, 1, or 2, and
       depending on the type of joint) points along the vector X Y Z. By default,
       axis0 points along 1 0 0, axis1 along 0 1 0, and axis2 along 0 0 1.
 
@@ -224,8 +224,6 @@ class BodyParser(Parser):
     - stop_cfm N -- set the lo- and hi-stop CFM for DOFs on this joint.
 
     - stop_erp N -- set the lo- and hi-stop ERP for DOFs on this joint.
-
-    - passive -- indicates that this joint's motor remains disabled.
 
     Example
     -------
@@ -365,8 +363,6 @@ class BodyParser(Parser):
                 lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'hi_stops':
                 hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
-            if token == 'passive':
-                is_passive = True
             if token == 'stop_cfm':
                 stop_cfm = self._next_float()
             if token == 'stop_erp':
@@ -378,7 +374,6 @@ class BodyParser(Parser):
         joint = self.world.join(
             shape, body1, body2, anchor=anchor, jointgroup=self.jointgroup)
         joint.axes = axes[:joint.ADOF]
-        joint.is_passive = is_passive
         if lo_stops is not None:
             joint.lo_stops = lo_stops
         if hi_stops is not None:
