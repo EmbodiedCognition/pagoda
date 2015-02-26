@@ -213,7 +213,7 @@ class Markers:
         if isinstance(source, str):
             source = open(source)
         else:
-            filename = '(file-{:r})'.format(source)
+            filename = '(file-{})'.format(id(source))
 
         for i, line in enumerate(source):
             tokens = line.split('#')[0].strip().split()
