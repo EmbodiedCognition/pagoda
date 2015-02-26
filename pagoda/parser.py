@@ -375,7 +375,6 @@ class BodyParser(Parser):
 
         joint = self.world.join(
             shape, body1, body2, anchor=anchor, jointgroup=self.jointgroup)
-        logging.info('%s: dof %d', joint.amotor, joint.amotor.dof)
 
         if joint.ADOF or joint.LDOF:
             joint.axes = axes[:max(joint.ADOF, joint.LDOF)]
