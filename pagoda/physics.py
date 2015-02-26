@@ -386,12 +386,13 @@ class AMotor(Motor):
     MOTOR_FACTORY = ode.AMotor
 
     def __init__(self, *args, **kwargs):
+        mode = kwargs.pop('mode', 'user')
         super(AMotor, self).__init__(*args, **kwargs)
-        mode = kwargs.get('mode', 'user')
         if isinstance(mode, str):
-            mode = ode.AMotorUser
             if mode.lower().startswith('e'):
                 mode = ode.AMotorEuler
+            else:
+                mode = ode.AMotorUser
         self.ode_motor.setMode(mode)
 
     @property
