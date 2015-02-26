@@ -266,11 +266,11 @@ class Motor(object):
     the motor.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3, **kwargs):
+    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3, jointgroup=None):
         self.name = name
         if isinstance(world, World):
             world = world.ode_world
-        self.ode_motor = self.MOTOR_FACTORY(world)
+        self.ode_motor = self.MOTOR_FACTORY(world, jointgroup=jointgroup)
         self.ode_motor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_motor.setFeedback(feedback)
         self.ode_motor.setNumAxes(dof)
