@@ -301,8 +301,10 @@ class Motor(object):
 
     @property
     def axes(self):
-        return [dict(rel=self.ode_motor.getAxisRel(i), axis=self.ode_motor.getAxis(i))
-                for i in range(self.dof)]
+        def ax(i):
+            return dict(rel=self.ode_motor.getAxisRel(i),
+                        axis=self.ode_motor.getAxis(i))
+        return [ax(i) for i in range(self.dof)]
 
     @axes.setter
     def axes(self, axes):
