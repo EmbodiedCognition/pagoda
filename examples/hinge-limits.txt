@@ -11,5 +11,5 @@ arm -1 0 0
 axis0 0 1 0
 lo_stops  0
 hi_stops 80
-stop_cfm 1e-1
+stop_cfm 1e-3
 stop_erp 0.9
