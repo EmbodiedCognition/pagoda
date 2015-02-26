@@ -79,7 +79,7 @@ class Skeleton:
     capable of mimicking the motion of the human body.
 
     Most often, skeletons are configured by parsing information from a text file
-    of some sort. See :class:`pagoda.parser.SkelParser` for more information
+    of some sort. See :class:`pagoda.parser.BodyParser` for more information
     about the format of the text file. Skeletons can also be loaded from text
     files in ASF format; see :class:`pagoda.parser.AsfParser` for more
     information.
@@ -135,16 +135,16 @@ class Skeleton:
         ----------
         source : str or file
             A filename or file-like object that contains text information
-            describing a skeleton. See :class:`pagoda.parser.Parser` for more
-            information about the format of the text file.
+            describing a skeleton. See :class:`pagoda.parser.BodyParser` for
+            more information about the format of the text file.
         '''
         logging.info('%s: parsing skeleton configuration', source)
-        p = parser.SkelParser(self.world, self.jointgroup)
+        p = parser.BodyParser(self.world, self.jointgroup)
         p.parse(source)
         self.roots = [self.world.get_body(r) for r in p.roots]
         self.bodies = p.bodies
         self.joints = p.joints
-        self.set_pid_params(kp=(1 - 1e4) / self.world.dt)
+        self.set_pid_params(kp=0.999 / self.world.dt)
 
     def load_asf(self, source):
         '''Load a skeleton definition from an ASF text file.

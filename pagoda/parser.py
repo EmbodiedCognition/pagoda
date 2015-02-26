@@ -148,7 +148,7 @@ class Parser:
         raise NotImplementedError
 
 
-class SkelParser(Parser):
+class BodyParser(Parser):
     '''This parser class reads a text configuration of a pagoda simulation.
 
     The format for the configuration file follows basic Unix conventions. A
