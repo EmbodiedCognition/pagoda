@@ -510,30 +510,27 @@ class Joint(object):
 
     @property
     def velocities(self):
-        return self.amotor.velocities if self.amotor is not None else ()
+        return _get_params(self.ode_joint, 'Vel', self.dof)
 
     @velocities.setter
     def velocities(self, velocities):
-        if self.amotor is not None:
-            self.amotor.velocities = velocities
+        _set_params(self.ode_joint, 'Vel', velocities, self.dof)
 
     @property
     def max_forces(self):
-        return self.amotor.max_forces if self.amotor is not None else ()
+        return _get_params(self.ode_joint, 'FMax', self.dof)
 
     @max_forces.setter
     def max_forces(self, max_forces):
-        if self.amotor is not None:
-            self.amotor.max_forces = max_forces
+        _set_params(self.ode_joint, 'FMax', max_forces, self.dof)
 
     @property
     def cfms(self):
-        return self.amotor.cfms if self.amotor is not None else ()
+        return _get_params(self.ode_joint, 'CFM', self.dof)
 
     @cfms.setter
     def cfms(self, cfms):
-        if self.amotor is not None:
-            self.amotor.cfms = cfms
+        _set_params(self.ode_joint, 'CFM', cfms, self.dof)
 
     @property
     def lo_stops(self):
@@ -566,10 +563,6 @@ class Joint(object):
     @stop_erps.setter
     def stop_erps(self, stop_erps):
         _set_params(self.ode_joint, 'StopERP', stop_erps, self.ADOF)
-
-    def add_torques(self, torques):
-        if self.amotor is not None:
-            self.amotor.add_torques(torques)
 
 
 class Fixed(Joint):
