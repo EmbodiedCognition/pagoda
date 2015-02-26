@@ -336,17 +336,26 @@ class BodyParser(Parser):
     def _handle_joint(self):
         '''Parse the entirety of a "join" section in the source.'''
         shape = self._next_token(expect='^({})$'.format('|'.join(physics.JOINTS)))
+
         body1 = self._next_token(lower=False)
-        offset1 = self._floats()
+        offset1 = 0, 0, 0
+        if body1 == 'world':
+            body1 = None
+        else:
+            offset1 = self._floats()
+
         body2 = self._next_token(lower=False)
-        offset2 = self._floats()
+        offset2 = 0, 0, 0
+        if body2 == 'world':
+            body2 = None
+        else:
+            offset2 = self._floats()
 
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
 
         token = self._next_token()
         axes = [(1, 0, 0), (0, 1, 0)]
         lo_stops = hi_stops = stop_cfm = stop_erp = None
-        is_passive = False
         while token:
             if token in ('body', 'join'):
                 break

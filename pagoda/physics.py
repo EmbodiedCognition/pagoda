@@ -778,6 +778,10 @@ class World(base.World):
         Returns the location of the shared point, which is often useful to use
         as a joint anchor.
         '''
+        if body_a is None:
+            return self.get_body(body_b).position
+        if body_b is None:
+            return self.get_body(body_a).position
         ba = self.get_body(body_a)
         bb = self.get_body(body_b)
         anchor = ba.body_to_world(offset_a * ba.dimensions / 2)
