@@ -1,0 +1,15 @@
+body box fix lengths 0.2 0.2  0.2   position 0 0 1
+body box arm lengths 0.5 0.05 0.05
+
+join hinge
+fix 0 0 0
+world
+
+join hinge
+fix  1 0 0
+arm -1 0 0
+axis0 0 1 0
+lo_stops -10
+hi_stops  80
+stop_cfm 0.2
+stop_erp 0.2
