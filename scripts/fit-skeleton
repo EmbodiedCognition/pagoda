@@ -12,6 +12,8 @@ logging = climate.get_logger('fit-skeleton')
 
 climate.add_arg('-a', '--markers', metavar='FILE',
                 help='load marker attachments from FILE')
+climate.add_arg('-b', '--bounds', metavar='FILE',
+                help='load parameter bounds from FILE')
 climate.add_arg('-m', '--motion', metavar='FILE',
                 help='load motion data from FILE')
 climate.add_arg('-o', '--output', default='optimized-', metavar='PREFIX',
@@ -55,8 +57,8 @@ def build_cost(args, skeleton, markers):
                      for _ in w.follow_markers(start=args.start_frame,
                                                end=args.end_frame,
                                                states=states)]
-        logging.info('cost %.2f +/- %.2f', np.nanmean(distances), np.nanstd(distances))
-        return np.nanmean(distances) + np.nanstd(distances)
+        logging.info('cost %.4f +/- %.4f', np.nanmean(distances), np.nanstd(distances))
+        return np.nanmean(distances) + 2 * np.nanstd(distances)
     return cost
 
 
@@ -67,15 +69,29 @@ def main(args):
     f = build_cost(args, skeleton, markers)
 
     S = len(skeleton)
-    N = S + len(markers)
-
-    upper = np.zeros((N, ), 'f')
+    upper = np.zeros((S + len(markers), ), 'f')
     upper[:S] = 0.4
     upper[S:] = 1
-
-    lower = np.zeros((N, ), 'f')
+    lower = np.zeros((S + len(markers), ), 'f')
     lower[:S] = 0.03
     lower[S:] = -1
+
+    if args.bounds:
+        with open(args.bounds) as h:
+            logging.info('%s: loading parameter bounds', args.bounds)
+            for l in h:
+                l = l.split('#')[0].strip()
+                if not l:
+                    continue
+                try:
+                    name, lo, hi = l.split()
+                    i = skeleton.fields.index(name)
+                    lower[i] = float(lo)
+                    upper[i] = float(hi)
+                    logging.info('set bound for %s (%d) to (%.4f, %.4f)',
+                                 name, i, lower[i], upper[i])
+                except Exception as e:
+                    logging.exception('error')
 
     res = scipy.optimize.differential_evolution(f, list(zip(lower, upper)))
 
