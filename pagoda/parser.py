@@ -350,9 +350,11 @@ class BodyParser(Parser):
             offset2 = self._floats()
 
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
+        if shape.startswith('fix'):
+            anchor = None
 
         token = self._next_token()
-        axes = [(1, 0, 0), (0, 1, 0)]
+        axes = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
         lo_stops = hi_stops = stop_cfm = stop_erp = None
         while token:
             if token in ('body', 'join'):
@@ -373,15 +375,19 @@ class BodyParser(Parser):
 
         joint = self.world.join(
             shape, body1, body2, anchor=anchor, jointgroup=self.jointgroup)
-        joint.axes = axes[:joint.ADOF]
-        if lo_stops is not None:
-            joint.lo_stops = lo_stops
-        if hi_stops is not None:
-            joint.hi_stops = hi_stops
-        if stop_cfm is not None:
-            joint.stop_cfms = stop_cfm
-        if stop_erp is not None:
-            joint.stop_erps = stop_erp
+        logging.info('%s: dof %d', joint.amotor, joint.amotor.dof)
+
+        if joint.ADOF or joint.LDOF:
+            joint.axes = axes[:max(joint.ADOF, joint.LDOF)]
+
+        if joint.ADOF and lo_stops is not None:
+            joint.amotor.lo_stops = lo_stops
+        if joint.ADOF and hi_stops is not None:
+            joint.amotor.hi_stops = hi_stops
+        if joint.ADOF and stop_cfm is not None:
+            joint.amotor.stop_cfms = stop_cfm
+        if joint.ADOF and stop_erp is not None:
+            joint.amotor.stop_erps = stop_erp
 
         self.joints.append(joint)
 
