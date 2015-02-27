@@ -471,7 +471,7 @@ class World(physics.World):
         for _ in range(max_iters):
             for states in self._step_to_marker_frame(frame_no):
                 pass
-            dist = np.mean(self.markers.distances())
+            dist = np.nanmean(self.markers.distances())
             logging.info('settling to frame %d: marker distance %.3f', frame_no, dist)
             if dist < max_distance:
                 return states
@@ -532,7 +532,7 @@ class World(physics.World):
         self.markers.reposition(frame_no)
         self.markers.attach(frame_no)
 
-        # detect collisions
+        # detect collisions.
         self.ode_space.collide(None, self.on_collision)
 
         # record the state of each skeleton body.
