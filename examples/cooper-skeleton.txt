@@ -6,8 +6,8 @@
 # http://www.emeraldinsight.com/journals.htm?articleid=844037&show=html
 # ... and some guesswork.
 
-body box head      lengths 0.16 0.18 0.20  density 900  position 0 0 2
-body box neck      lengths 0.08 0.08 0.06  density 900
+body box head      lengths 0.14 0.18 0.17  density 900  position 0 0 2
+body box neck      lengths 0.12 0.10 0.06  density 900
 body box u-torso   lengths 0.26 0.20 0.18  density 900
 body box l-torso   lengths 0.24 0.18 0.18  density 900
 body box pelvis    lengths 0.26 0.20 0.16  density 900  root
@@ -38,7 +38,7 @@ body box l-toes    lengths 0.08 0.10 0.04  density 1100  root
 
 # spine
 join ball
-head 0 -0.5 -0.9
+head 0 -0.3 -1
 neck 0  0    1
 lo_stops -30 -30 -85
 hi_stops  60  30  85
@@ -52,14 +52,14 @@ hi_stops  30  30  30
 join ball
 u-torso 0 -1 -1
 l-torso 0 -1  1
-lo_stops -10 -30 -10
-hi_stops  10  30  10
+lo_stops -20 -30 -10
+hi_stops  20  30  10
 
 join ball
 l-torso 0 0 -1
 pelvis  0 0  1
-lo_stops -10 -30 -10
-hi_stops  10  30  10
+lo_stops -20 -30 -10
+hi_stops  20  30  10
 
 # right arm
 join uni
@@ -67,14 +67,14 @@ u-torso   0.5 0  1
 r-collar -1   0 -1
 axis0 0 1 0
 axis1 0 0 1
-lo_stops -30 -30
-hi_stops  30  30
+lo_stops -30 -10
+hi_stops  20  30
 
 join ball
 r-collar 0.6 0 -1
 ru-arm   0   0  1
-lo_stops -150 -70 -30
-hi_stops  150  70  150
+lo_stops  -80 -80 -80
+hi_stops  170  40 120
 
 join uni
 ru-arm 0 0 -1
@@ -161,8 +161,8 @@ join hinge
 r-foot 0  1 -1
 r-toes 0 -1 -1
 axis0 1 0 0
-lo_stops -60
-hi_stops  60
+lo_stops -30
+hi_stops  30
 
 # left leg
 join ball
@@ -190,5 +190,5 @@ join hinge
 l-foot 0  1 -1
 l-toes 0 -1 -1
 axis0 1 0 0
-lo_stops -60
-hi_stops  60
+lo_stops -30
+hi_stops  30
