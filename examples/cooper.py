@@ -11,8 +11,6 @@ def full(name):
 
 def main():
     w = pagoda.cooper.World(dt=1. / 120)
-    w.erp = 0.3
-    w.cfm = 1e-6
     w.load_skeleton(full('cooper-skeleton.txt'))
     w.load_markers(full('cooper-motion.c3d'), full('cooper-markers.txt'))
     pagoda.viewer.Viewer(w).run()
