@@ -208,6 +208,24 @@ class Skeleton:
         '''Get a list of all current body angular velocities in the skeleton.'''
         return as_flat_array(b.angular_velocity for b in self.bodies)
 
+    @property
+    def cfm(self):
+        return self.joints[0].cfm
+
+    @cfm.setter
+    def cfm(self, cfm):
+        for joint in self.joints:
+            joint.cfm = cfm
+
+    @property
+    def erp(self):
+        return self.joints[0].erp
+
+    @erp.setter
+    def erp(self, erp):
+        for joint in self.joints:
+            joint.erp = erp
+
     def indices_for_joint(self, name):
         '''Get a list of the indices for a specific joint.
 

@@ -393,6 +393,8 @@ class World(physics.World):
         self.skeleton.load(filename)
         if pid_params:
             self.skeleton.set_pid_params(**pid_params)
+        self.skeleton.erp = 0.1
+        self.skeleton.cfm = 0
 
     def load_markers(self, filename, attachments, max_frames=1e100):
         '''Load marker data and attachment preferences into the model.
