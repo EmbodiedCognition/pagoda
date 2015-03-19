@@ -507,7 +507,7 @@ class World(physics.World):
                 for states in self._step_to_marker_frame(frame_no):
                     yield states
 
-    def _step_to_marker_frame(self, frame_no):
+    def _step_to_marker_frame(self, frame_no, dt=None):
         '''Update the simulator to a specific frame of marker data.
 
         This method returns a generator of body states for the skeleton! This
@@ -528,6 +528,8 @@ class World(physics.World):
         ----------
         frame_no : int
             Step to this frame of marker data.
+        dt : float, optional
+            Step with this time duration. Defaults to ``self.dt``.
 
         Returns
         -------
@@ -551,7 +553,7 @@ class World(physics.World):
         yield states
 
         # update the ode world.
-        self.ode_world.step(self.dt)
+        self.ode_world.step(dt or self.dt)
 
         # clear out contact joints to prepare for the next frame.
         self.ode_contactgroup.empty()
