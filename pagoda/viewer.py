@@ -446,7 +446,11 @@ class Viewer(Window):
                 shape = dict(radius=b.radius, length=b.length)
             if isinstance(b, physics.Capsule):
                 shape = dict(radius=b.radius, length=b.length)
-            bp = b.__class__(b.name, self.world.ode_world, self.world.ode_space, color=b.color, **shape)
+            bp = b.__class__(b.name,
+                             self.world.ode_world,
+                             self.world.ode_space,
+                             color=tuple(list(b.color[:3]) + [0.5]),
+                             **shape)
             bp.position = b.position
             bp.quaternion = b.quaternion
             bp.is_kinematic = True
