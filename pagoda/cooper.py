@@ -25,7 +25,7 @@ class Markers:
     '''
     '''
 
-    DEFAULT_CFM = 1e-4
+    DEFAULT_CFM = 1e-6
     DEFAULT_ERP = 0.3
 
     def __init__(self, world):
@@ -33,7 +33,6 @@ class Markers:
         self.jointgroup = ode.JointGroup()
         self.joints = []
 
-        self.cfm = Markers.DEFAULT_CFM
         self.erp = Markers.DEFAULT_ERP
         self.root_attachment_factor = 1.
 
@@ -43,6 +42,12 @@ class Markers:
         self.channels = {}
 
         self.data = None
+        self.cfms = None
+
+        # these arrays are derived from the data array.
+        self.visibility = None
+        self.positions = None
+        self.velocities = None
 
     @property
     def num_frames(self):
@@ -163,6 +168,7 @@ class Markers:
             for c in range(self.num_markers):
                 if -1 < prev[c, 3] < 100 and -1 < next[c, 3] < 100:
                     self.velocities[frame_no, c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
+        self.cfms = np.zeros_like(self.visibility) + self.DEFAULT_CFM
 
     def create_bodies(self):
         '''Create physics bodies corresponding to each marker in our data.'''
@@ -265,7 +271,7 @@ class Markers:
             joint.attach(self.marker_bodies[label].ode_body, target.ode_body)
             joint.setAnchor1Rel([0, 0, 0])
             joint.setAnchor2Rel(self.attach_offsets[label])
-            joint.setParam(ode.ParamCFM, self.cfm / f)
+            joint.setParam(ode.ParamCFM, self.cfms[frame_no, j] / f)
             joint.setParam(ode.ParamERP, self.erp)
             self.joints.append(joint)
 
