@@ -22,6 +22,7 @@ Bodies
 .. autosummary::
    :toctree: generated/
 
+   Body
    Box
    Sphere
    Cylinder
@@ -33,6 +34,7 @@ Motors
 .. autosummary::
    :toctree: generated/
 
+   Motor
    AMotor
    LMotor
 
@@ -42,6 +44,7 @@ Joints
 .. autosummary::
    :toctree: generated/
 
+   Joint
    Fixed
    Slider
    Hinge
@@ -76,6 +79,17 @@ Articulated Multi-Joint Bodies
 
    pid
    Skeleton
+
+.. automodule:: pagoda.parser
+   :no-members:
+   :no-inherited-members:
+
+.. autosummary::
+   :toctree: generated/
+
+   Parser
+   BodyParser
+   AsfParser
 
 Cooper (Skeleton-based IK and ID)
 =================================
