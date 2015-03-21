@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name='pagoda',
-    version='0.0.2',
+    version='0.1.0',
     packages=setuptools.find_packages(),
     author='Leif Johnson',
     author_email='leif@cs.utexas.edu',
