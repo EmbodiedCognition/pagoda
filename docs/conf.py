@@ -3,6 +3,15 @@ import sys
 
 import better
 
+from mock import Mock as MagicMock
+
+class Mock(MagicMock):
+    @classmethod
+    def __getattr__(cls, name):
+            return Mock()
+
+sys.modules.update(('ode', Mock())
+
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
