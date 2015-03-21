@@ -16,14 +16,13 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['climate', 'numpy', 'pyglet', 'Open-Dynamics-Engine'],
+    install_requires=['climate', 'numpy', 'pyglet'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
         'Topic :: Scientific/Engineering',
-        'Topic :: Scientific/Engineering :: Artificial Intelligence',
         'Topic :: Scientific/Engineering :: Physics',
         'Topic :: Scientific/Engineering :: Visualization',
         ],
