@@ -10,7 +10,7 @@ class Mock(MagicMock):
     def __getattr__(cls, name):
             return Mock()
 
-sys.modules.update(('ode', Mock())
+sys.modules['ode'] = Mock()
 
 extensions = [
     'sphinx.ext.autodoc',
