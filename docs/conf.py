@@ -11,7 +11,7 @@ class Mock(MagicMock):
             return Mock()
 
 sys.modules['ode'] = Mock()
-sys.modules['GLU'] = Mock()
+sys.modules['pyglet'] = Mock()
 
 extensions = [
     'sphinx.ext.autodoc',
