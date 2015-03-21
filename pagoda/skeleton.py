@@ -10,13 +10,15 @@ logging = climate.get_logger(__name__)
 
 
 def pid(kp=0., ki=0., kd=0., smooth=0.1):
-    '''Create a callable that implements a PID controller.
+    r'''Create a callable that implements a PID controller.
 
-    A PID controller returns a control signal u(t) given a history of error
-    measurements e(0) ... e(t), using proportional (P), integral (I), and
-    derivative (D) terms, according to:
+    A PID controller returns a control signal :math:`u(t)` given a history of
+    error measurements :math:`e(0) \dots e(t)`, using proportional (P), integral
+    (I), and derivative (D) terms, according to:
 
-    u(t) = kp * e(t) + ki * \int_{s=0}^t e(s) ds + kd * \frac{de(s)}{ds}(t)
+    .. math::
+
+       u(t) = kp * e(t) + ki * \int_{s=0}^t e(s) ds + kd * \frac{de(s)}{ds}(t)
 
     The proportional term is just the current error, the integral term is the
     sum of all error measurements, and the derivative term is the instantaneous
@@ -39,7 +41,7 @@ def pid(kp=0., ki=0., kd=0., smooth=0.1):
 
     Returns
     -------
-    (error, dt) -> control
+    controller : callable (float, float) -> float
         Returns a function that accepts an error measurement and a delta-time
         value since the previous measurement, and returns a control signal.
     '''
