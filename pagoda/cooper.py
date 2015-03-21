@@ -387,7 +387,7 @@ class World(physics.World):
         pid_params : dict, optional
             If given, use this dictionary to set the PID controller
             parameters on each joint in the skeleton. See
-            `pagoda.skeleton.pid` for more information.
+            :func:`pagoda.skeleton.pid` for more information.
         '''
         self.skeleton = skeleton.Skeleton(self)
         self.skeleton.load(filename)
@@ -444,12 +444,12 @@ class World(physics.World):
             self.reset()
 
     def reset(self):
-        '''Reset the automatic process that gets called by :method:`step`.
+        '''Reset the automatic process that gets called by :func:`step`.
 
         By default this follows whatever marker data is loaded into our model.
 
         Provide an override for this method to customize the default behavior of
-        the :method:`step` method.
+        the :func:`step` method.
         '''
         self.follower = self.follow_markers()
 
@@ -577,8 +577,8 @@ class World(physics.World):
             defaults to 20N. Set this value higher to simulate a stiff skeleton
             while following marker data.
 
-        Return
-        ------
+        Returns
+        -------
         angles : sequence of angle frames
             Returns a generator of joint angle data for the skeleton. One set of
             joint angles will be generated for each frame of marker data between

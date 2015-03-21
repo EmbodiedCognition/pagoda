@@ -160,8 +160,7 @@ class BodyParser(Parser):
     - body -- indicates the definition of a new rigid body;
     - join -- indicates that two bodies will be joined together.
 
-    Bodies
-    ------
+    **Bodies**
 
     A "body" section must contain the following information:
 
@@ -195,8 +194,7 @@ class BodyParser(Parser):
 
     - root -- indicates that this body is a root in the skeleton.
 
-    Joints
-    ------
+    **Joints**
 
     A "join" section must contain the following information:
 
@@ -225,8 +223,7 @@ class BodyParser(Parser):
 
     - stop_erp N -- set the lo- and hi-stop ERP for DOFs on this joint.
 
-    Example
-    -------
+    **Example**
 
     A simple example is probably sufficient to get started; also see the
     ``cooper-skeleton.txt`` file distributed with the pagoda source for a more

@@ -86,18 +86,18 @@ class Skeleton:
 
     Parameters
     ----------
-    world : class:`pagoda.physics.World`
+    world : :class:`pagoda.physics.World`
         A world object that holds bodies and joints for physics simulation.
 
     Attributes
     ----------
-    bodies : list of class:`pagoda.physics.Body`
+    bodies : list of :class:`pagoda.physics.Body`
         A list of the rigid bodies that comprise this skeleton.
 
-    joints : list of class:`pagoda.physics.Joint`
+    joints : list of :class:`pagoda.physics.Joint`
         A list of the joints that connect bodies in this skeleton.
 
-    roots : list of class:`pagoda.physics.Body`
+    roots : list of :class:`pagoda.physics.Body`
         A list of rigid bodies that are considered "roots" in the skeleton.
         Roots are given special treatment when modeling movement of the
         skeleton; for instance, when using ASM data, the skeleton root is
