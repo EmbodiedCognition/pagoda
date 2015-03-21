@@ -8,7 +8,12 @@ import numpy as np
 import os
 import pyglet
 
-from pyglet.gl import *
+# normally this import should work; the try/except here is so the documentation
+# will build on readthedocs.org!
+try:
+    from pyglet.gl import *
+except ImportError:
+    pass
 
 logging = climate.get_logger(__name__)
 
