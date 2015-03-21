@@ -229,9 +229,11 @@ class BodyParser(Parser):
     ``cooper-skeleton.txt`` file distributed with the pagoda source for a more
     complete example.
 
-    | body box foo-body lengths 0.5 0.3 0.2    position 0 0 2
-    | body sph bar      radius 0.1
-    | body cap baz      radius 0.1 length 0.3  root
+    .. code-block:: shell
+
+      body box foo-body lengths 0.5 0.3 0.2    position 0 0 2
+      body sph bar      radius 0.1
+      body cap baz      radius 0.1 length 0.3  root
 
     This section of the example causes three bodies to be created:
 
@@ -245,10 +247,12 @@ class BodyParser(Parser):
       (the total length of this geometry is actually 50cm due to the
       hemispherical cylinder end caps). This body is a root of the skeleton.
 
-    | join hinge  foo-body 1 0 0  bar 0 -1 0
-    | lo_stops -10
-    | hi_stops  20
-    | join ball   bar      0 0 0  baz 0  0 1
+    .. code-block:: shell
+
+      join hinge  foo-body 1 0 0  bar 0 -1 0
+      lo_stops -10
+      hi_stops  20
+      join ball   bar      0 0 0  baz 0  0 1
 
     This section joins the three bodies together:
 
