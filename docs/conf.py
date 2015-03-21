@@ -10,7 +10,7 @@ class Mock(MagicMock):
     def __getattr__(cls, name):
             return Mock()
 
-sys.modules.update((mod, Mock()) for mod in 'ode pyglet'.split())
+sys.modules.update((mod, Mock()) for mod in 'ode'.split())
 
 extensions = [
     'sphinx.ext.autodoc',

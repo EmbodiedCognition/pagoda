@@ -1,3 +1,4 @@
 mock
 numpydoc
 sphinx-better-theme
+pyopengl
