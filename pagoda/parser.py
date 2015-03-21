@@ -12,7 +12,7 @@ TAU = 2 * np.pi
 FLOAT_RE = r'^[-+]?\d+(\.\d*)?([efgEFG][-+]?\d+(\.\d*)?)?$'
 
 
-class Parser:
+class Parser(object):
     '''Base class for skeleton parsers of various sorts.
     '''
 
@@ -404,7 +404,6 @@ class AsfParser(Parser):
     body. It notably omits the dimensions and masses of the rigid bodies that
     connect the joints together, so we need additional information to construct
     a skeleton in the physics simulator.
-
     '''
 
     TOPLEVEL_TOKENS = 'version name units documentation root bonedata hierarchy'.split()
