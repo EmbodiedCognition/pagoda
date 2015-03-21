@@ -91,8 +91,8 @@ Articulated Multi-Joint Bodies
    BodyParser
    AsfParser
 
-Cooper (Skeleton-based IK and ID)
-=================================
+Articulated IK and ID
+=====================
 
 .. automodule:: pagoda.cooper
    :no-members:
