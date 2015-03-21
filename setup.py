@@ -8,7 +8,7 @@ setuptools.setup(
     author='Leif Johnson',
     author_email='leif@cs.utexas.edu',
     description='yet another OpenGL-with-physics simulation framework',
-    long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.md')).read(),
+    long_description=open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'README.rst')).read(),
     license='MIT',
     url='http://github.com/EmbodiedCognition/py-sim/',
     keywords=('simulation '
