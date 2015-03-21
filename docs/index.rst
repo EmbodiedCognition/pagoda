@@ -7,7 +7,7 @@ Dynamics Engine (ODE)`_, a physics simulator, with Pyglet_, a package for
 relatively painless graphics. This package provides some additional classes that
 make it even easier to construct, simulate, and visualize physical worlds.
 
-.. _Open Dynamics Engine: http://ode.org
+.. _Open Dynamics Engine (ODE): http://ode.org
 .. _Pyglet: http://pyglet.org
 
 The package defines Pythonic wrappers for all of the Body and most of the Joint
