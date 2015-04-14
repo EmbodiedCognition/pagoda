@@ -191,6 +191,7 @@ class Window(pyglet.window.Window):
         self.frame_no = 0
         self.paused = paused
         self.saved_frames = None
+        self._saved_frame = 0
         self.view = View(zoom=4.666, ty=0.23, tz=-0.5, ry=27, rz=-50)
 
         self.on_resize(self.width, self.height)
@@ -285,7 +286,8 @@ class Window(pyglet.window.Window):
     def save_frame(self, dt=None):
         if self.saved_frames is None:
             return
-        bn = 'frame-{:05d}.png'.format(self.frame_no)
+        bn = 'frame-{:05d}.png'.format(self._saved_frame)
+        self._saved_frame += 1
         fn = os.path.join(self.saved_frames, bn)
         logging.info('saving frame %s', fn)
         pyglet.image.get_buffer_manager().get_color_buffer().save(fn)
@@ -429,7 +431,7 @@ class Viewer(Window):
 
     def run(self, render_dt=1 / 30, movie=None):
         super(Viewer, self).run(
-            step_dt=self.world.dt, render_dt=1 / 60, movie=movie)
+            step_dt=self.world.dt, render_dt=render_dt, movie=movie)
 
     def step(self, dt):
         if self.world.step():
