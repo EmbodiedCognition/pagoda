@@ -72,7 +72,7 @@ class Markers:
             return dict((c, i) for i, c in enumerate(channels))
         return channels or {}
 
-    def load_csv(self, filename, start_frame=0, max_frames=int(1e300)):
+    def load_csv(self, filename, start_frame=10, max_frames=int(1e300)):
         '''Load marker data from a CSV file.
 
         The file will be imported using Pandas, which must be installed to use
@@ -93,7 +93,7 @@ class Markers:
         compression = None
         if filename.endswith('.gz'):
             compression = 'gzip'
-        df = pd.read_csv(filename, compression=compression).set_index('time')
+        df = pd.read_csv(filename, compression=compression).set_index('time').fillna(-1)
 
         # make sure the data frame's time index matches our world.
         assert self.world.dt == pd.Series(df.index).diff().mean()
