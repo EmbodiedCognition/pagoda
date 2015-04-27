@@ -588,6 +588,9 @@ class Joint(object):
     def stop_erps(self, stop_erps):
         _set_params(self.ode_joint, 'StopERP', stop_erps, self.ADOF)
 
+    def add_torques(self, *torques):
+        self.amotor.add_torques(*torques)
+
 
 class Fixed(Joint):
     ADOF = 0
