@@ -273,6 +273,7 @@ class Markers:
             joint.setAnchor2Rel(self.attach_offsets[label])
             joint.setParam(ode.ParamCFM, self.cfms[frame_no, j] / f)
             joint.setParam(ode.ParamERP, self.erp)
+            joint.name = label
             self.joints.append(joint)
 
     def reposition(self, frame_no):
