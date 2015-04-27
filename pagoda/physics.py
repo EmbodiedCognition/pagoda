@@ -534,27 +534,27 @@ class Joint(object):
 
     @property
     def velocities(self):
-        return _get_params(self.ode_joint, 'Vel', self.dof)
+        return _get_params(self.ode_joint, 'Vel', self.ADOF)
 
     @velocities.setter
     def velocities(self, velocities):
-        _set_params(self.ode_joint, 'Vel', velocities, self.dof)
+        _set_params(self.ode_joint, 'Vel', velocities, self.ADOF)
 
     @property
     def max_forces(self):
-        return _get_params(self.ode_joint, 'FMax', self.dof)
+        return _get_params(self.ode_joint, 'FMax', self.ADOF)
 
     @max_forces.setter
     def max_forces(self, max_forces):
-        _set_params(self.ode_joint, 'FMax', max_forces, self.dof)
+        _set_params(self.ode_joint, 'FMax', max_forces, self.ADOF)
 
     @property
     def cfms(self):
-        return _get_params(self.ode_joint, 'CFM', self.dof)
+        return _get_params(self.ode_joint, 'CFM', self.ADOF)
 
     @cfms.setter
     def cfms(self, cfms):
-        _set_params(self.ode_joint, 'CFM', cfms, self.dof)
+        _set_params(self.ode_joint, 'CFM', cfms, self.ADOF)
 
     @property
     def lo_stops(self):
