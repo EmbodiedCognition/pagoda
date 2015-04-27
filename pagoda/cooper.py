@@ -601,7 +601,8 @@ class World(physics.World):
         angles : ndarray (num-frames x num-dofs)
             Follow angle data provided by this array of angle values.
         start : int, optional
-            Start following angle data after this frame. Defaults to 0.
+            Start following angle data after this frame. Defaults to the start
+            of the angle data.
         end : int, optional
             Stop following angle data after this frame. Defaults to the end of
             the angle data.
@@ -622,7 +623,6 @@ class World(physics.World):
             of joint torques will be generated for each frame of angle data
             between `start` and `end`.
         '''
-        angles = angles[start:end]
         for i, states in enumerate(self.follow_markers(start, end, states)):
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
@@ -631,7 +631,7 @@ class World(physics.World):
             # will be stepping the model using the computed torques.
 
             self.skeleton.enable_motors(max_force)
-            self.skeleton.set_target_angles(angles[i])
+            self.skeleton.set_target_angles(angles[start + i])
 
             self.ode_world.step(self.dt)
 
