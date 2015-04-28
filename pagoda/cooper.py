@@ -149,7 +149,7 @@ class Markers:
             self.data = np.array(data)
 
             # scale the data to meters -- mm is a very common C3D unit.
-            if reader['POINT:UNITS'].string_value.strip().lower() == 'mm':
+            if reader.get('POINT:UNITS').string_value.strip().lower() == 'mm':
                 logging.info('scaling point data from mm to m')
                 self.data[:, :, :3] /= 1000.
 
