@@ -624,6 +624,7 @@ class World(physics.World):
             of joint torques will be generated for each frame of angle data
             between `start` and `end`.
         '''
+        self.skeleton.enable_motors(max_force)
         for i, states in enumerate(self.follow_markers(start, end, states)):
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
@@ -631,15 +632,15 @@ class World(physics.World):
             # stepping using angle constraints will be removed, because we
             # will be stepping the model using the computed torques.
 
-            self.skeleton.enable_motors(max_force)
+            #self.skeleton.enable_motors(max_force)
             self.skeleton.set_target_angles(angles[start + i])
 
             self.ode_world.step(self.dt)
 
             torques = self.skeleton.joint_torques
-            self.skeleton.disable_motors()
-            self.skeleton.set_body_states(states)
-            self.skeleton.add_torques(torques)
+            #self.skeleton.disable_motors()
+            #self.skeleton.set_body_states(states)
+            #self.skeleton.add_torques(torques)
             yield torques
 
     def forward_dynamics(self, torques, start=0, states=None):
