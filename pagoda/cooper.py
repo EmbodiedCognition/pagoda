@@ -314,7 +314,7 @@ class Markers:
         forces : list of float
             A list of the force exerted by each marker spring attachment.
         '''
-        return [j.getFeedback()[0] for j in self.joints]
+        return [j.getFeedback()[-1] for j in self.joints]
 
 
 class World(physics.World):
