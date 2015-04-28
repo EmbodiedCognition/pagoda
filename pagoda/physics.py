@@ -274,6 +274,7 @@ class Motor(object):
         self.ode_motor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_motor.setFeedback(feedback)
         self.ode_motor.setNumAxes(dof)
+        self.cfms = 1e-8
 
     @property
     def feedback(self):
