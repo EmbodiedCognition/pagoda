@@ -10,8 +10,8 @@ TakeoMonday:RBAC u-torso 0.3 -1  0
 TakeoMonday:T10  l-torso 0   -1  1
 
 TakeoMonday:RBWT pelvis  0.3 -1 0.5
-TakeoMonday:RFWT pelvis  1    1 0.5
-TakeoMonday:LFWT pelvis -1    1 0.5
+TakeoMonday:RFWT pelvis  0.8  1 0.3
+TakeoMonday:LFWT pelvis -0.8  1 0.3
 TakeoMonday:LBWT pelvis -0.3 -1 0.5
 
 TakeoMonday:LSHO l-collar -0.5 0  1
@@ -20,7 +20,7 @@ TakeoMonday:LELB lu-arm    0   0 -1
 TakeoMonday:LFRM ll-arm   -1   0 -0.2
 TakeoMonday:LWRA ll-arm    1   0 -1
 TakeoMonday:LWRB ll-arm   -1   0 -1
-TakeoMonday:LFIN l-palm    0   1  0
+TakeoMonday:LFIN l-hand    0   1  0
 
 TakeoMonday:RSHO r-collar 0 0  1
 TakeoMonday:RUPA ru-arm   1 0  0.3
@@ -28,7 +28,7 @@ TakeoMonday:RELB ru-arm   0 0 -1
 TakeoMonday:RFRM rl-arm   1 0  0.2
 TakeoMonday:RWRA rl-arm  -1 0 -1
 TakeoMonday:RWRB rl-arm   1 0 -1
-TakeoMonday:RFIN r-palm   0 1  0
+TakeoMonday:RFIN r-hand   0 1  0
 
 TakeoMonday:LTHI lu-leg -1   -0.2 -0.3
 TakeoMonday:LKNE lu-leg  0    0   -1
