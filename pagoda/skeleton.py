@@ -271,22 +271,18 @@ class Skeleton:
                 return list(range(j * step, (j + 1) * step))
         return []
 
-    def joint_rms(self):
-        '''Get the current RMS joint separations for the skeleton.
+    def joint_distances(self):
+        '''Get the current joint separations for the skeleton.
 
         Returns
         -------
-        float :
-            A scalar value expressing the RMS distance, over all joints in the
-            skeleton, between the two anchor points in the joint. This quantity
-            describes how "exploded" the bodies in the skeleton are. A value of
-            0 indicates that all joint constraints are perfectly satisfied.
+        distances : list of float
+            A list expressing the distance between the two joint anchor points,
+            for each joint in the skeleton. These quantities describe how
+            "exploded" the bodies in the skeleton are; a value of 0 indicates
+            that the constraints are perfectly satisfied for that joint.
         '''
-        deltas = []
-        for joint in self.joints:
-            delta = np.array(joint.anchor) - joint.anchor2
-            deltas.append((delta * delta).sum())
-        return np.sqrt(np.mean(deltas))
+        return [((np.array(j.anchor) - j.anchor2) ** 2).sum() for j in self.joints]
 
     def get_body_states(self):
         '''Return a list of the states of all bodies in the skeleton.'''

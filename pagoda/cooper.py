@@ -149,7 +149,7 @@ class Markers:
             self.data = np.array(data)
 
             # scale the data to meters -- mm is a very common C3D unit.
-            if reader['POINT:UNITS'].string_value.strip().lower() == 'mm':
+            if reader.get('POINT:UNITS').string_value.strip().lower() == 'mm':
                 logging.info('scaling point data from mm to m')
                 self.data[:, :, :3] /= 1000.
 
@@ -273,6 +273,7 @@ class Markers:
             joint.setAnchor2Rel(self.attach_offsets[label])
             joint.setParam(ode.ParamCFM, self.cfms[frame_no, j] / f)
             joint.setParam(ode.ParamERP, self.erp)
+            joint.name = label
             self.joints.append(joint)
 
     def reposition(self, frame_no):
@@ -313,7 +314,7 @@ class Markers:
         forces : list of float
             A list of the force exerted by each marker spring attachment.
         '''
-        return [j.getFeedback()[0] for j in self.joints]
+        return [j.getFeedback()[-1] for j in self.joints]
 
 
 class World(physics.World):
@@ -601,7 +602,8 @@ class World(physics.World):
         angles : ndarray (num-frames x num-dofs)
             Follow angle data provided by this array of angle values.
         start : int, optional
-            Start following angle data after this frame. Defaults to 0.
+            Start following angle data after this frame. Defaults to the start
+            of the angle data.
         end : int, optional
             Stop following angle data after this frame. Defaults to the end of
             the angle data.
@@ -622,7 +624,7 @@ class World(physics.World):
             of joint torques will be generated for each frame of angle data
             between `start` and `end`.
         '''
-        angles = angles[start:end]
+        self.skeleton.enable_motors(max_force)
         for i, states in enumerate(self.follow_markers(start, end, states)):
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
@@ -630,15 +632,15 @@ class World(physics.World):
             # stepping using angle constraints will be removed, because we
             # will be stepping the model using the computed torques.
 
-            self.skeleton.enable_motors(max_force)
-            self.skeleton.set_target_angles(angles[i])
+            #self.skeleton.enable_motors(max_force)
+            self.skeleton.set_target_angles(angles[start + i])
 
             self.ode_world.step(self.dt)
 
             torques = self.skeleton.joint_torques
-            self.skeleton.disable_motors()
-            self.skeleton.set_body_states(states)
-            self.skeleton.add_torques(torques)
+            #self.skeleton.disable_motors()
+            #self.skeleton.set_body_states(states)
+            #self.skeleton.add_torques(torques)
             yield torques
 
     def forward_dynamics(self, torques, start=0, states=None):
