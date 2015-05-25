@@ -333,7 +333,8 @@ class Skeleton:
         '''
         for joint in self.joints:
             joint.max_forces = max_force
-            joint.amotor.ode_motor.setFeedback(True)
+            joint.amotor.max_forces = max_force
+            joint.amotor.ode_motor.setFeedback(max_force > 0)
 
     def disable_motors(self):
         '''Disable joint motors in this skeleton.
@@ -341,9 +342,7 @@ class Skeleton:
         This method sets to 0 the maximum force that joint motors are allowed to
         apply, in addition to disabling torque feedback.
         '''
-        for joint in self.joints:
-            joint.max_forces = 0
-            joint.amotor.ode_motor.setFeedback(False)
+        self.enable_motors(0)
 
     def set_target_angles(self, angles):
         '''Move each joint toward a target angle.
