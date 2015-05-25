@@ -15,8 +15,7 @@ body box pelvis    lengths 0.26 0.20 0.16  density 900  root
 body box r-collar  lengths 0.17 0.12 0.05
 body box ru-arm    lengths 0.07 0.10 0.34
 body box rl-arm    lengths 0.07 0.05 0.25  density 1100
-body box r-palm    lengths 0.08 0.03 0.07  density 1100
-body box r-fingers lengths 0.08 0.03 0.08  density 1100
+body box r-hand    lengths 0.08 0.03 0.12  density 1100
 
 body box ru-leg    lengths 0.13 0.16 0.45
 body box rl-leg    lengths 0.12 0.12 0.40  density 1100
@@ -26,8 +25,7 @@ body box r-toes    lengths 0.08 0.10 0.04  density 1100  root
 body box l-collar  lengths 0.17 0.12 0.05
 body box lu-arm    lengths 0.07 0.10 0.34
 body box ll-arm    lengths 0.07 0.05 0.25  density 1100
-body box l-palm    lengths 0.08 0.03 0.07  density 1100
-body box l-fingers lengths 0.08 0.03 0.08  density 1100
+body box l-hand    lengths 0.08 0.03 0.12  density 1100
 
 body box lu-leg    lengths 0.13 0.16 0.45
 body box ll-leg    lengths 0.12 0.12 0.40  density 1100
@@ -86,17 +84,10 @@ hi_stops    1  70
 
 join hinge
 rl-arm 0 -1 -1
-r-palm 0 -1  1
+r-hand 0 -1  1
 axis0 1 0 0
 lo_stops -70
 hi_stops  70
-
-join hinge
-r-palm    0 0 -1
-r-fingers 0 0  1
-axis0 1 0 0
-lo_stops -90
-hi_stops  30
 
 # left arm
 join uni
@@ -123,17 +114,10 @@ hi_stops    1  70
 
 join hinge
 ll-arm 0 -1 -1
-l-palm 0 -1  1
+l-hand 0 -1  1
 axis0 1 0 0
 lo_stops -70
 hi_stops  70
-
-join hinge
-l-palm    0 0 -1
-l-fingers 0 0  1
-axis0 1 0 0
-lo_stops -90
-hi_stops  30
 
 # right leg
 join ball
