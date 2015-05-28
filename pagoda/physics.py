@@ -374,6 +374,12 @@ class Motor(object):
     def stop_erps(self, stop_erps):
         _set_params(self.ode_motor, 'StopERP', stop_erps, self.ADOF)
 
+    def enable_feedback(self):
+        self.ode_motor.setFeedback(True)
+
+    def disable_feedback(self):
+        self.ode_motor.setFeedback(False)
+
 
 class AMotor(Motor):
     '''An AMotor applies forces to change an angle in the physics world.
@@ -591,6 +597,12 @@ class Joint(object):
 
     def add_torques(self, *torques):
         self.amotor.add_torques(*torques)
+
+    def enable_feedback(self):
+        self.ode_joint.setFeedback(True)
+
+    def disable_feedback(self):
+        self.ode_joint.setFeedback(False)
 
 
 class Fixed(Joint):
