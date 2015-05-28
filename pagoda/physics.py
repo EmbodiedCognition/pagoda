@@ -21,6 +21,7 @@ class Body(object):
 
     def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
         self.name = name
+        self.world = world
         self.shape = shape
         self.color = color
 
@@ -259,8 +260,48 @@ class Body(object):
             op(force)
 
     def add_torque(self, torque, relative=False):
+        '''Add a torque to this body.
+
+        Parameters
+        ----------
+        force : 3-tuple of float
+            A vector giving the torque along each world or body coordinate axis.
+        relative : bool, optional
+            If False, the torque values are assumed to be given in the world
+            coordinate frame. If True, they are assumed to be given in the
+            body-relative coordinate frame. Defaults to False.
+        '''
         op = self.ode_body.addRelTorque if relative else self.ode_body.addTorque
         op(torque)
+
+    def connect_to(self, offset, other_body, other_offset, joint, **kwargs):
+        '''Move another body next to this one and join them together.
+
+        This method will move the ``other_body`` so that the anchor points for
+        the joint coincide. It then creates a joint to fasten the two bodies
+        together. See :func:`World.move_next_to` and :func:`World.join`.
+
+        Parameters
+        ----------
+        offset : 3-tuple of float
+            The body-relative offset where the anchor for the joint should be
+            placed. The offset is given as a fraction of the extent of the
+            body along each of its axes. For example, offset (0, 0, 0) is the
+            center of the body, while (0.5, -0.2, 0.1) describes a point
+            halfway from the center towards the maximum x-extent of the body,
+            20% of the way from the center towards the minimum y-extent, and
+            10% of the way from the center towards the maximum z-extent.
+        other_body : :class:`Body`
+            The other body to join with this one.
+        other_offset : 3-tuple of float
+            The offset on the second body where the joint anchor should be
+            placed. Like ``offset``, this is given as an offset relative to the
+            size and shape of ``other_body``.
+        joint : str
+            The type of joint to use when connecting these bodies.
+        '''
+        self.world.move_next_to(self, other_body, offset, other_offset)
+        self.world.join(joint, self, other_body, **kwargs)
 
 
 class Box(Body):
