@@ -274,6 +274,22 @@ class Body(object):
         op = self.ode_body.addRelTorque if relative else self.ode_body.addTorque
         op(torque)
 
+    def join_to(self, joint, other_body=None, **kwargs):
+        '''Connect this body to another one using a joint.
+
+        This method creates a joint to fasten this body to the other one. See
+        :func:`World.join`.
+
+        Parameters
+        ----------
+        joint : str
+            The type of joint to use when connecting these bodies.
+        other_body : :class:`Body`, optional
+            The other body to join with this one. If not given, connects this
+            body to the world.
+        '''
+        self.world.join(joint, self, other_body, **kwargs)
+
     def connect_to(self, other_body, joint, offset=(0, 0, 0), other_offset=(0, 0, 0), **kwargs):
         '''Move another body next to this one and join them together.
 
