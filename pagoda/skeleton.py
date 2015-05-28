@@ -328,7 +328,6 @@ class Skeleton:
             target velocity.
         '''
         for joint in self.joints:
-            joint.max_forces = max_force
             joint.amotor.max_forces = max_force
             if max_force > 0:
                 joint.amotor.enable_feedback()
