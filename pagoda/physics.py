@@ -497,7 +497,7 @@ class Joint(object):
                                  feedback=feedback,
                                  jointgroup=jointgroup,
                                  dof=self.ADOF,
-                                 mode='euler')
+                                 mode='euler' if self.ADOF == 3 else 'user')
         self.lmotor = None
         if self.LDOF > 0:
             self.lmotor = LMotor(name=name + ':lmotor',
