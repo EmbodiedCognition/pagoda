@@ -15,6 +15,7 @@ Physics wrapper
    make_quaternion
    center_of_mass
    World
+   Constraints
 
 Bodies
 ------
