@@ -37,26 +37,44 @@ class Body(object):
 
     @property
     def mass(self):
+        '''The ODE mass object for this body.'''
         return self.ode_body.getMass()
 
     @property
     def position(self):
+        '''The (x, y, z) coordinates of the center of this body.'''
         return self.ode_body.getPosition()
 
     @position.setter
     def position(self, position):
+        '''Set the (x, y, z) coordinates of the center of this body.
+
+        Parameters
+        ----------
+        position : 3-tuple of float
+            The coordinates of the desired center of this body.
+        '''
         self.ode_body.setPosition(position)
 
     @property
     def rotation(self):
+        '''The rotation matrix for this body.'''
         return self.ode_body.getRotation()
 
     @rotation.setter
     def rotation(self, rotation):
+        '''Set the rotation of this body using a rotation matrix.
+
+        Parameters
+        ----------
+        rotation : sequence of 9 floats
+            The desired rotation matrix for this body.
+        '''
         self.ode_body.setRotation(rotation)
 
     @property
     def quaternion(self):
+        '''The (w, x, y, z) rotation quaternion for this body.'''
         return self.ode_body.getQuaternion()
 
     @quaternion.setter
@@ -65,42 +83,86 @@ class Body(object):
 
     @property
     def linear_velocity(self):
+        '''Current linear velocity of this body (in world coordinates).'''
         return self.ode_body.getLinearVel()
 
     @linear_velocity.setter
     def linear_velocity(self, velocity):
+        '''Set the linear velocity for this body.
+
+        Parameters
+        ----------
+        velocity : 3-tuple of float
+            The desired velocity for this body, in world coordinates.
+        '''
         self.ode_body.setLinearVel(velocity)
 
     @property
     def angular_velocity(self):
+        '''Current angular velocity of this body (in world coordinates).'''
         return self.ode_body.getAngularVel()
 
     @angular_velocity.setter
     def angular_velocity(self, velocity):
+        '''Set the angular velocity for this body.
+
+        Parameters
+        ----------
+        velocity : 3-tuple of float
+            The desired angular velocity for this body, in world coordinates.
+        '''
         self.ode_body.setAngularVel(velocity)
 
     @property
     def force(self):
+        '''Current net force acting on this body (in world coordinates).'''
         return self.ode_body.getForce()
 
     @force.setter
     def force(self, force):
+        '''Set the force acting on this body.
+
+        Parameters
+        ----------
+        force : 3-tuple of float
+            The desired force acting on this body, in world coordinates.
+        '''
         self.ode_body.setForce(force)
 
     @property
     def torque(self):
+        '''Current net torque acting on this body (in world coordinates).'''
         return self.ode_body.getTorque()
 
     @torque.setter
     def torque(self, torque):
+        '''Set the torque acting on this body.
+
+        Parameters
+        ----------
+        torque : 3-tuple of float
+            The desired torque acting on this body, in world coordinates.
+        '''
         self.ode_body.setTorque(torque)
 
     @property
     def is_kinematic(self):
+        '''True iff this body is kinematic.'''
         return self.ode_body.isKinematic()
 
     @is_kinematic.setter
     def is_kinematic(self, is_kinematic):
+        '''Set the kinematic/dynamic attribute for this body.
+
+        In pagoda, kinematic bodies have infinite mass and do interact with
+        other bodies via collisions.
+
+        Parameters
+        ----------
+        is_kinematic : bool
+            If True, this body will be set to kinematic. If False, it will be
+            set to dynamic.
+        '''
         if is_kinematic:
             self.ode_body.setKinematic()
         else:
@@ -108,22 +170,83 @@ class Body(object):
 
     @property
     def follows_gravity(self):
+        '''True iff this body follows gravity.'''
         return self.ode_body.getGravityMode()
 
     @follows_gravity.setter
     def follows_gravity(self, follows_gravity):
+        '''Set whether this body follows gravity.
+
+        Parameters
+        ----------
+        follows_gravity : bool
+            This body will follow gravity iff this parameter is True.
+        '''
         self.ode_body.setGravity(follows_gravity)
 
     def rotate_to_body(self, x):
+        '''Rotate the given vector to the same orientation as this body.
+
+        Parameters
+        ----------
+        x : 3-tuple of float
+            A point in three dimensions.
+
+        Returns
+        -------
+        xrot : 3-tuple of float
+            The same point after rotation into the orientation of this body.
+        '''
         return np.dot(x, np.array(self.rotation).reshape((3, 3)))
 
     def body_to_world(self, position):
+        '''Convert a body-relative offset to world coordinates.
+
+        Parameters
+        ----------
+        position : 3-tuple of float
+            A tuple giving body-relative offsets.
+
+        Returns
+        -------
+        position : 3-tuple of float
+            A tuple giving the world coordinates of the given offset.
+        '''
         return self.ode_body.getRelPointPos(position)
 
     def world_to_body(self, position):
+        '''Convert a point in world coordinates to a body-relative offset.
+
+        Parameters
+        ----------
+        position : 3-tuple of float
+            A world coordinates position.
+
+        Returns
+        -------
+        offset : 3-tuple of float
+            A tuple giving the body-relative offset of the given position.
+        '''
         return self.ode_body.getPosRelPoint(position)
 
     def add_force(self, force, relative=False, position=None, relative_position=None):
+        '''Add a force to this body.
+
+        Parameters
+        ----------
+        force : 3-tuple of float
+            A vector giving the forces along each world or body coordinate axis.
+        relative : bool, optional
+            If False, the force values are assumed to be given in the world
+            coordinate frame. If True, they are assumed to be given in the
+            body-relative coordinate frame. Defaults to False.
+        position : 3-tuple of float, optional
+            If given, apply the force at this location in world coordinates.
+            Defaults to the current position of the body.
+        relative_position : 3-tuple of float, optional
+            If given, apply the force at this relative location on the body. If
+            given, this method ignores the ``position`` parameter.
+        '''
         b = self.ode_body
         if relative_position is not None:
             op = b.addRelForceAtRelPos if relative else b.addForceAtRelPos
@@ -851,46 +974,121 @@ class World(base.World):
 
     @property
     def gravity(self):
+        '''Current gravity vector in the world.'''
         return self.ode_world.getGravity()
 
     @gravity.setter
     def gravity(self, gravity):
+        '''Set the gravity vector in the world.
+
+        Parameters
+        ----------
+        gravity : 3-tuple of float
+            The vector where gravity should point.
+        '''
         return self.ode_world.setGravity(gravity)
 
     @property
     def cfm(self):
+        '''Current default CFM value for the world.'''
         return self.ode_world.getCFM()
 
     @cfm.setter
     def cfm(self, cfm):
+        '''Set the current default CFM value in the world.
+
+        Parameters
+        ----------
+        cfm : float
+            The CFM value that should be the world default.
+        '''
         return self.ode_world.setCFM(cfm)
 
     @property
     def erp(self):
+        '''Current default ERP value for the world.'''
         return self.ode_world.getERP()
 
     @erp.setter
     def erp(self, erp):
+        '''Set the current default ERP value in the world.
+
+        Parameters
+        ----------
+        erp : float
+            The ERP value that should be the world default.
+        '''
         return self.ode_world.setERP(erp)
 
     @property
     def bodies(self):
+        '''Sequence of all bodies in the world, sorted by name.'''
         for k in sorted(self._bodies):
             yield self._bodies[k]
 
     @property
     def joints(self):
+        '''Sequence of all joints in the world, sorted by name.'''
         for k in sorted(self._joints):
             yield self._joints[k]
 
     def get_body(self, name):
+        '''Get a body by name.
+
+        Parameters
+        ----------
+        name : str
+            The name of a body to look up.
+
+        Raises
+        ------
+        KeyError :
+            If no such body exists in the world.
+
+        Returns
+        -------
+        body : :class:`Body`
+            The body in the world with the given name.
+        '''
         return self._bodies[name]
 
     def get_joint(self, name):
+        '''Get a joint by name.
+
+        Parameters
+        ----------
+        name : str
+            The name of a joint to look up.
+
+        Raises
+        ------
+        KeyError :
+            If no such joint exists in the world.
+
+        Returns
+        -------
+        joint : :class:`Joint`
+            The joint in the world with the given name.
+        '''
         return self._joints[name]
 
     def create_body(self, shape, name=None, **kwargs):
-        '''Create a new body.'''
+        '''Create a new body.
+
+        Parameters
+        ----------
+        shape : str
+            The "shape" of the body to be created. This should name a type of
+            body object, e.g., "box" or "cap".
+        name : str, optional
+            The name to use for this body. If not given, a default name will be
+            constructed of the form "{shape}{# of objects in the world}".
+
+        Returns
+        -------
+        body : :class:`Body`
+            The created body object.
+        '''
         shape = shape.lower()
         if name is None:
             for i in range(1 + len(self._bodies)):
@@ -902,7 +1100,30 @@ class World(base.World):
         return body
 
     def join(self, shape, body_a, body_b=None, name=None, **kwargs):
-        '''Create a new joint that connects two bodies together.'''
+        '''Create a new joint that connects two bodies together.
+
+        Parameters
+        ----------
+        shape : str
+            The "shape" of the joint to use for joining together two bodies.
+            This should name a type of joint, such as "ball" or "piston".
+        body_a : str or :class:`Body`
+            The first body to join together with this joint. If a string is
+            given, it will be used as the name of a body to look up in the
+            world.
+        body_b : str or :class:`Body`, optional
+            If given, identifies the second body to join together with
+            ``body_a``. If not given, ``body_a`` is joined to the world.
+        name : str, optional
+            If given, use this name for the created joint. If not given, a name
+            will be constructed of the form
+            "{body_a.name}^{shape}^{body_b.name}".
+
+        Returns
+        -------
+        joint : :class:`Joint`
+            The joint object that was created.
+        '''
         ba = body_a
         if isinstance(body_a, str):
             ba = self.get_body(body_a)
@@ -917,13 +1138,36 @@ class World(base.World):
         return joint
 
     def move_next_to(self, body_a, body_b, offset_a, offset_b):
-        '''Move body_b to be near body_a.
+        '''Move one body to be near another one.
 
-        After moving, offset_a on body_a will be in the same place as offset_b
-        on body_b.
+        After moving, the location described by ``offset_a`` on ``body_a`` will
+        be coincident with the location described by ``offset_b`` on ``body_b``.
 
-        Returns the location of the shared point, which is often useful to use
-        as a joint anchor.
+        Parameters
+        ----------
+        body_a : str or :class:`Body`
+            The body to use as a reference for moving the other body. If this is
+            a string, it is treated as the name of a body to look up in the
+            world.
+        body_b : str or :class:`Body`
+            The body to move next to ``body_a``. If this is a string, it is
+            treated as the name of a body to look up in the world.
+        offset_a : 3-tuple of float
+            The offset of the anchor point, given as a relative fraction of the
+            shape and size of ``body_a``. For example, offset (0, 0, 0) is the
+            center of the body, while (0.5, -0.2, 0.1) describes a point halfway
+            from the center towards the maximum x-extent of the body, 20% of the
+            way from the center towards the minimum y-extent, and 10% of the way
+            from the center towards the maximum z-extent.
+        offset_b : 3-tuple of float
+            The offset of the anchor point, given as a relative fraction of the
+            shape and size of ``body_b``.
+
+        Returns
+        -------
+        anchor : 3-tuple of float
+            The location of the shared point, which is often useful to use as a
+            joint anchor.
         '''
         if body_a is None:
             return self.get_body(body_b).position
@@ -938,7 +1182,20 @@ class World(base.World):
         return anchor
 
     def get_body_states(self):
-        '''Return a list of the states of all bodies in the world.'''
+        '''Return the complete state of all bodies in the world.
+
+        Returns
+        -------
+        states : list of state information tuples
+            A list of body state information for each body in the world. Each
+            state tuple contains:
+
+            - name of the body (str)
+            - position (3-tuple)
+            - quaternion (4-tuple)
+            - linear velocity (3-tuple)
+            - angular velocity (3-tuple)
+        '''
         return [(b.name,
                  b.position,
                  b.quaternion,
@@ -946,7 +1203,14 @@ class World(base.World):
                  b.angular_velocity) for b in self.bodies]
 
     def set_body_states(self, states):
-        '''Set the states of all bodies in the world.'''
+        '''Set the states of some bodies in the world.
+
+        Parameters
+        ----------
+        states : sequence of states
+            A complete state tuple for one or more bodies in the world. See
+            :func:`get_body_states`.
+        '''
         for name, pos, rot, lin, ang in states:
             body = self.get_body(name)
             body.position = pos
@@ -955,7 +1219,14 @@ class World(base.World):
             body.angular_velocity = ang
 
     def step(self, substeps=2):
-        '''Step the world forward by one frame.'''
+        '''Step the world forward by one frame.
+
+        Parameters
+        ----------
+        substeps : int, optional
+            Split the step into this many sub-steps. This helps to prevent the
+            time delta for an update from being too large.
+        '''
         self.frame_no += 1
         dt = self.dt / substeps
         for _ in range(substeps):
@@ -964,7 +1235,22 @@ class World(base.World):
             self.ode_world.step(dt)
 
     def are_connected(self, body_a, body_b):
-        '''Return True iff the given bodies are currently connected.'''
+        '''Determine whether the given bodies are currently connected.
+
+        Parameters
+        ----------
+        body_a : str or :class:`Body`
+            One body to test for connectedness. If this is a string, it is
+            treated as the name of a body to look up.
+        body_b : str or :class:`Body`
+            One body to test for connectedness. If this is a string, it is
+            treated as the name of a body to look up.
+
+        Returns
+        -------
+        connected : bool
+            Return True iff the two bodies are connected.
+        '''
         ba = body_a
         if isinstance(body_a, str):
             ba = self.get_body(body_a)
@@ -974,7 +1260,17 @@ class World(base.World):
         return bool(ode.areConnected(ba.ode_body, bb.ode_body))
 
     def on_collision(self, args, geom_a, geom_b):
-        '''Callback function for the collide() method.'''
+        '''Callback function for the collide() method.
+
+        Parameters
+        ----------
+        args : None
+            Arguments passed when the callback was registered. Not used.
+        geom_a : ODE geometry
+            The geometry object of one of the bodies that has collided.
+        geom_b : ODE geometry
+            The geometry object of one of the bodies that has collided.
+        '''
         body_a = geom_a.getBody()
         body_b = geom_b.getBody()
         if (ode.areConnected(body_a, body_b) or
