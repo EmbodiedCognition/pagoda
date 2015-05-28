@@ -242,150 +242,266 @@ def _set_params(target, param, values, dof):
         target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
 
 
-class Motor(object):
-    '''This class wraps an ODE motor -- either an LMotor or an AMotor.
+class Constraints(object):
+    '''This class wraps an ODE entity that constrains body movement.
 
-    The class has read-write properties for :
+    In ODE, :class:`Body` objects represent mass/inertia properties, while
+    :class:`Joint` and :class:`Motor` objects represent mathematical constraints
+    that govern how specific pairs of bodies interact. For example, a
+    :class:`BallJoint` that connects two bodies will force the anchor point for
+    those two bodies to remain in the same location in space -- any linear force
+    that displaces one of the bodies will also cause a force to be applied to
+    the second body, because of the constraint imposed by the ball joint. As
+    another example, a :class:`Slider` that connects two bodies allows those two
+    bodies to displace relative to one another along a single axis, but not to
+    rotate with respect to one another -- any torque applied to one body will
+    also cause a torque to be applied to the other body.
 
-    - the axes of rotation or motion for the motor (`axes`),
-    - the low and high stops of the motor's motion (`lo_stops` and `hi_stops`),
-    - the max force that is allowed to be applied (`max_forces`),
-    - the target value for the motor (`velocities`), and
-    - the constraint force mixing parameter (`cfms`).
+    Constraints can be applied to angular degrees of freedom (e.g.,
+    :class:`AMotor`), linear degrees of freedom (e.g., :class:`BallJoint`,
+    :class:`LMotor`), or both (e.g., :class:`PistonJoint`).
 
-    There are also read-only properties for :
-
-    - the feedback through the motor (`feedback`),
-    - the number of degrees of freedom (`dof`), and
-    - the current state of the motor (`angles`) as well as the derivative
-      (`angle_rates`).
-
-    All of these properties except `dof` return sequences of values. The setters
-    can be applied using a scalar value, which will be applied to all degrees of
-    freedom, or with a sequence whose length must match the number of DOFs in
-    the motor.
+    Both joints and motors apply constraints to pairs of bodies, but they are
+    quite different in many ways and so are represented using specific
+    subclasses. This superclass is just a mixin to avoid repeating the getters
+    and setters that are common between motors and joints.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3, jointgroup=None):
-        self.name = name
-        if isinstance(world, World):
-            world = world.ode_world
-        self.ode_motor = self.MOTOR_FACTORY(world, jointgroup=jointgroup)
-        self.ode_motor.attach(body_a.ode_body, body_b.ode_body if body_b else None)
-        self.ode_motor.setFeedback(feedback)
-        self.ode_motor.setNumAxes(dof)
-        self.cfms = 1e-8
+    ADOF = 0
+    LDOF = 0
 
     @property
     def feedback(self):
-        return self.ode_motor.getFeedback()
-
-    @property
-    def dof(self):
-        return self.ode_motor.getNumAxes()
+        '''Feedback buffer (list of 3-tuples) for this ODE motor/joint.'''
+        return self.ode_obj.getFeedback()
 
     @property
     def positions(self):
-        return [self.ode_motor.getPosition(i) for i in range(self.dof)]
+        '''List of positions for linear degrees of freedom.'''
+        return [self.ode_obj.getPosition(i) for i in range(self.LDOF)]
 
     @property
     def position_rates(self):
-        return [self.ode_motor.getPositionRate(i) for i in range(self.dof)]
+        '''List of position rates for linear degrees of freedom.'''
+        return [self.ode_obj.getPositionRate(i) for i in range(self.LDOF)]
 
     @property
     def angles(self):
-        return [self.ode_motor.getAngle(i) for i in range(self.dof)]
+        '''List of angles for rotational degrees of freedom.'''
+        return [self.ode_obj.getAngle(i) for i in range(self.ADOF)]
 
     @property
     def angle_rates(self):
-        return [self.ode_motor.getAngleRate(i) for i in range(self.dof)]
+        '''List of angle rates for rotational degrees of freedom.'''
+        return [self.ode_obj.getAngleRate(i) for i in range(self.ADOF)]
 
     @property
     def axes(self):
+        '''List of axes for this object's degrees of freedom.'''
         def ax(i):
-            return dict(rel=self.ode_motor.getAxisRel(i),
-                        axis=self.ode_motor.getAxis(i))
-        return [ax(i) for i in range(self.dof)]
+            return dict(rel=self.ode_obj.getAxisRel(i),
+                        axis=self.ode_obj.getAxis(i))
+        return [ax(i) for i in range(self.ADOF)]
 
     @axes.setter
     def axes(self, axes):
-        assert self.dof == len(axes)
+        '''Set the axes for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        axes : list of None, 3 floats, or dict
+            A list of axis values to set. This list must have the same number of
+            elements as the degrees of freedom of the underlying ODE object.
+            Each element can be
+
+            (a) None, which has no effect on the corresponding axis,
+            (b) three floats specifying the axis to set, or
+            (c) a dictionary with an "axis" key specifying the axis to set and a
+                "rel" key specifying the relative body to set the axis on.
+        '''
+        assert self.ADOF == len(axes)
         for i, axis in enumerate(axes):
             rel = 0
             if isinstance(axis, dict):
                 rel = axis.get('rel', 0)
                 axis = axis.get('axis')
             if axis is not None:
-                self.ode_motor.setAxis(i, rel, axis)
+                self.ode_obj.setAxis(i, rel, axis)
 
     @property
     def lo_stops(self):
-        return _get_params(self.ode_motor, 'LoStop', self.dof)
+        '''List of lo stop values for this object's degrees of freedom.'''
+        return _get_params(self.ode_obj, 'LoStop', self.ADOF)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
-        _set_params(self.ode_motor, 'LoStop', lo_stops, self.dof)
+        '''Set the lo stop values for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        lo_stops : float or sequence of float
+            A lo stop value to set on all degrees of freedom, or a list
+            containing one such value for each degree of freedom. For rotational
+            degrees of freedom, these values must be in radians.
+        '''
+        _set_params(self.ode_obj, 'LoStop', lo_stops, self.ADOF)
 
     @property
     def hi_stops(self):
-        return _get_params(self.ode_motor, 'HiStop', self.dof)
+        '''List of hi stop values for this object's degrees of freedom.'''
+        return _get_params(self.ode_obj, 'HiStop', self.ADOF)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
-        _set_params(self.ode_motor, 'HiStop', hi_stops, self.dof)
+        '''Set the hi stop values for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        hi_stops : float or sequence of float
+            A hi stop value to set on all degrees of freedom, or a list
+            containing one such value for each degree of freedom. For rotational
+            degrees of freedom, these values must be in radians.
+        '''
+        _set_params(self.ode_obj, 'HiStop', hi_stops, self.ADOF)
 
     @property
     def velocities(self):
-        return _get_params(self.ode_motor, 'Vel', self.dof)
+        '''List of target velocity values for rotational degrees of freedom.'''
+        return _get_params(self.ode_obj, 'Vel', self.ADOF)
 
     @velocities.setter
     def velocities(self, velocities):
-        _set_params(self.ode_motor, 'Vel', velocities, self.dof)
+        '''Set the target velocities for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        velocities : float or sequence of float
+            A target velocity value to set on all degrees of freedom, or a list
+            containing one such value for each degree of freedom. For rotational
+            degrees of freedom, these values must be in radians / second.
+        '''
+        _set_params(self.ode_obj, 'Vel', velocities, self.ADOF)
 
     @property
     def max_forces(self):
-        return _get_params(self.ode_motor, 'FMax', self.dof)
+        '''List of max force values for rotational degrees of freedom.'''
+        return _get_params(self.ode_obj, 'FMax', self.ADOF)
 
     @max_forces.setter
     def max_forces(self, max_forces):
-        _set_params(self.ode_motor, 'FMax', max_forces, self.dof)
+        '''Set the maximum forces for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        max_forces : float or sequence of float
+            A maximum force value to set on all degrees of freedom, or a list
+            containing one such value for each degree of freedom.
+        '''
+        _set_params(self.ode_obj, 'FMax', max_forces, self.ADOF)
 
     @property
     def cfms(self):
-        return _get_params(self.ode_motor, 'CFM', self.dof)
+        '''List of CFM values for this object's degrees of freedom.'''
+        return _get_params(self.ode_obj, 'CFM', self.ADOF)
 
     @cfms.setter
     def cfms(self, cfms):
-        _set_params(self.ode_motor, 'CFM', cfms, self.dof)
+        '''Set the CFM values for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        cfms : float or sequence of float
+            A CFM value to set on all degrees of freedom, or a list
+            containing one such value for each degree of freedom.
+        '''
+        _set_params(self.ode_obj, 'CFM', cfms, self.ADOF)
 
     @property
     def stop_cfms(self):
-        return _get_params(self.ode_motor, 'StopCFM', self.ADOF)
+        '''List of lo/hi stop CFM values.'''
+        return _get_params(self.ode_obj, 'StopCFM', self.ADOF)
 
     @stop_cfms.setter
     def stop_cfms(self, stop_cfms):
-        _set_params(self.ode_motor, 'StopCFM', stop_cfms, self.ADOF)
+        '''Set the CFM values for this object's DOF limits.
+
+        Parameters
+        ----------
+        stop_cfms : float or sequence of float
+            A CFM value to set on all degrees of freedom limits, or a list
+            containing one such value for each degree of freedom limit.
+        '''
+        _set_params(self.ode_obj, 'StopCFM', stop_cfms, self.ADOF)
 
     @property
     def stop_erps(self):
-        return _get_params(self.ode_motor, 'StopERP', self.ADOF)
+        '''List of lo/hi stop ERP values.'''
+        return _get_params(self.ode_obj, 'StopERP', self.ADOF)
 
     @stop_erps.setter
     def stop_erps(self, stop_erps):
-        _set_params(self.ode_motor, 'StopERP', stop_erps, self.ADOF)
+        '''Set the ERP values for this object's DOF limits.
+
+        Parameters
+        ----------
+        stop_erps : float or sequence of float
+            An ERP value to set on all degrees of freedom limits, or a list
+            containing one such value for each degree of freedom limit.
+        '''
+        _set_params(self.ode_obj, 'StopERP', stop_erps, self.ADOF)
 
     def enable_feedback(self):
-        self.ode_motor.setFeedback(True)
+        '''Enable feedback on this ODE object.'''
+        self.ode_obj.setFeedback(True)
 
     def disable_feedback(self):
-        self.ode_motor.setFeedback(False)
+        '''Disable feedback on this ODE object.'''
+        self.ode_obj.setFeedback(False)
+
+
+class Motor(Constraints):
+    '''This class wraps an ODE motor -- either an LMotor or an AMotor.
+
+    Parameters
+    ----------
+    name : str
+        A name for this object in the world.
+    world : :class:`World`
+        A world object to which this motor belongs.
+    body_a : :class:`Body`
+        A first body connected to this joint.
+    body_b : :class:`Body`, optional
+        A second body connected to this joint. If not given, the joint will
+        connect the first body to the world.
+    feedback : bool, optional
+        Feedback will be enabled on this motor iff this is True. Defaults to
+        False.
+    dof : int, optional
+        Number of degrees of freedom in this motor. Defaults to 3.
+    jointgroup : ode.JointGroup, optional
+        A joint group to which this motor belongs. Defaults to the default joint
+        group in the world.
+    '''
+
+    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3, jointgroup=None):
+        self.name = name
+        if isinstance(world, World):
+            world = world.ode_world
+        self.ode_obj = self.MOTOR_FACTORY(world, jointgroup=jointgroup)
+        self.ode_obj.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.ode_obj.setNumAxes(dof)
+        self.cfms = 1e-8
+        if feedback:
+            self.enable_feedback()
+        else:
+            self.disable_feedback()
 
 
 class AMotor(Motor):
-    '''An AMotor applies forces to change an angle in the physics world.
+    '''An angular motor applies torques to change an angle in the physics world.
 
     AMotors can be created in "user" mode---in which case the user must supply
-    all axis and angle values---or, for 3 DOF motors, in "euler" mode---in which
+    all axis and angle values---or, for 3-DOF motors, in "euler" mode---in which
     case the first and last axes must be specified, and ODE computes the middle
     axis automatically.
     '''
@@ -395,63 +511,42 @@ class AMotor(Motor):
     def __init__(self, *args, **kwargs):
         mode = kwargs.pop('mode', 'user')
         super(AMotor, self).__init__(*args, **kwargs)
-        if self.dof == 3:
-            if isinstance(mode, str):
-                if mode.lower().startswith('e'):
-                    mode = ode.AMotorEuler
-                else:
-                    mode = ode.AMotorUser
-            self.ode_motor.setMode(mode)
-
-    @property
-    def amotor(self):
-        return self
+        if isinstance(mode, str):
+            if self.ADOF == 3 and mode.lower().startswith('e'):
+                mode = ode.AMotorEuler
+            else:
+                mode = ode.AMotorUser
+        self.ode_obj.setMode(mode)
 
     @property
     def ADOF(self):
-        return self.ode_motor.getNumAxes()
+        '''Number of angular degrees of freedom for this motor.'''
+        return self.ode_obj.getNumAxes()
 
     def add_torques(self, torques):
-        self.ode_motor.addTorques(*torques)
+        '''Add the given torques along this motor's axes.
+
+        Parameters
+        ----------
+        torques : sequence of float
+            A sequence of torque values to apply to this motor's axes.
+        '''
+        self.ode_obj.addTorques(*torques)
 
 
 class LMotor(Motor):
-    '''An LMotor applies forces to change a position in the physics world.
-    '''
+    '''An LMotor applies forces to change a position in the physics world.'''
 
     MOTOR_FACTORY = ode.LMotor
 
     @property
     def LDOF(self):
-        return self.ode_motor.getNumAxes()
+        '''Number of linear degrees of freedom for this motor.'''
+        return self.ode_obj.getNumAxes()
 
 
-class Joint(object):
+class Joint(Constraints):
     '''This class wraps the ODE Joint class with some Python properties.
-
-    The class has read-write properties for :
-
-    - the axes of rotation or motion for the joint (`axes`),
-    - the low and high stops of the joint's motion (`lo_stops` and `hi_stops`),
-    - the maximum force that is allowed to be applied (`max_forces`),
-    - the target velocities for the joint (`velocities`), and
-    - the constraint force mixing parameter (`cfms`).
-
-    There are also read-only properties for :
-
-    - the feedback that the joint is experiencing (`feedback`),
-    - the anchor of the joint in world coordinates (`anchor`),
-    - the anchor of the joint on body 2 in world coordinates (`anchor2`),
-    - the current angular configuration of the joint (`angles`) as well as the
-      derivative (`angle_rates`),
-    - the current linear configuration of the joint (`position`) as well as the
-      derivative (`position_rate`),
-
-    All of these properties except the position ones return sequences of values.
-    The setters can be applied using a scalar value, which will be applied to
-    all degrees of freedom, or with a sequence whose length must match the
-    number of angular DOFs in the joint. (All joints in ODE have at most one
-    linear axis of displacement, so the linear properties are scalars.)
 
     Parameters
     ----------
@@ -477,17 +572,17 @@ class Joint(object):
     '''
 
     def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False, jointgroup=None):
-        '''Create a new joint connecting two bodies in the world.'''
         self.name = name
+
+        build = getattr(ode, '{}Joint'.format(self.__class__.__name__))
         if isinstance(world, World):
             world = world.ode_world
-        self.ode_joint = getattr(ode, '{}Joint'.format(self.__class__.__name__))(
-            world, jointgroup=jointgroup)
-        self.ode_joint.attach(body_a.ode_body, body_b.ode_body if body_b else None)
+        self.ode_obj = build(world, jointgroup=jointgroup)
+        self.ode_obj.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         if anchor is not None:
-            self.ode_joint.setAnchor(anchor)
-            self.ode_joint.setFeedback(feedback)
-            self.ode_joint.setParam(ode.ParamCFM, 0)
+            self.ode_obj.setAnchor(anchor)
+            self.ode_obj.setParam(ode.ParamCFM, 0)
+
         self.amotor = None
         if self.ADOF > 0:
             self.amotor = AMotor(name=name + ':amotor',
@@ -498,6 +593,7 @@ class Joint(object):
                                  jointgroup=jointgroup,
                                  dof=self.ADOF,
                                  mode='euler' if self.ADOF == 3 else 'user')
+
         self.lmotor = None
         if self.LDOF > 0:
             self.lmotor = LMotor(name=name + ':lmotor',
@@ -508,101 +604,53 @@ class Joint(object):
                                  jointgroup=jointgroup,
                                  dof=self.LDOF)
 
+        if feedback:
+            self.enable_feedback()
+        else:
+            self.disable_feedback()
+
     def __str__(self):
         return self.name
 
     @property
-    def feedback(self):
-        return self.ode_joint.getFeedback()
-
-    @property
     def anchor(self):
-        return self.ode_joint.getAnchor()
+        '''3-tuple specifying location of this joint's anchor.'''
+        return self.ode_obj.getAnchor()
 
     @property
     def anchor2(self):
-        return self.ode_joint.getAnchor2()
+        '''3-tuple specifying location of the anchor on the second body.'''
+        return self.ode_obj.getAnchor2()
 
     @property
     def angles(self):
-        return (self.ode_joint.getAngle(), )
+        '''List of angles for this joint's rotational degrees of freedom.'''
+        return [self.ode_obj.getAngle()]
 
     @property
     def angle_rates(self):
-        return (self.ode_joint.getAngleRate(), )
+        '''List of angle rates for this joint's degrees of freedom.'''
+        return [self.ode_obj.getAngleRate()]
 
     @property
-    def position(self):
-        return self.ode_joint.getPosition()
+    def positions(self):
+        '''List of positions for this joint's linear degrees of freedom.'''
+        return [self.ode_obj.getPosition()]
 
     @property
-    def position_rate(self):
-        return self.ode_joint.getPositionRate()
-
-    @property
-    def velocities(self):
-        return _get_params(self.ode_joint, 'Vel', self.ADOF)
-
-    @velocities.setter
-    def velocities(self, velocities):
-        _set_params(self.ode_joint, 'Vel', velocities, self.ADOF)
-
-    @property
-    def max_forces(self):
-        return _get_params(self.ode_joint, 'FMax', self.ADOF)
-
-    @max_forces.setter
-    def max_forces(self, max_forces):
-        _set_params(self.ode_joint, 'FMax', max_forces, self.ADOF)
-
-    @property
-    def cfms(self):
-        return _get_params(self.ode_joint, 'CFM', self.ADOF)
-
-    @cfms.setter
-    def cfms(self, cfms):
-        _set_params(self.ode_joint, 'CFM', cfms, self.ADOF)
-
-    @property
-    def lo_stops(self):
-        return _get_params(self.ode_joint, 'LoStop', self.ADOF)
-
-    @lo_stops.setter
-    def lo_stops(self, lo_stops):
-        _set_params(self.ode_joint, 'LoStop', lo_stops, self.ADOF)
-
-    @property
-    def hi_stops(self):
-        return _get_params(self.ode_joint, 'HiStop', self.ADOF)
-
-    @hi_stops.setter
-    def hi_stops(self, hi_stops):
-        _set_params(self.ode_joint, 'HiStop', hi_stops, self.ADOF)
-
-    @property
-    def stop_cfms(self):
-        return _get_params(self.ode_joint, 'StopCFM', self.ADOF)
-
-    @stop_cfms.setter
-    def stop_cfms(self, stop_cfms):
-        _set_params(self.ode_joint, 'StopCFM', stop_cfms, self.ADOF)
-
-    @property
-    def stop_erps(self):
-        return _get_params(self.ode_joint, 'StopERP', self.ADOF)
-
-    @stop_erps.setter
-    def stop_erps(self, stop_erps):
-        _set_params(self.ode_joint, 'StopERP', stop_erps, self.ADOF)
+    def position_rates(self):
+        '''List of position rates for this joint's degrees of freedom.'''
+        return [self.ode_obj.getPositionRate()]
 
     def add_torques(self, *torques):
+        '''Add the given torques along this joint's axes.
+
+        Parameters
+        ----------
+        torques : sequence of float
+            A sequence of torque values to apply to this motor's axes.
+        '''
         self.amotor.add_torques(*torques)
-
-    def enable_feedback(self):
-        self.ode_joint.setFeedback(True)
-
-    def disable_feedback(self):
-        self.ode_joint.setFeedback(False)
 
 
 class Fixed(Joint):
@@ -616,12 +664,22 @@ class Slider(Joint):
 
     @property
     def axes(self):
-        return (self.ode_joint.getAxis(), )
+        '''Axis of displacement for this joint.'''
+        return [self.ode_obj.getAxis()]
 
     @axes.setter
     def axes(self, axes):
-        self.lmotor.axes = (dict(rel=1, axis=axes[0]), )
-        self.ode_joint.setAxis(axes[0])
+        '''Set the linear axis of displacement for this joint.
+
+        Parameters
+        ----------
+        axes : list containing one 3-tuple of floats
+            A list of the axes for this joint. For a slider joint, which has one
+            degree of freedom, this must contain one 3-tuple specifying the X,
+            Y, and Z axis for the joint.
+        '''
+        self.lmotor.axes = [dict(rel=1, axis=axes[0])]
+        self.ode_obj.setAxis(axes[0])
 
 
 class Hinge(Joint):
@@ -630,12 +688,22 @@ class Hinge(Joint):
 
     @property
     def axes(self):
-        return (self.ode_joint.getAxis(), )
+        '''Axis of rotation for this joint.'''
+        return [self.ode_obj.getAxis()]
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = (dict(rel=1, axis=axes[0]), )
-        self.ode_joint.setAxis(axes[0])
+        '''Set the angular axis of rotation for this joint.
+
+        Parameters
+        ----------
+        axes : list containing one 3-tuple of floats
+            A list of the axes for this joint. For a hinge joint, which has one
+            degree of freedom, this must contain one 3-tuple specifying the X,
+            Y, and Z axis for the joint.
+        '''
+        self.amotor.axes = [dict(rel=1, axis=axes[0])]
+        self.ode_obj.setAxis(axes[0])
 
 
 class Piston(Joint):
@@ -644,13 +712,14 @@ class Piston(Joint):
 
     @property
     def axes(self):
-        return (self.ode_joint.getAxis(), )
+        '''Axis of rotation and displacement for this joint.'''
+        return [self.ode_obj.getAxis()]
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = (dict(rel=1, axis=axes[0]), )
-        self.lmotor.axes = (dict(rel=1, axis=axes[0]), )
-        self.ode_joint.setAxis(axes[0])
+        self.amotor.axes = [dict(rel=1, axis=axes[0])]
+        self.lmotor.axes = [dict(rel=1, axis=axes[0])]
+        self.ode_obj.setAxis(axes[0])
 
 
 class Universal(Joint):
@@ -659,23 +728,26 @@ class Universal(Joint):
 
     @property
     def axes(self):
-        return (self.ode_joint.getAxis1(), self.ode_joint.getAxis2())
+        '''A list of axes of rotation for this joint.'''
+        return [self.ode_obj.getAxis1(), self.ode_obj.getAxis2()]
 
     @axes.setter
     def axes(self, axes):
         self.amotor.axes = dict(rel=1, axis=axes[0]), dict(rel=2, axis=axes[1])
-        setters = [self.ode_joint.setAxis1, self.ode_joint.setAxis2]
+        setters = [self.ode_obj.setAxis1, self.ode_obj.setAxis2]
         for axis, setter in zip(axes, setters):
             if axis is not None:
                 setter(axis)
 
     @property
     def angles(self):
-        return (self.ode_joint.getAngle1(), self.ode_joint.getAngle2())
+        '''A list of two angles for this joint's degrees of freedom.'''
+        return [self.ode_obj.getAngle1(), self.ode_obj.getAngle2()]
 
     @property
     def angle_rates(self):
-        return (self.ode_joint.getAngle1Rate(), self.ode_joint.getAngle2Rate())
+        '''A list of two angle rates for this joint's degrees of freedom.'''
+        return [self.ode_obj.getAngle1Rate(), self.ode_obj.getAngle2Rate()]
 
 
 class Ball(Joint):
