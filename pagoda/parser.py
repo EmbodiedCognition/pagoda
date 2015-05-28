@@ -381,13 +381,13 @@ class BodyParser(Parser):
             joint.axes = axes[:max(joint.ADOF, joint.LDOF)]
 
         if joint.ADOF and lo_stops is not None:
-            joint.amotor.lo_stops = lo_stops
+            joint.lo_stops = lo_stops
         if joint.ADOF and hi_stops is not None:
-            joint.amotor.hi_stops = hi_stops
+            joint.hi_stops = hi_stops
         if joint.ADOF and stop_cfm is not None:
-            joint.amotor.stop_cfms = stop_cfm
+            joint.stop_cfms = stop_cfm
         if joint.ADOF and stop_erp is not None:
-            joint.amotor.stop_erps = stop_erp
+            joint.stop_erps = stop_erp
 
         self.joints.append(joint)
 
