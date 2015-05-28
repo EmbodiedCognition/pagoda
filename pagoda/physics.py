@@ -274,7 +274,7 @@ class Body(object):
         op = self.ode_body.addRelTorque if relative else self.ode_body.addTorque
         op(torque)
 
-    def connect_to(self, offset, other_body, other_offset, joint, **kwargs):
+    def connect_to(self, other_body, joint, offset=(0, 0, 0), other_offset=(0, 0, 0), **kwargs):
         '''Move another body next to this one and join them together.
 
         This method will move the ``other_body`` so that the anchor points for
@@ -283,22 +283,18 @@ class Body(object):
 
         Parameters
         ----------
-        offset : 3-tuple of float
-            The body-relative offset where the anchor for the joint should be
-            placed. The offset is given as a fraction of the extent of the
-            body along each of its axes. For example, offset (0, 0, 0) is the
-            center of the body, while (0.5, -0.2, 0.1) describes a point
-            halfway from the center towards the maximum x-extent of the body,
-            20% of the way from the center towards the minimum y-extent, and
-            10% of the way from the center towards the maximum z-extent.
         other_body : :class:`Body`
             The other body to join with this one.
-        other_offset : 3-tuple of float
-            The offset on the second body where the joint anchor should be
-            placed. Like ``offset``, this is given as an offset relative to the
-            size and shape of ``other_body``.
         joint : str
             The type of joint to use when connecting these bodies.
+        offset : 3-tuple of float, optional
+            The body-relative offset where the anchor for the joint should be
+            placed. Defaults to (0, 0, 0). See :func:`World.move_next_to` for a
+            description of how offsets are specified.
+        other_offset : 3-tuple of float, optional
+            The offset on the second body where the joint anchor should be
+            placed. Defaults to (0, 0, 0). Like ``offset``, this is given as an
+            offset relative to the size and shape of ``other_body``.
         '''
         self.world.move_next_to(self, other_body, offset, other_offset)
         self.world.join(joint, self, other_body, **kwargs)
