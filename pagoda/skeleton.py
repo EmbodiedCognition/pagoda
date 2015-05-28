@@ -330,7 +330,10 @@ class Skeleton:
         for joint in self.joints:
             joint.max_forces = max_force
             joint.amotor.max_forces = max_force
-            joint.amotor.ode_motor.setFeedback(max_force > 0)
+            if max_force > 0:
+                joint.amotor.enable_feedback()
+            else:
+                joint.amotor.disable_feedback()
 
     def disable_motors(self):
         '''Disable joint motors in this skeleton.
