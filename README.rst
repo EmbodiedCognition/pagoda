@@ -1,14 +1,21 @@
-# py-sim
+======
+PAGODA
+======
 
-Yet another simulator framework for Python!
+A physics simulator + OpenGL tool for Python!
 
-Install using this source repository, or with `pip`:
+Install with ``pip``::
 
-```shell
-pip install pagoda
-```
+    pip install pagoda
 
-You'll also need a patched version of the Open Dynamics Engine. To install,
-follow the instructions in the
-[`ode/README.md`](https://github.com/EmbodiedCognition/py-sim/tree/master/ode)
-file in the source repository.
+or by cloning this repository::
+
+    git clone https://github.com/EmbodiedCognition/pagoda
+    cd pagoda
+    python setup.py develop
+
+To run ``pagoda`` you'll need a patched version of the Open Dynamics Engine,
+included in the package source. To install, follow the instructions in the
+`ode/README.md`_ file in the source repository.
+
+.. _ode/README.md: https://github.com/EmbodiedCognition/pagoda/tree/master/ode
