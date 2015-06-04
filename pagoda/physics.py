@@ -1020,7 +1020,7 @@ class World(base.World):
         self.friction = 2000
         self.gravity = 0, 0, -9.81
         self.cfm = 1e-6
-        self.erp = 0.3
+        self.erp = 0.7
 
         self._bodies = {}
         self._joints = {}
