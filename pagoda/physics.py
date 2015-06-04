@@ -1043,33 +1043,33 @@ class World(base.World):
 
     @property
     def cfm(self):
-        '''Current default CFM value for the world.'''
+        '''Current global CFM value.'''
         return self.ode_world.getCFM()
 
     @cfm.setter
     def cfm(self, cfm):
-        '''Set the current default CFM value in the world.
+        '''Set the global CFM value.
 
         Parameters
         ----------
         cfm : float
-            The CFM value that should be the world default.
+            The desired global CFM value.
         '''
         return self.ode_world.setCFM(cfm)
 
     @property
     def erp(self):
-        '''Current default ERP value for the world.'''
+        '''Current global ERP value.'''
         return self.ode_world.getERP()
 
     @erp.setter
     def erp(self, erp):
-        '''Set the current default ERP value in the world.
+        '''Set the global ERP value.
 
         Parameters
         ----------
         erp : float
-            The ERP value that should be the world default.
+            The desired global ERP value.
         '''
         return self.ode_world.setERP(erp)
 
