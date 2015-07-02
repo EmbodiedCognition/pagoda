@@ -131,11 +131,8 @@ class Markers:
         with open(filename, 'rb') as handle:
             reader = c3d.Reader(handle)
 
-            # make sure the c3d file's frame rate matches our world.
-            assert self.world.dt == 1. / reader.frame_rate()
-
             # set up a map from marker label to index in the data stream.
-            labels = [s.strip() for s in reader.point_labels()]
+            labels = [s.strip() for s in reader.point_labels]
             logging.info('%s: loaded marker labels %s', filename, labels)
             self.channels = self._interpret_channels(labels)
 
