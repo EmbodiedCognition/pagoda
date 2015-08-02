@@ -298,9 +298,14 @@ class Markers:
             List of distances for each marker joint in our attachment setup.
         '''
         deltas = []
-        for joint in self.joints:
-            delta = np.array(joint.getAnchor()) - joint.getAnchor2()
-            deltas.append(np.sqrt((delta * delta).sum()))
+        for label, _ in self.channels.items():
+            joints = [j for j in self.joints if j.name == label]
+            if joints:
+                joint = joints[0]
+                delta = np.array(joint.getAnchor()) - joint.getAnchor2()
+                deltas.append(np.sqrt((delta * delta).sum()))
+            else:
+                deltas.append(0)
         return deltas
 
     def forces(self):
