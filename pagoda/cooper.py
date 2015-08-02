@@ -505,10 +505,13 @@ class World(physics.World):
         if states is not None:
             self.skeleton.set_body_states(states)
         for frame_no, frame in enumerate(self.markers):
-            if start <= frame_no < end:
-                # TODO: replace with "yield from" for full py3k goodness
-                for states in self._step_to_marker_frame(frame_no):
-                    yield states
+            if frame_no < start:
+                continue
+            if frame_no >= end:
+                break
+            # TODO: replace with "yield from" for full py3k goodness
+            for states in self._step_to_marker_frame(frame_no):
+                yield states
 
     def _step_to_marker_frame(self, frame_no, dt=None):
         '''Update the simulator to a specific frame of marker data.
