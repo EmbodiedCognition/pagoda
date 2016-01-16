@@ -1,0 +1,29 @@
+cache: apt
+sudo: false
+language: python
+python:
+  - "2.7"
+  - "3.4"
+addons:
+  apt:
+    packages:
+    - libatlas-dev
+    - libatlas-base-dev
+    - liblapack-dev
+    - gfortran
+    - subversion
+    - build-essential
+before_install:
+  - wget http://repo.continuum.io/miniconda/Miniconda-latest-Linux-x86_64.sh -O miniconda.sh
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - conda update --yes conda
+install:
+  - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy nose
+  - ./build-ode-for-travis.sh
+  - pip install pep8 python-coveralls
+  - pip install .
+script:
+  - nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
+after_success:
+  - coveralls
