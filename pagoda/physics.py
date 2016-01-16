@@ -19,7 +19,7 @@ class Body(object):
     equivalent ODE getters and setters for things like position, rotation, etc.
     '''
 
-    def __init__(self, name, world, space, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
+    def __init__(self, name, world, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
         self.name = name
         self.world = world
         self.shape = shape
@@ -27,9 +27,10 @@ class Body(object):
 
         m = ode.Mass()
         self.init_mass(m, density)
-        self.ode_body = ode.Body(world)
+        self.ode_body = ode.Body(world.ode_world)
         self.ode_body.setMass(m)
-        self.ode_geom = getattr(ode, 'Geom%s' % self.__class__.__name__)(space, **shape)
+        self.ode_geom = getattr(ode, 'Geom%s' % self.__class__.__name__)(
+            world.ode_space, **shape)
         self.ode_geom.setBody(self.ode_body)
 
     def __str__(self):
@@ -1148,7 +1149,7 @@ class World(base.World):
                 name = '{}{}'.format(shape, i)
                 if name not in self._bodies:
                     break
-        body = BODIES[shape](name, self.ode_world, self.ode_space, **kwargs)
+        body = BODIES[shape](name, self, **kwargs)
         self._bodies[name] = body
         return body
 
