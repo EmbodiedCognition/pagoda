@@ -184,7 +184,7 @@ class Body(object):
         follows_gravity : bool
             This body will follow gravity iff this parameter is True.
         '''
-        self.ode_body.setGravity(follows_gravity)
+        self.ode_body.setGravityMode(follows_gravity)
 
     def rotate_to_body(self, x):
         '''Rotate the given vector to the same orientation as this body.
@@ -230,6 +230,26 @@ class Body(object):
             A tuple giving the body-relative offset of the given position.
         '''
         return self.ode_body.getPosRelPoint(position)
+
+    def relative_offset_to_world(self, offset):
+        '''Convert a relative body offset to world coordinates.
+
+        Parameters
+        ----------
+        offset : 3-tuple of float
+            The offset of the desired point, given as a relative fraction of the
+            size of this body. For example, offset (0, 0, 0) is the center of
+            the body, while (0.5, -0.2, 0.1) describes a point halfway from the
+            center towards the maximum x-extent of the body, 20% of the way from
+            the center towards the minimum y-extent, and 10% of the way from the
+            center towards the maximum z-extent.
+
+        Returns
+        -------
+        position : 3-tuple of float
+            A position in world coordinates of the given body offset.
+        '''
+        return self.body_to_world(offset * self.dimensions / 2)
 
     def add_force(self, force, relative=False, position=None, relative_position=None):
         '''Add a force to this body.
@@ -285,13 +305,13 @@ class Body(object):
         ----------
         joint : str
             The type of joint to use when connecting these bodies.
-        other_body : :class:`Body`, optional
+        other_body : :class:`Body` or str, optional
             The other body to join with this one. If not given, connects this
             body to the world.
         '''
         self.world.join(joint, self, other_body, **kwargs)
 
-    def connect_to(self, other_body, joint, offset=(0, 0, 0), other_offset=(0, 0, 0),
+    def connect_to(self, joint, other_body, offset=(0, 0, 0), other_offset=(0, 0, 0),
                    **kwargs):
         '''Move another body next to this one and join them together.
 
@@ -301,10 +321,10 @@ class Body(object):
 
         Parameters
         ----------
-        other_body : :class:`Body`
-            The other body to join with this one.
         joint : str
             The type of joint to use when connecting these bodies.
+        other_body : :class:`Body` or str
+            The other body to join with this one.
         offset : 3-tuple of float, optional
             The body-relative offset where the anchor for the joint should be
             placed. Defaults to (0, 0, 0). See :func:`World.move_next_to` for a
@@ -314,8 +334,8 @@ class Body(object):
             placed. Defaults to (0, 0, 0). Like ``offset``, this is given as an
             offset relative to the size and shape of ``other_body``.
         '''
-        self.world.move_next_to(self, other_body, offset, other_offset)
-        self.world.join(joint, self, other_body, **kwargs)
+        anchor = self.world.move_next_to(self, other_body, offset, other_offset)
+        self.world.join(joint, self, other_body, anchor=anchor, **kwargs)
 
 
 class Box(Body):
@@ -665,9 +685,7 @@ class Motor(Constraints):
     def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3,
                  jointgroup=None):
         self.name = name
-        if isinstance(world, World):
-            world = world.ode_world
-        self.ode_obj = self.MOTOR_FACTORY(world, jointgroup=jointgroup)
+        self.ode_obj = self.MOTOR_FACTORY(world.ode_world, jointgroup=jointgroup)
         self.ode_obj.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         self.ode_obj.setNumAxes(dof)
         self.cfms = 1e-8
@@ -756,9 +774,7 @@ class Joint(Constraints):
         self.name = name
 
         build = getattr(ode, '{}Joint'.format(self.__class__.__name__))
-        if isinstance(world, World):
-            world = world.ode_world
-        self.ode_obj = build(world, jointgroup=jointgroup)
+        self.ode_obj = build(world.ode_world, jointgroup=jointgroup)
         self.ode_obj.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         if anchor is not None:
             self.ode_obj.setAnchor(anchor)
@@ -1090,45 +1106,37 @@ class World(base.World):
         for k in sorted(self._joints):
             yield self._joints[k]
 
-    def get_body(self, name):
-        '''Get a body by name.
+    def get_body(self, key):
+        '''Get a body by key.
 
         Parameters
         ----------
-        name : str
-            The name of a body to look up.
-
-        Raises
-        ------
-        KeyError :
-            If no such body exists in the world.
+        key : str, None, or :class:`Body`
+            The key for looking up a body. If this is None or a :class:`Body`
+            instance, the key itself will be returned.
 
         Returns
         -------
         body : :class:`Body`
-            The body in the world with the given name.
+            The body in the world with the given key.
         '''
-        return self._bodies[name]
+        return self._bodies.get(key, key)
 
-    def get_joint(self, name):
-        '''Get a joint by name.
+    def get_joint(self, key):
+        '''Get a joint by key.
 
         Parameters
         ----------
-        name : str
-            The name of a joint to look up.
-
-        Raises
-        ------
-        KeyError :
-            If no such joint exists in the world.
+        key : str
+            The key for a joint to look up.
 
         Returns
         -------
         joint : :class:`Joint`
-            The joint in the world with the given name.
+            The joint in the world with the given key, or None if there is no
+            such joint.
         '''
-        return self._joints[name]
+        return self._joints.get(key, None)
 
     def create_body(self, shape, name=None, **kwargs):
         '''Create a new body.
@@ -1153,9 +1161,8 @@ class World(base.World):
                 name = '{}{}'.format(shape, i)
                 if name not in self._bodies:
                     break
-        body = BODIES[shape](name, self, **kwargs)
-        self._bodies[name] = body
-        return body
+        self._bodies[name] = BODIES[shape](name, self, **kwargs)
+        return self._bodies[name]
 
     def join(self, shape, body_a, body_b=None, name=None, **kwargs):
         '''Create a new joint that connects two bodies together.
@@ -1182,18 +1189,13 @@ class World(base.World):
         joint : :class:`Joint`
             The joint object that was created.
         '''
-        ba = body_a
-        if isinstance(body_a, str):
-            ba = self.get_body(body_a)
-        bb = body_b
-        if isinstance(body_b, str):
-            bb = self.get_body(body_b)
+        ba = self.get_body(body_a)
+        bb = self.get_body(body_b)
         shape = shape.lower()
         if name is None:
             name = '{}^{}^{}'.format(ba.name, shape, bb.name if bb else '')
-        joint = JOINTS[shape](name, self.ode_world, body_a=ba, body_b=bb, **kwargs)
-        self._joints[name] = joint
-        return joint
+        self._joints[name] = JOINTS[shape](name, self, body_a=ba, body_b=bb, **kwargs)
+        return self._joints[name]
 
     def move_next_to(self, body_a, body_b, offset_a, offset_b):
         '''Move one body to be near another one.
@@ -1212,14 +1214,10 @@ class World(base.World):
             treated as the name of a body to look up in the world.
         offset_a : 3-tuple of float
             The offset of the anchor point, given as a relative fraction of the
-            shape and size of ``body_a``. For example, offset (0, 0, 0) is the
-            center of the body, while (0.5, -0.2, 0.1) describes a point halfway
-            from the center towards the maximum x-extent of the body, 20% of the
-            way from the center towards the minimum y-extent, and 10% of the way
-            from the center towards the maximum z-extent.
+            size of ``body_a``. See :func:`Body.relative_offset_to_world`.
         offset_b : 3-tuple of float
             The offset of the anchor point, given as a relative fraction of the
-            shape and size of ``body_b``.
+            size of ``body_b``.
 
         Returns
         -------
@@ -1227,16 +1225,15 @@ class World(base.World):
             The location of the shared point, which is often useful to use as a
             joint anchor.
         '''
-        if body_a is None:
-            return self.get_body(body_b).position
-        if body_b is None:
-            return self.get_body(body_a).position
         ba = self.get_body(body_a)
         bb = self.get_body(body_b)
-        anchor = ba.body_to_world(offset_a * ba.dimensions / 2)
-        bb.position = (
-            np.asarray(bb.position) + anchor -
-            bb.body_to_world(offset_b * bb.dimensions / 2))
+        if ba is None:
+            return bb.relative_offset_to_world(offset_b)
+        if bb is None:
+            return ba.relative_offset_to_world(offset_a)
+        anchor = ba.relative_offset_to_world(offset_a)
+        offset = bb.relative_offset_to_world(offset_b)
+        bb.position = np.asarray(bb.position) + anchor - offset
         return anchor
 
     def get_body_states(self):
