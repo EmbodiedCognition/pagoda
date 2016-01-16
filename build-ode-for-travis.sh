@@ -11,6 +11,6 @@ make -j
 make install
 
 cd bindings/python
-PKG_CONFIG_PATH=$HOME/ode/lib:$PKG_CONFIG_PATH \
+PKG_CONFIG_PATH=$HOME/ode/lib/pkgconfig:$PKG_CONFIG_PATH \
     python setup.py build_ext -L$HOME/ode/lib -I$HOME/ode/include
 python setup.py install
