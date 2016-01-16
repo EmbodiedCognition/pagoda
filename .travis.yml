@@ -20,8 +20,8 @@ before_install:
   - conda update --yes conda
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy nose
+  - pip install pep8 python-coveralls cython
   - ./build-ode-for-travis.sh
-  - pip install pep8 python-coveralls
   - pip install .
 script:
   - nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
