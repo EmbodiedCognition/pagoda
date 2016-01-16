@@ -1,3 +1,8 @@
+.. image:: https://travis-ci.org/EmbodiedCognition/pagoda.svg?branch=master
+   :target: https://travis-ci.org/EmbodiedCognition/pagoda
+.. image:: https://coveralls.io/repos/EmbodiedCognition/pagoda/badge.svg?branch=master&service=github
+   :target: https://coveralls.io/github/EmbodiedCognition/pagoda?branch=master
+
 ======
 PAGODA
 ======
