@@ -1,0 +1,105 @@
+#!/usr/bin/env python
+
+import climate
+import lmj.plot
+import pagoda
+import pagoda.cooper
+import pagoda.viewer
+import numpy as np
+import ode
+
+logging = climate.get_logger('invert')
+
+ROOT = '/data/treadmill/'
+
+L_HIP = 35
+
+
+def zero_crossings(angles):
+    pos = np.convolve(angles - angles.mean(), [1. / 30] * 30, 'same') > 0
+    result, = (pos[:-1] & ~pos[1:]).nonzero()
+    logging.info('counted %s zero-crossings in %s', result.shape, angles.shape)
+    return result
+
+
+def spaced_pairs(angles, width):
+    return ((x, x + width) for x in range(0, len(angles) - width, width // 10))
+
+
+def random_pairs(angles, width, count):
+    start = np.random.randint(0, len(angles) - width, size=count)
+    return zip(start, start + width)
+
+
+def pairs(x):
+    return zip(x[:-1], x[1:])
+
+
+@climate.annotate(
+    motion='load mocap data from this file',
+)
+def main(motion):
+    w = pagoda.cooper.World(dt=1. / 240)
+    Z = -0.35
+
+    # lift up the floor b/c our walking data are on a treadmill.
+    w.ode_floor = ode.GeomPlane(w.ode_space, (0, 0, 1), Z)
+
+    w.load_skeleton(ROOT + 'skeleton.txt')
+    w.load_markers(ROOT + motion, ROOT + 'markers.txt')
+
+    w.markers.cfms[:] = 1e-3
+    w.markers.erp = 0.3
+    w.friction = 0
+
+    w.skeleton.set_pid_params(kp=0.7 / w.dt)
+
+    pose = w.settle_to_markers(1)
+
+    #w.follower = iter(w.follow_markers(1, states=pose))
+    #pagoda.viewer.Viewer(w, floor_z=Z).run()
+    #return
+
+    angles = []
+    states = []
+    forces = []
+    for thetas in w.inverse_kinematics(states=pose, max_force=2.5):
+        angles.append(thetas)
+        states.append(w.skeleton.get_body_states())
+        forces.append([d / 1e-5 for d in w.markers.distances()])
+    angles = np.array(angles)
+    forces = np.array(forces)
+
+    #m = len(forces) // 2
+    #rms = np.sqrt((forces * forces).sum(axis=1))[m-500:m+500]
+    #logging.info('force,%s,%s,%s,%s', len(forces),
+    #             rms.sum(), rms.mean(), rms.std())
+    #
+    #with lmj.plot.axes() as ax:
+    #    for c in range(forces.shape[1]):
+    #        ax.plot(forces[:, c])
+
+    # loosen the marker constraint springs -- equivalent to k = 3 N/m.
+    w.markers.root_attachment_factor = 10.
+    w.markers.cfms[:] = 0.5
+    w.markers.erp = 0.3
+    w.friction = 0  # for this data (on a treadmill) we want 0 friction
+
+    torques = []
+    for t in w.inverse_dynamics(angles, states=pose, max_force=250):
+        torques.append(t)
+    torques = np.array(torques)
+
+    m = len(forces) // 2
+    rms = np.sqrt((torques * torques).sum(axis=1))[m-500:m+500]
+    logging.info('torque,%s,%s,%s,%s', len(torques),
+                 rms.sum(), rms.mean(), rms.std())
+
+    with lmj.plot.axes() as ax:
+        ax.plot(rms)
+        for c in range(torques.shape[1]):
+            ax.plot(torques[:, c])
+
+
+if __name__ == '__main__':
+    climate.call(main)

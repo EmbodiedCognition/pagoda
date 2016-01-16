@@ -132,11 +132,8 @@ class Markers:
         with open(filename, 'rb') as handle:
             reader = c3d.Reader(handle)
 
-            # make sure the c3d file's frame rate matches our world.
-            assert self.world.dt == 1. / reader.frame_rate()
-
             # set up a map from marker label to index in the data stream.
-            labels = [s.strip() for s in reader.point_labels()]
+            labels = [s.strip() for s in reader.point_labels]
             logging.info('%s: loaded marker labels %s', filename, labels)
             self.channels = self._interpret_channels(labels)
 
@@ -303,9 +300,14 @@ class Markers:
             List of distances for each marker joint in our attachment setup.
         '''
         deltas = []
-        for joint in self.joints:
-            delta = np.array(joint.getAnchor()) - joint.getAnchor2()
-            deltas.append(np.sqrt((delta * delta).sum()))
+        for label, _ in self.channels.items():
+            joints = [j for j in self.joints if j.name == label]
+            if joints:
+                joint = joints[0]
+                delta = np.array(joint.getAnchor()) - joint.getAnchor2()
+                deltas.append(np.sqrt((delta * delta).sum()))
+            else:
+                deltas.append(0)
         return deltas
 
     def forces(self):
@@ -505,10 +507,13 @@ class World(physics.World):
         if states is not None:
             self.skeleton.set_body_states(states)
         for frame_no, frame in enumerate(self.markers):
-            if start <= frame_no < end:
-                # TODO: replace with "yield from" for full py3k goodness
-                for states in self._step_to_marker_frame(frame_no):
-                    yield states
+            if frame_no < start:
+                continue
+            if frame_no >= end:
+                break
+            # TODO: replace with "yield from" for full py3k goodness
+            for states in self._step_to_marker_frame(frame_no):
+                yield states
 
     def _step_to_marker_frame(self, frame_no, dt=None):
         '''Update the simulator to a specific frame of marker data.
