@@ -46,11 +46,13 @@ def pid(kp=0., ki=0., kd=0., smooth=0.1):
         value since the previous measurement, and returns a control signal.
     '''
     state = dict(p=0, i=0, d=0)
+
     def control(error, dt=1):
         state['d'] = smooth * state['d'] + (1 - smooth) * (error - state['p']) / dt
         state['i'] += error * dt
         state['p'] = error
         return kp * state['p'] + ki * state['i'] + kd * state['d']
+
     return control
 
 

@@ -17,6 +17,7 @@ setuptools.setup(
               'visualization '
               ),
     install_requires=['climate', 'numpy', 'pyglet'],
+    tests_require=['nose', 'pep8'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

@@ -26,7 +26,7 @@ class World(physics.World):
     def add_skeleton(self, asf, name=None, translate=(0, 1, 0)):
         skeleton = parse_asf(asf)
         skeleton.create_bodies(self, translate=translate)
-        #skeleton.create_joints(self)
+        # TODO: call skeleton.create_joints(self)
         if name is None:
             name = skeleton.name
         self.skeletons[name] = skeleton
@@ -72,7 +72,8 @@ class Skeleton(object):
         return 2.54 / (100. * self.units['length'])
 
     def to_json(self):
-        h = lambda x: x.__dict__ if isinstance(x, Bone) else x
+        def h(x):
+            return x.__dict__ if isinstance(x, Bone) else x
         return json.dumps(self.__dict__, default=h)
 
     def create_bodies(self, world, translate=(0, 1, 0)):
@@ -156,18 +157,19 @@ class Bone(object):
             ct = np.cos(theta)
             st = np.sin(theta)
             if ax == 'X':
-                z = np.dot([[ 1,   0,  0], [ 0, ct, -st], [  0, st, ct]], z)
+                z = np.dot([[1, 0, 0], [0, ct, -st], [0, st, ct]], z)
             if ax == 'Y':
-                z = np.dot([[ct,   0, st], [ 0,  1,   0], [-st,  0, ct]], z)
+                z = np.dot([[ct, 0, st], [0, 1, 0], [-st, 0, ct]], z)
             if ax == 'Z':
-                z = np.dot([[ct, -st,  0], [st, ct,   0], [  0,  0,  1]], z)
+                z = np.dot([[ct, -st, 0], [st, ct, 0], [0, 0, 1]], z)
         return z
 
     def create_body(self, world, rank=0):
-        return world.create_body('box',
-                                 name=self.name,
-                                 color=tuple(np.random.rand(3)) + (0.9, ),#(rank, 0.7, 0.3, 0.9),
-                                 lengths=(0.06, 0.03, self.length))
+        return world.create_body(
+            'box',
+            name=self.name,
+            color=tuple(np.random.rand(3)) + (0.9, ),
+            lengths=(0.06, 0.03, self.length))
 
 
 class Tokenizer(list):
@@ -177,8 +179,11 @@ class Tokenizer(list):
     number. Maintains some minimal state information for parsing nested blocks.
     '''
 
-    class EOS(IndexError): pass
-    class MissingEndKeyword(ValueError): pass
+    class EOS(IndexError):
+        pass
+
+    class MissingEndKeyword(ValueError):
+        pass
 
     def __init__(self, data):
         for i, l in enumerate(data.splitlines()):
@@ -225,8 +230,10 @@ class Tokenizer(list):
 def _parse_version(tok, asf):
     asf.version = tok.next()
 
+
 def _parse_name(tok, asf):
     asf.name = tok.next()
+
 
 def _parse_units(tok, asf):
     while not tok.peek().startswith(':'):
@@ -236,11 +243,13 @@ def _parse_units(tok, asf):
             value = float(value)
         asf.units[key] = value
 
+
 def _parse_documentation(tok, asf):
     doc = []
     while not tok.peek().startswith(':'):
         doc.append(tok.next())
     asf.documentation = ' '.join(doc)
+
 
 def _parse_root(tok, asf):
     while not tok.peek().startswith(':'):
@@ -252,6 +261,7 @@ def _parse_root(tok, asf):
         else:
             value = tok.next()
         asf.root[key] = value
+
 
 def _parse_hierarchy(tok, asf):
     assert tok.next() == 'begin'
@@ -266,6 +276,7 @@ def _parse_hierarchy(tok, asf):
         logging.debug('hierarchy: %s -> %s', source, ', '.join(targets))
         token = tok.next()
 
+
 def _parse_bonedata(tok, asf):
     while not tok.peek().startswith(':'):
         bone = _parse_bone(tok)
@@ -276,6 +287,7 @@ def _parse_bonedata(tok, asf):
             bone.limits *= TAU / 360
         asf.bones[bone.id] = asf.bones[bone.name] = bone
         logging.debug('bone %s: %dmm', bone.name, 1000 * bone.length)
+
 
 def _parse_bone(tok):
     assert tok.next() == 'begin'
@@ -310,6 +322,7 @@ def _parse_bone(tok):
     bone.limits = np.array(bone.limits)
     return bone
 
+
 PARSERS = dict(
     version=_parse_version,
     name=_parse_name,
@@ -319,6 +332,7 @@ PARSERS = dict(
     bonedata=_parse_bonedata,
     hierarchy=_parse_hierarchy,
     )
+
 
 def parse_asf(data):
     '''Parse an ASF skeleton definition file.

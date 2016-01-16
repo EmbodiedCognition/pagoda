@@ -21,8 +21,11 @@ class World(pagoda.physics.World):
 def main(n=20):
     w = World()
     # set the cfm parameter below for a trampoline-like floor !
-    #w.cfm = 1e-3
-    g = lambda n, k=0.1, size=1: np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
+    # w.cfm = 1e-3
+
+    def g(n, k=0.1, size=1):
+        return np.clip(rng.gamma(n, k, size=size), 0.5, 1000)
+
     for _ in range(n):
         s, kw = sorted(dict(
             box=dict(lengths=g(8, size=3)),
@@ -32,7 +35,9 @@ def main(n=20):
             ).items())[rng.randint(4)]
         kw['color'] = tuple(rng.uniform(0, 1, size=3)) + (0.9, )
         w.create_body(s, **kw)
+
     w.reset()
+
     pagoda.viewer.Viewer(w).run()
 
 

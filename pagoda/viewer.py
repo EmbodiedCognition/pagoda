@@ -8,6 +8,8 @@ import numpy as np
 import os
 import pyglet
 
+from . import physics
+
 # normally this import should work; the try/except here is so the documentation
 # will build on readthedocs.org!
 try:
@@ -16,8 +18,6 @@ except ImportError:
     pass
 
 logging = climate.get_logger(__name__)
-
-from . import physics
 
 TAU = 2 * np.pi
 
@@ -48,7 +48,7 @@ def build_vertex_list(idx, vtx, nrm):
 
 def box_vertices():
     vtx = np.array([
-        [ 1, 1, 1], [ 1, 1, -1], [ 1, -1, -1], [ 1, -1, 1],
+        [1, 1, 1], [1, 1, -1], [1, -1, -1], [1, -1, 1],
         [-1, 1, 1], [-1, 1, -1], [-1, -1, -1], [-1, -1, 1]], 'f')
     nrm = vtx / np.sqrt((vtx * vtx).sum(axis=1))[:, None]
     return [
@@ -62,7 +62,7 @@ def sphere_vertices(n=3):
     idx = [[0, 1, 2], [0, 5, 1], [0, 2, 4], [0, 4, 5],
            [3, 2, 1], [3, 4, 2], [3, 5, 4], [3, 1, 5]]
     vtx = list(np.array([
-        [ 1, 0, 0], [0,  1, 0], [0, 0,  1],
+        [1, 0, 0], [0, 1, 0], [0, 0, 1],
         [-1, 0, 0], [0, -1, 0], [0, 0, -1]], 'f'))
     for _ in range(n):
         idx_ = []
@@ -247,10 +247,10 @@ class Window(pyglet.window.Window):
         glTranslatef(-self.view.zoom, self.view.ty, self.view.tz)
         glRotatef(self.view.ry, 0, 1, 0)
         glRotatef(self.view.rz, 0, 0, 1)
-        #print(self.view)
 
     def on_mouse_scroll(self, x, y, dx, dy):
-        if dy == 0: return
+        if dy == 0:
+            return
         self.view.zoom *= 1.1 ** (-1 if dy > 0 else 1)
         self._update_view()
 

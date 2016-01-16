@@ -6,7 +6,7 @@ import pagoda
 import pagoda.parser
 import pagoda.physics
 import pagoda.viewer
-import sys
+
 
 def full(name):
     return os.path.join(os.path.dirname(__file__), name)

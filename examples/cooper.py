@@ -6,8 +6,10 @@ import pagoda
 import pagoda.viewer
 import sys
 
+
 def full(name):
     return os.path.join(os.path.dirname(__file__), name)
+
 
 def main():
     w = pagoda.cooper.World(dt=1. / 120)

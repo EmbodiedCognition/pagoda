@@ -291,7 +291,8 @@ class Body(object):
         '''
         self.world.join(joint, self, other_body, **kwargs)
 
-    def connect_to(self, other_body, joint, offset=(0, 0, 0), other_offset=(0, 0, 0), **kwargs):
+    def connect_to(self, other_body, joint, offset=(0, 0, 0), other_offset=(0, 0, 0),
+                   **kwargs):
         '''Move another body next to this one and join them together.
 
         This method will move the ``other_body`` so that the anchor points for
@@ -409,6 +410,7 @@ def _get_params(target, param, dof):
     '''Get the given param from each of the DOFs for a joint.'''
     return [target.getParam(getattr(ode, 'Param{}{}'.format(param, s)))
             for s in ['', '2', '3'][:dof]]
+
 
 def _set_params(target, param, values, dof):
     '''Set the given param for each of the DOFs for a joint.'''
@@ -660,7 +662,8 @@ class Motor(Constraints):
         group in the world.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3, jointgroup=None):
+    def __init__(self, name, world, body_a, body_b=None, feedback=False, dof=3,
+                 jointgroup=None):
         self.name = name
         if isinstance(world, World):
             world = world.ode_world
@@ -748,7 +751,8 @@ class Joint(Constraints):
         Add the joint to this group. Defaults to the default world joint group.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False, jointgroup=None):
+    def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False,
+                 jointgroup=None):
         self.name = name
 
         build = getattr(ode, '{}Joint'.format(self.__class__.__name__))
@@ -1327,9 +1331,9 @@ class World(base.World):
         '''
         body_a = geom_a.getBody()
         body_b = geom_b.getBody()
-        if (ode.areConnected(body_a, body_b) or
-            (body_a and body_a.isKinematic()) or
-            (body_b and body_b.isKinematic())):
+        if ode.areConnected(body_a, body_b) or \
+           (body_a and body_a.isKinematic()) or \
+           (body_b and body_b.isKinematic()):
             return
         for c in ode.collide(geom_a, geom_b):
             c.setBounce(self.elasticity)

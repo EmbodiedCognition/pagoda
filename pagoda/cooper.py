@@ -101,7 +101,8 @@ class Markers:
         markers = []
         for c in df.columns:
             m = re.match(r'^marker\d\d-(.*)-c$', c)
-            if m: markers.append(m.group(1))
+            if m:
+                markers.append(m.group(1))
         self.channels = self._interpret_channels(markers)
 
         cols = [c for c in df.columns if re.match(r'^marker\d\d-.*-[xyzc]$', c)]
@@ -167,7 +168,8 @@ class Markers:
             next = self.data[frame_no + 1]
             for c in range(self.num_markers):
                 if -1 < prev[c, 3] < 100 and -1 < next[c, 3] < 100:
-                    self.velocities[frame_no, c] = (next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
+                    self.velocities[frame_no, c] = (
+                        next[c, :3] - prev[c, :3]) / (2 * self.world.dt)
         self.cfms = np.zeros_like(self.visibility) + self.DEFAULT_CFM
 
     def create_bodies(self):
@@ -632,15 +634,15 @@ class World(physics.World):
             # stepping using angle constraints will be removed, because we
             # will be stepping the model using the computed torques.
 
-            #self.skeleton.enable_motors(max_force)
+            self.skeleton.enable_motors(max_force)
             self.skeleton.set_target_angles(angles[start + i])
 
             self.ode_world.step(self.dt)
 
             torques = self.skeleton.joint_torques
-            #self.skeleton.disable_motors()
-            #self.skeleton.set_body_states(states)
-            #self.skeleton.add_torques(torques)
+            self.skeleton.disable_motors()
+            self.skeleton.set_body_states(states)
+            self.skeleton.add_torques(torques)
             yield torques
 
     def forward_dynamics(self, torques, start=0, states=None):
