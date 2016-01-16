@@ -24,6 +24,6 @@ install:
   - ./build-ode-for-travis.sh
   - pip install .
 script:
-  - nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
+  - LD_LIBRARY_PATH=$HOME/ode/lib:$LD_LIBRARY_PATH nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
 after_success:
   - coveralls

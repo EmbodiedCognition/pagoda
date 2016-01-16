@@ -1,7 +1,7 @@
 #!/bin/bash
 
 cd ode
-svn checkout -r 1939 https://svn.code.sf.net/p/opende/code/trunk opende
+svn checkout -r 1939 https://svn.code.sf.net/p/opende/code/trunk opende >/dev/null 2>&1
 
 cd opende
 patch -p0 < ../ode-r1939.patch
