@@ -1306,13 +1306,9 @@ class World(base.World):
         connected : bool
             Return True iff the two bodies are connected.
         '''
-        ba = body_a
-        if isinstance(body_a, str):
-            ba = self.get_body(body_a)
-        bb = body_b
-        if isinstance(body_b, str):
-            bb = self.get_body(body_b)
-        return bool(ode.areConnected(ba.ode_body, bb.ode_body))
+        return bool(ode.areConnected(
+            self.get_body(body_a).ode_body,
+            self.get_body(body_b).ode_body))
 
     def on_collision(self, args, geom_a, geom_b):
         '''Callback function for the collide() method.

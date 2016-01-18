@@ -6,8 +6,8 @@ import pagoda.physics
 class Base(object):
     def setUp(self):
         self.world = pagoda.physics.World()
-        self.box = pagoda.physics.Box('box', self.world, lengths=(1, 2, 3))
-        self.cap = pagoda.physics.Capsule('cap', self.world, radius=1, length=2)
+        self.box = self.world.create_body('box', lengths=(1, 2, 3))
+        self.cap = self.world.create_body('cap', radius=1, length=2)
 
 
 class TestShapes(Base):
@@ -143,6 +143,7 @@ class TestMotor(Base):
 class TestJoint(Base):
     def test_fixed(self):
         j = pagoda.physics.Fixed('fix', self.world, self.box)
+        assert j is not None
 
     def test_slider(self):
         j = pagoda.physics.Slider('sli', self.world, self.box)
@@ -150,19 +151,23 @@ class TestJoint(Base):
         assert j.position_rates == [0]
 
     def test_hinge(self):
-        j = pagoda.physics.Hinge('hin', self.world, self.box)
+        j = pagoda.physics.Hinge('hin', self.world, self.box, anchor=(0, 0, 0))
         assert j.axes == [(1, 0, 0)]
         assert j.angles == [0]
         assert j.angle_rates == [0]
+        j.axes = [(0, 1, 0)]
+        assert j.axes == [(0, 1, 0)]
 
     def test_universal(self):
-        j = pagoda.physics.Universal('uni', self.world, self.box)
+        j = pagoda.physics.Universal('uni', self.world, self.box, anchor=(0, 0, 0))
         assert j.axes == [(1, 0, 0), (0, 1, 0)]
         assert j.angles == [0, 0]
         assert j.angle_rates == [0, 0]
+        j.axes = [(0, 1, 0), (0, 0, 1)]
+        assert j.axes == [(0, 1, 0), (0, 0, 1)]
 
     def test_ball(self):
-        j = pagoda.physics.Ball('bal', self.world, self.box)
+        j = pagoda.physics.Ball('bal', self.world, self.box, anchor=(0, 0, 0))
 
     def test_join_to(self):
         b = pagoda.physics.Box('b', self.world, lengths=(1, 2, 3))
@@ -208,10 +213,18 @@ class TestWorld(Base):
         assert self.world.get_joint('foo') is j
 
     def test_body_states(self):
-        s = self.world.create_body('sphere', radius=1)
-        b = self.world.create_body('box', lengths=(1, 1, 1))
         states = self.world.get_body_states()
         assert states == [('box0', (0, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0)),
-                          ('sphere0', (0, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0))]
+                          ('cap0', (0, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0))]
         self.world.set_body_states(states)
         assert states == self.world.get_body_states()
+
+    def test_are_connected(self):
+        assert not self.world.are_connected('box0', 'cap0')
+        self.world.join('hinge', 'box0', 'cap0')
+        assert self.world.are_connected('box0', 'cap0')
+
+    def test_on_collision(self):
+        assert not self.world.are_connected('box0', 'cap0')
+        self.world.on_collision(None, self.box.ode_geom, self.cap.ode_geom)
+        assert self.world.are_connected('box0', 'cap0')
