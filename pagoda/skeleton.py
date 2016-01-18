@@ -100,21 +100,12 @@ class Skeleton:
 
     joints : list of :class:`pagoda.physics.Joint`
         A list of the joints that connect bodies in this skeleton.
-
-    roots : list of :class:`pagoda.physics.Body`
-        A list of rigid bodies that are considered "roots" in the skeleton.
-        Roots are given special treatment when modeling movement of the
-        skeleton; for instance, when using ASM data, the skeleton root is
-        allowed to interact with the world, and when using the Cooper model,
-        roots are allowed to remain attached to their associated markers during
-        the inverse dynamics process.
     '''
 
     def __init__(self, world):
         self.world = world
         self.jointgroup = ode.JointGroup()
 
-        self.roots = []
         self.bodies = []
         self.joints = []
 
@@ -145,7 +136,6 @@ class Skeleton:
         logging.info('%s: parsing skeleton configuration', source)
         p = parser.BodyParser(self.world, self.jointgroup)
         p.parse(source)
-        self.roots = [self.world.get_body(r) for r in p.roots]
         self.bodies = p.bodies
         self.joints = p.joints
         self.set_pid_params(kp=0.999 / self.world.dt)

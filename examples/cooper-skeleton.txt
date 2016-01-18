@@ -19,8 +19,8 @@ body box r-hand    lengths 0.08 0.03 0.12  density 1100
 
 body cap ru-leg    length 0.35 radius 0.08
 body cap rl-leg    length 0.28 radius 0.06 density 1100
-body box r-foot    lengths 0.08 0.10 0.06  density 1100  root
-body box r-toes    lengths 0.08 0.10 0.04  density 1100  root
+body box r-foot    lengths 0.08 0.10 0.06  density 1100
+body box r-toes    lengths 0.08 0.10 0.04  density 1100
 
 body box l-collar  lengths 0.17 0.12 0.05
 body cap lu-arm    length 0.26 radius 0.05
@@ -29,8 +29,8 @@ body box l-hand    lengths 0.08 0.03 0.12  density 1100
 
 body cap lu-leg    length 0.35 radius 0.08
 body cap ll-leg    length 0.28 radius 0.06 density 1100
-body box l-foot    lengths 0.08 0.10 0.06  density 1100  root
-body box l-toes    lengths 0.08 0.10 0.04  density 1100  root
+body box l-foot    lengths 0.08 0.10 0.06  density 1100
+body box l-toes    lengths 0.08 0.10 0.04  density 1100
 
 # --- joint attachments ---
 

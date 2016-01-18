@@ -8,7 +8,6 @@ from . import physics
 
 logging = climate.get_logger(__name__)
 
-TAU = 2 * np.pi
 FLOAT_RE = r'^[-+]?\d+(\.\d*)?([efgEFG][-+]?\d+(\.\d*)?)?$'
 
 
@@ -22,7 +21,7 @@ class Parser(object):
 
         self.joints = []
         self.bodies = []
-        self.roots = []
+        self.root = None
 
         self._filename = None
         self._tokens = []
@@ -192,7 +191,7 @@ class BodyParser(Parser):
       rotation for the body. By default bodies are created without any rotation
       (i.e., with a 0 1 0 0 quaternion).
 
-    - root -- indicates that this body is a root in the skeleton.
+    - root -- indicates that this body is the root in the skeleton.
 
     **Joints**
 
@@ -245,7 +244,7 @@ class BodyParser(Parser):
 
     - A capped cylinder identified as "baz" that is 10cm in radius and 30cm long
       (the total length of this geometry is actually 50cm due to the
-      hemispherical cylinder end caps). This body is a root of the skeleton.
+      hemispherical cylinder end caps). This body is the root of the skeleton.
 
     .. code-block:: shell
 
@@ -310,12 +309,13 @@ class BodyParser(Parser):
                 kwargs[token] = self._next_float()
             if token == 'quaternion':
                 theta, x, y, z = self._floats(4)
-                quaternion = physics.make_quaternion(TAU * theta / 360, x, y, z)
+                quaternion = physics.make_quaternion(np.deg2rad(theta), x, y, z)
             if token == 'position':
                 position = self._floats()
             if token == 'root':
                 logging.info('"%s" will be used as a root', name)
-                self.roots.append(name)
+                assert self.root is None, 'more than one root!'
+                self.root = name
             token = self._next_token()
 
         logging.info('creating %s %s %s', shape, name, kwargs)

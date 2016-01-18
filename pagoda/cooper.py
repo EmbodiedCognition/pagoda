@@ -209,8 +209,6 @@ class Markers:
         skeleton : :class:`pagoda.skeleton.Skeleton`
             The skeleton to attach our marker data to.
         '''
-        self.roots = skeleton.roots
-
         self.attach_bodies = {}
         self.attach_offsets = {}
 
