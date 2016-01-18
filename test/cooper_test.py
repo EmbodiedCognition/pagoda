@@ -20,7 +20,7 @@ class TestMarkers(Base):
         assert len(self.markers.channels) == 41
 
     def test_csv(self):
-        return # TODO
+        return  # TODO
         self.markers.load_csv('examples/cooper-motion.csv')
         assert self.markers.num_frames == 343
         assert len(self.markers.marker_bodies) == 41
