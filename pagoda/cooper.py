@@ -34,7 +34,6 @@ class Markers:
         self.joints = []
 
         self.erp = Markers.DEFAULT_ERP
-        self.root_attachment_factor = 1.
 
         self.marker_bodies = {}
         self.attach_bodies = {}
@@ -129,6 +128,7 @@ class Markers:
             Maximum number of frames to load. Defaults to loading all frames.
         '''
         import c3d
+
         with open(filename, 'rb') as handle:
             reader = c3d.Reader(handle)
 
@@ -265,12 +265,11 @@ class Markers:
                 continue
             if np.linalg.norm(self.velocities[frame_no, j]) > 10:
                 continue
-            f = self.root_attachment_factor if target in self.roots else 1.
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
             joint.attach(self.marker_bodies[label].ode_body, target.ode_body)
             joint.setAnchor1Rel([0, 0, 0])
             joint.setAnchor2Rel(self.attach_offsets[label])
-            joint.setParam(ode.ParamCFM, self.cfms[frame_no, j] / f)
+            joint.setParam(ode.ParamCFM, self.cfms[frame_no, j])
             joint.setParam(ode.ParamERP, self.erp)
             joint.name = label
             self.joints.append(joint)
@@ -359,19 +358,13 @@ class World(physics.World):
        can be queried to find their constraint slippage.
 
     2. :func:`Inverse Dynamics <inverse_dynamics>`. The marker constraints are
-       weakened significantly, and the joint angles computed in the first pass
-       are then used to constrain the skeleton's movements.
+       removed, and the joint angles computed in the first pass are used to
+       constrain the skeleton's movements.
 
        At each frame during the second pass, the joints in the skeleton attempt
        to follow the angles computed in the first pass; a PID controller is used
        to convert the angular error value into a target angular velocity for
        each joint.
-
-       In addition, because joint-local optimization discards orientation in
-       world coordinates, the articulated skeleton needs additional constraints
-       to avoid falling over. To this end, some marker attachments
-       (specifically, markers attached to "root" bodies in the skeleton) are
-       maintained at full strength.
 
        The torques that ODE computes to solve this forward angle-following
        problem are returned as a result of the second pass.
@@ -511,7 +504,6 @@ class World(physics.World):
                 continue
             if frame_no >= end:
                 break
-            # TODO: replace with "yield from" for full py3k goodness
             for states in self._step_to_marker_frame(frame_no):
                 yield states
 
