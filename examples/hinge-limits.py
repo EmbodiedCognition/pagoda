@@ -22,7 +22,7 @@ class Viewer(pagoda.viewer.Viewer):
 
 def main():
     w = pagoda.physics.World(dt=0.01)
-    p = pagoda.parser.BodyParser(w)
+    p = pagoda.parser.BodyParser(w, color=(0.9, 0.3, 0.1, 0.8))
     p.parse(full('hinge-limits.txt'))
     w.get_body('arm').add_force((0, 0, 100), relative_position=(1, 0, 0))
     Viewer(w).run()

@@ -15,9 +15,10 @@ class Parser(object):
     '''Base class for skeleton parsers of various sorts.
     '''
 
-    def __init__(self, world, jointgroup=None):
+    def __init__(self, world, jointgroup=None, color=None):
         self.world = world
         self.jointgroup = jointgroup
+        self.color = color
 
         self.joints = []
         self.bodies = []
@@ -282,10 +283,16 @@ class BodyParser(Parser):
                 token = self._handle_joint()
             else:
                 self._error('unexpected token')
+
         mass = sum(b.mass.mass for b in self.bodies)
         vol = sum(b.volume for b in self.bodies)
         logging.info('%.1f mass / %f volume = %.1f overall density',
                      mass, vol, mass / vol)
+
+        if self.color is not None:
+            for b in self.bodies:
+                if not hasattr(b, 'color'):
+                    b.color = self.color
 
     def _handle_body(self):
         '''Parse the entirety of a "body" section in the source.'''

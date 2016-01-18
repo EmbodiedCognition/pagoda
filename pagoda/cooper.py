@@ -384,12 +384,11 @@ class World(physics.World):
             :func:`pagoda.skeleton.pid` for more information.
         '''
         self.skeleton = skeleton.Skeleton(self)
-        self.skeleton.load(filename)
+        self.skeleton.load(filename, color=(0.3, 0.5, 0.9, 0.8))
         if pid_params:
             self.skeleton.set_pid_params(**pid_params)
         self.skeleton.erp = 0.1
         self.skeleton.cfm = 0
-        self.skeleton.color = 0.3, 0.5, 0.9, 0.8
 
     def load_markers(self, filename, attachments, max_frames=1e100):
         '''Load marker data and attachment preferences into the model.

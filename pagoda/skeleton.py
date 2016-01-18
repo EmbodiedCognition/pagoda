@@ -109,7 +109,7 @@ class Skeleton:
         self.bodies = []
         self.joints = []
 
-    def load(self, source):
+    def load(self, source, **kwargs):
         '''Load a skeleton definition from a file.
 
         Parameters
@@ -120,10 +120,10 @@ class Skeleton:
             information about the format of the text file.
         '''
         if hasattr(source, 'endswith') and source.lower().endswith('.asf'):
-            return self.load_asf(source)
-        self.load_skel(source)
+            return self.load_asf(source, **kwargs)
+        self.load_skel(source, **kwargs)
 
-    def load_skel(self, source):
+    def load_skel(self, source, **kwargs):
         '''Load a skeleton definition from a text file.
 
         Parameters
@@ -134,13 +134,13 @@ class Skeleton:
             more information about the format of the text file.
         '''
         logging.info('%s: parsing skeleton configuration', source)
-        p = parser.BodyParser(self.world, self.jointgroup)
+        p = parser.BodyParser(self.world, self.jointgroup, **kwargs)
         p.parse(source)
         self.bodies = p.bodies
         self.joints = p.joints
         self.set_pid_params(kp=0.999 / self.world.dt)
 
-    def load_asf(self, source):
+    def load_asf(self, source, **kwargs):
         '''Load a skeleton definition from an ASF text file.
 
         NOT IMPLEMENTED!
