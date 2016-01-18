@@ -16,7 +16,7 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['climate', 'numpy', 'pyglet'],
+    install_requires=['climate', 'numpy', 'popglove'],
     tests_require=['nose', 'pep8'],
     classifiers=[
         'Development Status :: 3 - Alpha',
