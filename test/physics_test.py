@@ -35,6 +35,11 @@ class TestShapes(Base):
 
 
 class TestBody(Base):
+    def test_state(self):
+        st = self.box.state
+        assert st == ('box0', (0, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0))
+        self.box.state = st
+
     def test_position(self):
         assert self.box.position == (0, 0, 0)
         self.box.position = 1, 2, 3
@@ -108,11 +113,15 @@ class TestBody(Base):
         assert not self.box.is_kinematic
         self.box.is_kinematic = True
         assert self.box.is_kinematic
+        self.box.is_kinematic = False
+        assert not self.box.is_kinematic
 
     def test_follows_gravity(self):
         assert self.box.follows_gravity
         self.box.follows_gravity = False
         assert not self.box.follows_gravity
+        self.box.follows_gravity = True
+        assert self.box.follows_gravity
 
     def test_rotate_to_body(self):
         assert np.allclose(self.box.rotate_to_body((1, 0, 0)), (1, 0, 0))

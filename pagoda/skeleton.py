@@ -163,6 +163,15 @@ class Skeleton:
             joint.controllers = [pid(*args, **kwargs) for i in range(joint.ADOF)]
 
     @property
+    def color(self):
+        return getattr(self.bodies[0], 'color', (1, 0, 0, 1))
+
+    @color.setter
+    def color(self, color):
+        for b in self.bodies:
+            b.color = color
+
+    @property
     def num_dofs(self):
         '''Return the number of degrees of freedom in the skeleton.'''
         return sum(j.ADOF for j in self.joints)

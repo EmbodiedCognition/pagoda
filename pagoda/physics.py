@@ -2,28 +2,29 @@
 
 from __future__ import division, print_function
 
+import collections
 import numpy as np
 import ode
 
 from . import base
 
 
+BodyState = collections.namedtuple(
+    'BodyState', 'name position quaternion linear_velocity angular_velocity')
+
+
 class Body(object):
     '''This class wraps things that participate in the ODE physics simulation.
 
-    The primary attribute of this class is "ode_body" -- a PyODE Body object. In
-    addition, there is a PyODE Geom object (for detecting collisions -- not sure
-    if this is really necessary to keep around though).
-
-    This class also provides lots of Python-specific properties that call the
-    equivalent ODE getters and setters for things like position, rotation, etc.
+    This class basically provides lots of Python-specific properties that call
+    the equivalent ODE getters and setters for things like position, rotation,
+    etc.
     '''
 
-    def __init__(self, name, world, color=(0.3, 0.6, 0.9, 1), density=1000., **shape):
+    def __init__(self, name, world, density=1000., **shape):
         self.name = name
         self.world = world
         self.shape = shape
-        self.color = color
 
         m = ode.Mass()
         self.init_mass(m, density)
@@ -41,6 +42,38 @@ class Body(object):
     def mass(self):
         '''The ODE mass object for this body.'''
         return self.ode_body.getMass()
+
+    @property
+    def state(self):
+        '''The state of this body includes:
+
+            - name of the body (str)
+            - position (3-tuple)
+            - quaternion (4-tuple)
+            - linear velocity (3-tuple)
+            - angular velocity (3-tuple)
+        '''
+        return BodyState(self.name,
+                         self.position,
+                         self.quaternion,
+                         self.linear_velocity,
+                         self.angular_velocity)
+
+    @state.setter
+    def state(self, state):
+        '''Set the state of this body.
+
+        Parameters
+        ----------
+        state : BodyState tuple
+            The desired state of the body.
+        '''
+        assert self.name == state.name, \
+            'state name "{}" != body name "{}"'.format(state.name, self.name)
+        self.position = state.position
+        self.quaternion = state.quaternion
+        self.linear_velocity = state.linear_velocity
+        self.angular_velocity = state.angular_velocity
 
     @property
     def position(self):
@@ -1242,20 +1275,10 @@ class World(base.World):
         Returns
         -------
         states : list of state information tuples
-            A list of body state information for each body in the world. Each
-            state tuple contains:
-
-            - name of the body (str)
-            - position (3-tuple)
-            - quaternion (4-tuple)
-            - linear velocity (3-tuple)
-            - angular velocity (3-tuple)
+            A list of body state information for each body in the world. See
+            :func:`Body.state`.
         '''
-        return [(b.name,
-                 b.position,
-                 b.quaternion,
-                 b.linear_velocity,
-                 b.angular_velocity) for b in self.bodies]
+        return [b.state for b in self.bodies]
 
     def set_body_states(self, states):
         '''Set the states of some bodies in the world.
@@ -1266,12 +1289,8 @@ class World(base.World):
             A complete state tuple for one or more bodies in the world. See
             :func:`get_body_states`.
         '''
-        for name, pos, rot, lin, ang in states:
-            body = self.get_body(name)
-            body.position = pos
-            body.quaternion = rot
-            body.linear_velocity = lin
-            body.angular_velocity = ang
+        for state in states:
+            self.get_body(state.name).state = state
 
     def step(self, substeps=2):
         '''Step the world forward by one frame.

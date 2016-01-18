@@ -33,8 +33,8 @@ def main(n=20):
             cylinder=dict(radius=g(2), length=g(10)),
             sphere=dict(radius=g(2)),
             ).items())[rng.randint(4)]
-        kw['color'] = tuple(rng.uniform(0, 1, size=3)) + (0.9, )
-        w.create_body(s, **kw)
+        b = w.create_body(s, **kw)
+        b.color = tuple(rng.uniform(0, 1, size=3)) + (0.9, )
 
     w.reset()
 

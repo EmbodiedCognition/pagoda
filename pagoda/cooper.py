@@ -174,11 +174,9 @@ class Markers:
         self.marker_bodies = {}
         for label in self.channels:
             body = self.world.create_body(
-                'sphere',
-                name='marker:{}'.format(label),
-                radius=0.02,
-                color=(0.9, 0.1, 0.1, 0.5))
+                'sphere', name='marker:{}'.format(label), radius=0.02)
             body.is_kinematic = True
+            body.color = 0.9, 0.1, 0.1, 0.5
             self.marker_bodies[label] = body
 
     def load_attachments(self, source, skeleton):
@@ -391,6 +389,7 @@ class World(physics.World):
             self.skeleton.set_pid_params(**pid_params)
         self.skeleton.erp = 0.1
         self.skeleton.cfm = 0
+        self.skeleton.color = 0.3, 0.5, 0.9, 0.8
 
     def load_markers(self, filename, attachments, max_frames=1e100):
         '''Load marker data and attachment preferences into the model.
