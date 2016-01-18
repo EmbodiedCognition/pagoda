@@ -819,26 +819,6 @@ class Joint(Constraints):
         '''3-tuple specifying location of the anchor on the second body.'''
         return self.ode_obj.getAnchor2()
 
-    @property
-    def angles(self):
-        '''List of angles for this joint's rotational degrees of freedom.'''
-        return [self.ode_obj.getAngle()]
-
-    @property
-    def angle_rates(self):
-        '''List of angle rates for this joint's degrees of freedom.'''
-        return [self.ode_obj.getAngleRate()]
-
-    @property
-    def positions(self):
-        '''List of positions for this joint's linear degrees of freedom.'''
-        return [self.ode_obj.getPosition()]
-
-    @property
-    def position_rates(self):
-        '''List of position rates for this joint's degrees of freedom.'''
-        return [self.ode_obj.getPositionRate()]
-
     def add_torques(self, *torques):
         '''Add the given torques along this joint's axes.
 
@@ -858,6 +838,16 @@ class Fixed(Joint):
 class Slider(Joint):
     ADOF = 0
     LDOF = 1
+
+    @property
+    def positions(self):
+        '''List of positions for this joint's linear degrees of freedom.'''
+        return [self.ode_obj.getPosition()]
+
+    @property
+    def position_rates(self):
+        '''List of position rates for this joint's degrees of freedom.'''
+        return [self.ode_obj.getPositionRate()]
 
     @property
     def axes(self):
@@ -882,6 +872,16 @@ class Slider(Joint):
 class Hinge(Joint):
     ADOF = 1
     LDOF = 0
+
+    @property
+    def angles(self):
+        '''List of angles for this joint's rotational degrees of freedom.'''
+        return [self.ode_obj.getAngle()]
+
+    @property
+    def angle_rates(self):
+        '''List of angle rates for this joint's degrees of freedom.'''
+        return [self.ode_obj.getAngleRate()]
 
     @property
     def axes(self):
