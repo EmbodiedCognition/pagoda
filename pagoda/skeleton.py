@@ -5,6 +5,7 @@ import numpy as np
 import ode
 
 from . import parser
+from . import physics
 
 logging = climate.get_logger(__name__)
 
@@ -140,7 +141,8 @@ class Skeleton:
         self.joints = p.joints
         if p.root:
             b = self.world.get_body(p.root)
-            j = self.world.join('ball', b, None)
+            j = physics.AMotor('hog', self.world, b, None, mode='euler')
+            j.axes = [dict(rel=1, axis=(1, 0, 0)), None, dict(rel=2, axis=(0, 0, 1))]
             self.joints.append(j)
         self.set_pid_params(kp=0.999 / self.world.dt)
 
