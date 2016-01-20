@@ -1,6 +1,6 @@
 '''This module contains convenience wrappers for ODE objects.'''
 
-from __future__ import division, print_function
+from __future__ import division
 
 import collections
 import numpy as np
@@ -530,10 +530,7 @@ class Constraints(object):
     @property
     def axes(self):
         '''List of axes for this object's degrees of freedom.'''
-        def ax(i):
-            return dict(rel=self.ode_obj.getAxisRel(i),
-                        axis=self.ode_obj.getAxis(i))
-        return [ax(i) for i in range(self.ADOF)]
+        return [self.ode_obj.getAxis(i) for i in range(self.ADOF)]
 
     @axes.setter
     def axes(self, axes):
@@ -541,24 +538,18 @@ class Constraints(object):
 
         Parameters
         ----------
-        axes : list of None, 3 floats, or dict
+        axes : list of axes specifications
             A list of axis values to set. This list must have the same number of
             elements as the degrees of freedom of the underlying ODE object.
             Each element can be
 
-            (a) None, which has no effect on the corresponding axis,
-            (b) three floats specifying the axis to set, or
-            (c) a dictionary with an "axis" key specifying the axis to set and a
-                "rel" key specifying the relative body to set the axis on.
+            (a) None, which has no effect on the corresponding axis, or
+            (b) three floats specifying the axis to set.
         '''
         assert self.ADOF == len(axes)
         for i, axis in enumerate(axes):
-            rel = 0
-            if isinstance(axis, dict):
-                rel = axis.get('rel', 0)
-                axis = axis.get('axis')
             if axis is not None:
-                self.ode_obj.setAxis(i, rel, axis)
+                self.ode_obj.setAxis(i, 0, axis)
 
     @property
     def lo_stops(self):
@@ -741,18 +732,46 @@ class AMotor(Motor):
 
     def __init__(self, *args, **kwargs):
         mode = kwargs.pop('mode', 'user')
-        super(AMotor, self).__init__(*args, **kwargs)
         if isinstance(mode, str):
-            if self.ADOF == 3 and mode.lower().startswith('e'):
-                mode = ode.AMotorEuler
-            else:
-                mode = ode.AMotorUser
+            mode = ode.AMotorEuler if mode.lower() == 'euler' else ode.AMotorUser
+        super(AMotor, self).__init__(*args, **kwargs)
         self.ode_obj.setMode(mode)
 
     @property
     def ADOF(self):
         '''Number of angular degrees of freedom for this motor.'''
         return self.ode_obj.getNumAxes()
+
+    @property
+    def axes(self):
+        '''List of axes for this object's degrees of freedom.'''
+        print(self.ode_obj, self.name)
+        return [self.ode_obj.getAxis(i) for i in range(self.ADOF)]
+
+    @axes.setter
+    def axes(self, axes):
+        '''Set the axes for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        axes : list of axis parameters
+            A list of axis values to set. This list must have the same number of
+            elements as the degrees of freedom of the underlying ODE object.
+            Each element can be
+
+            (a) None, which has no effect on the corresponding axis, or
+            (b) three floats specifying the axis to set, or
+            (c) a dictionary with an "axis" key specifying the axis to set and
+                an optional "rel" key (defaults to 0) specifying the relative
+                body to set the axis on.
+        '''
+        assert len(axes) == self.ADOF
+        for i, ax in enumerate(axes):
+            if ax is None:
+                continue
+            if not isinstance(ax, dict):
+                ax = dict(axis=ax)
+            self.ode_obj.setAxis(i, ax.get('rel', 0), ax['axis'])
 
     def add_torques(self, torques):
         '''Add the given torques along this motor's axes.
@@ -803,7 +822,7 @@ class Joint(Constraints):
     '''
 
     def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False,
-                 jointgroup=None):
+                 jointgroup=None, amotor=True, lmotor=True):
         self.name = name
 
         build = getattr(ode, '{}Joint'.format(self.__class__.__name__))
@@ -814,7 +833,7 @@ class Joint(Constraints):
             self.ode_obj.setParam(ode.ParamCFM, 0)
 
         self.amotor = None
-        if self.ADOF > 0:
+        if self.ADOF > 0 and amotor:
             self.amotor = AMotor(name=name + ':amotor',
                                  world=world,
                                  body_a=body_a,
@@ -825,7 +844,7 @@ class Joint(Constraints):
                                  mode='euler' if self.ADOF == 3 else 'user')
 
         self.lmotor = None
-        if self.LDOF > 0:
+        if self.LDOF > 0 and lmotor:
             self.lmotor = LMotor(name=name + ':lmotor',
                                  world=world,
                                  body_a=body_a,
@@ -898,7 +917,7 @@ class Slider(Joint):
             degree of freedom, this must contain one 3-tuple specifying the X,
             Y, and Z axis for the joint.
         '''
-        self.lmotor.axes = [dict(rel=1, axis=axes[0])]
+        self.lmotor.axes = [axes[0]]
         self.ode_obj.setAxis(axes[0])
 
 
@@ -932,7 +951,7 @@ class Hinge(Joint):
             degree of freedom, this must contain one 3-tuple specifying the X,
             Y, and Z axis for the joint.
         '''
-        self.amotor.axes = [dict(rel=1, axis=axes[0])]
+        self.amotor.axes = [axes[0]]
         self.ode_obj.setAxis(axes[0])
 
 
@@ -947,8 +966,8 @@ class Piston(Joint):
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = [dict(rel=1, axis=axes[0])]
-        self.lmotor.axes = [dict(rel=1, axis=axes[0])]
+        self.amotor.axes = [axes[0]]
+        self.lmotor.axes = [axes[0]]
         self.ode_obj.setAxis(axes[0])
 
 
@@ -963,7 +982,7 @@ class Universal(Joint):
 
     @axes.setter
     def axes(self, axes):
-        self.amotor.axes = dict(rel=1, axis=axes[0]), dict(rel=2, axis=axes[1])
+        self.amotor.axes = [axes[0], axes[1]]
         setters = [self.ode_obj.setAxis1, self.ode_obj.setAxis2]
         for axis, setter in zip(axes, setters):
             if axis is not None:
@@ -984,14 +1003,14 @@ class Ball(Joint):
     ADOF = 3
     LDOF = 0
 
-    def __init__(self, *args, **kwargs):
-        super(Ball, self).__init__(*args, **kwargs)
+    def __init__(self, name, *args, **kwargs):
+        super(Ball, self).__init__(name, *args, **kwargs)
 
         # we augment ball joints with an additional motor that allows us to set
         # rotation limits.
         kw = {k: v for k, v in kwargs.items() if k != 'anchor'}
-        self.alimit = AMotor(args[0] + ':alimit', *args[1:],
-                             dof=self.ADOF, mode='euler', **kw)
+        self.alimit = AMotor(
+            name + ':alimit', *args, dof=self.ADOF, mode='euler', **kw)
 
     @property
     def angles(self):
@@ -1007,7 +1026,6 @@ class Ball(Joint):
 
     @axes.setter
     def axes(self, axes):
-        # always set axes in euler mode.
         axes = dict(rel=1, axis=axes[0]), None, dict(rel=2, axis=axes[1])
         self.amotor.axes = axes
         self.alimit.axes = axes

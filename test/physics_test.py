@@ -177,8 +177,8 @@ class TestJoint(Base):
         assert j.axes == [(1, 0, 0), (0, 1, 0)]
         assert j.angles == [0, 0]
         assert j.angle_rates == [0, 0]
-        j.axes = [(0, 1, 0), (0, 0, 1)]
-        assert j.axes == [(0, 1, 0), (0, 0, 1)]
+        j.axes = [(0, 2, 1), (0, 0, 1)]
+        assert j.axes == [(0, 2 / np.sqrt(5), 1 / np.sqrt(5)), (0, 0, 1)]
 
     def test_ball(self):
         j = pagoda.physics.Ball('bal', self.world, self.box, anchor=(0, 0, 0))
