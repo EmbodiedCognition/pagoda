@@ -619,8 +619,20 @@ class World(physics.World):
             of joint torques will be generated for each frame of angle data
             between `start` and `end`.
         '''
-        self.skeleton.enable_motors(max_force)
-        for i, states in enumerate(self.follow_markers(start, end, states)):
+        if states is not None:
+            self.skeleton.set_body_states(states)
+
+        for frame_no, frame in enumerate(angles):
+            if frame_no < start:
+                continue
+            if frame_no >= end:
+                break
+
+            self.ode_space.collide(None, self.on_collision)
+
+            states = self.skeleton.get_body_states()
+            self.skeleton.set_body_states(states)
+
             # joseph's stability fix: step to compute torques, then reset the
             # skeleton to the start of the step, and then step using computed
             # torques. thus any numerical errors between the body states after
@@ -628,17 +640,29 @@ class World(physics.World):
             # will be stepping the model using the computed torques.
 
             self.skeleton.enable_motors(max_force)
-            self.skeleton.set_target_angles(angles[start + i])
-
+            self.skeleton.set_target_angles(angles[frame_no])
             self.ode_world.step(self.dt)
-
             torques = self.skeleton.joint_torques
             self.skeleton.disable_motors()
+
             self.skeleton.set_body_states(states)
             self.skeleton.add_torques(torques)
             yield torques
+            self.ode_world.step(self.dt)
+
+            self.ode_contactgroup.empty()
 
     def forward_dynamics(self, torques, start=0, states=None):
         '''Move the body according to a set of torque data.'''
-        for i, _ in enumerate(self.follow_markers(start, states)):
-            self.skeleton.add_torques(torques[i])
+        if states is not None:
+            self.skeleton.set_body_states(states)
+        for frame_no, torque in enumerate(torques):
+            if frame_no < start:
+                continue
+            if frame_no >= end:
+                break
+            self.ode_space.collide(None, self.on_collision)
+            self.skeleton.add_torques(torque)
+            self.ode_world.step(self.dt)
+            yield
+            self.ode_contactgroup.empty()
