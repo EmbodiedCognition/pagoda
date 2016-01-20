@@ -138,6 +138,10 @@ class Skeleton:
         p.parse(source)
         self.bodies = p.bodies
         self.joints = p.joints
+        if p.root:
+            b = self.world.get_body(p.root)
+            j = self.world.join('ball', b, None)
+            self.joints.append(j)
         self.set_pid_params(kp=0.999 / self.world.dt)
 
     def load_asf(self, source, **kwargs):
