@@ -8,30 +8,35 @@ class Base(object):
         self.world = pagoda.physics.World()
         self.box = self.world.create_body('box', lengths=(1, 2, 3))
         self.cap = self.world.create_body('cap', radius=1, length=2)
+        self.cap.position = 1, 0, 0
 
 
 class TestShapes(Base):
     def test_sphere(self):
         b = pagoda.physics.Sphere('sph', self.world, radius=3)
         assert b.radius == 3
-        assert b.volume == 113.09733552923254
+        assert b.volume == 4/3 * np.pi * 27
+        assert tuple(b.dimensions) == (6, 6, 6)
 
     def test_cap(self):
         b = pagoda.physics.Capsule('cap', self.world, radius=3, length=2)
         assert b.radius == 3
         assert b.length == 2
-        assert b.volume == 169.64600329384882
+        assert b.volume == np.pi * (9 * 2 + 4/3 * 27)
+        assert tuple(b.dimensions) == (6, 6, 8), b.dimensions
 
     def test_box(self):
         b = pagoda.physics.Box('box', self.world, lengths=(3, 4, 5))
         assert b.lengths == (3, 4, 5)
         assert b.volume == 3 * 4 * 5
+        assert tuple(b.dimensions) == (3, 4, 5)
 
     def test_cylinder(self):
         b = pagoda.physics.Cylinder('cyl', self.world, radius=3, length=2)
         assert b.radius == 3
         assert b.length == 2
-        assert b.volume == 56.548667764616276
+        assert b.volume == np.pi * 9 * 2
+        assert tuple(b.dimensions) == (6, 6, 2)
 
 
 class TestBody(Base):
@@ -224,7 +229,7 @@ class TestWorld(Base):
     def test_body_states(self):
         states = self.world.get_body_states()
         assert states == [('box0', (0, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0)),
-                          ('cap0', (0, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0))]
+                          ('cap0', (1, 0, 0), (1, 0, 0, 0), (0, 0, 0), (0, 0, 0))]
         self.world.set_body_states(states)
         assert states == self.world.get_body_states()
 

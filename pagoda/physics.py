@@ -417,7 +417,7 @@ class Cylinder(Body):
 
     @property
     def dimensions(self):
-        d = self.radius
+        d = 2 * self.radius
         return np.array([d, d, self.length]).squeeze()
 
     @property
