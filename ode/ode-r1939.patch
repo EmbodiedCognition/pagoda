@@ -1,3 +1,20 @@
+Index: bindings/python/setup.py
+===================================================================
+--- bindings/python/setup.py    (revision 1939)
++++ bindings/python/setup.py    (working copy)
+@@ -12,10 +12,10 @@
+ try:
+     ode_cflags = Popen(
+         ["pkg-config", "--cflags", "ode"],
+-        stdout=PIPE).stdout.read().split()
++        stdout=PIPE).stdout.read().decode('ascii').split()
+     ode_libs = Popen(
+         ["pkg-config", "--libs", "ode"],
+-        stdout=PIPE).stdout.read().split()
++        stdout=PIPE).stdout.read().decode('ascii').split()
+ except (OSError, CalledProcessError):
+     raise SystemExit("Failed to find ODE with 'pkg-config'. Please make sure "
+                      "that it is installed and available on your system path.")
 Index: bindings/python/ode.pxd
 ===================================================================
 --- bindings/python/ode.pxd	(revision 1939)
