@@ -20,7 +20,7 @@ before_install:
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy nose pandas cython
   - pip install pep8 python-coveralls c3d
-  - ode/build-for-travis.sh
+  - ( cd ode ; ./build-ode.sh )
   - pip install .
 script:
   - LD_LIBRARY_PATH=$HOME/ode/lib:$LD_LIBRARY_PATH nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
