@@ -24,6 +24,6 @@ install:
   - ( cd ode ; ./build-ode.sh )
   - pip install .
 script:
-  - LD_LIBRARY_PATH=$HOME/ode/lib:$LD_LIBRARY_PATH nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
+  - LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$LD_LIBRARY_PATH nosetests --with-coverage --cover-package=pagoda --logging-level=INFO
 after_success:
   - coveralls
