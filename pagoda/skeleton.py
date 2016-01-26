@@ -293,20 +293,12 @@ class Skeleton:
 
     def get_body_states(self):
         '''Return a list of the states of all bodies in the skeleton.'''
-        return [(b.name,
-                 b.position,
-                 b.quaternion,
-                 b.linear_velocity,
-                 b.angular_velocity) for b in self.bodies]
+        return [b.state for b in self.bodies]
 
     def set_body_states(self, states):
         '''Set the states of all bodies in the skeleton.'''
-        for name, pos, quat, lin, ang in states:
-            body = self.world.get_body(name)
-            body.position = pos
-            body.quaternion = quat
-            body.linear_velocity = lin
-            body.angular_velocity = ang
+        for state in states:
+            self.world.get_body(state.name).state = state
 
     def set_joint_velocities(self, target=0):
         '''Set the target velocity for all joints in the skeleton.
