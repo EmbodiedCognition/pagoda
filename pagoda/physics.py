@@ -6,8 +6,6 @@ import collections
 import numpy as np
 import ode
 
-from . import base
-
 
 BodyState = collections.namedtuple(
     'BodyState', 'name position quaternion linear_velocity angular_velocity')
@@ -1076,7 +1074,7 @@ def center_of_mass(bodies):
     return x / t
 
 
-class World(base.World):
+class World(object):
     '''A wrapper for an ODE World object, for running in a simulator.'''
 
     def __init__(self, dt=1. / 60, max_angular_speed=20):
@@ -1325,6 +1323,18 @@ class World(base.World):
             self.ode_contactgroup.empty()
             self.ode_space.collide(None, self.on_collision)
             self.ode_world.step(dt)
+
+    def needs_reset(self):
+        '''Return True iff the world needs to be reset.'''
+        return False
+
+    def reset(self):
+        '''Reset the state of the world.'''
+        pass
+
+    def on_key_press(self, key, keymap):
+        '''Handle an otherwise unhandled keypress event (from a GUI).'''
+        pass
 
     def are_connected(self, body_a, body_b):
         '''Determine whether the given bodies are currently connected.
