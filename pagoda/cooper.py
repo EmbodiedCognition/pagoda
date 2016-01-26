@@ -304,29 +304,56 @@ class Markers:
 
         Returns
         -------
-        distances : list of float
-            List of distances for each marker joint in our attachment setup.
+        distances : ndarray of shape (num-markers, 3)
+            Array of distances for each marker joint in our attachment setup. If
+            a marker does not currently have an associated joint (e.g. because
+            it is not currently visible) this will contain NaN for that row.
         '''
-        deltas = []
-        for label, _ in self.channels.items():
-            joints = [j for j in self.joints if j.name == label]
-            if joints:
-                joint = joints[0]
-                delta = np.array(joint.getAnchor()) - joint.getAnchor2()
-                deltas.append(np.sqrt((delta * delta).sum()))
-            else:
-                deltas.append(0)
-        return deltas
+        distances = []
+        for label in self.labels:
+            joint = self.joints.get(label)
+            distances.append([np.nan, np.nan, np.nan] if joint is None else
+                             np.array(joint.getAnchor()) - joint.getAnchor2())
+        return np.array(distances)
 
-    def forces(self):
+    def forces(self, dx_tm1=None):
         '''Return an array of the forces exerted by marker springs.
+
+        Notes
+        -----
+
+        The forces exerted by the marker springs can be approximated by::
+
+          F = kp * dx
+
+        where ``dx`` is the current array of marker distances. An even more
+        accurate value is computed by approximating the velocity of the spring
+        displacement::
+
+          F = kp * dx + kd * (dx - dx_tm1) / dt
+
+        where ``dx_tm1`` is an array of distances from the previous time step.
+
+        Parameters
+        ----------
+        dx_tm1 : ndarray
+            An array of distances from markers to their attachment targets,
+            measured at the previous time step.
 
         Returns
         -------
-        forces : list of float
-            A list of the force exerted by each marker spring attachment.
+        F : ndarray
+            An array of forces that the markers are exerting on the skeleton.
         '''
-        return [j.getFeedback()[-1] for j in self.joints]
+        cfm = self.cfms[self._frame_no][:, None]
+        kp = self.erp / (cfm * self.world.dt)
+        kd = (1 - self.erp) / cfm
+        dx = self.distances()
+        F = kp * dx
+        if dx_tm1 is not None:
+            bad = np.isnan(dx) | np.isnan(dx_tm1)
+            F[~bad] += (kd * (dx - dx_tm1) / self.world.dt)[~bad]
+        return F
 
 
 class World(physics.World):
