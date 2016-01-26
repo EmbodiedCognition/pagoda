@@ -1024,7 +1024,8 @@ class Ball(Joint):
 
     @axes.setter
     def axes(self, axes):
-        axes = dict(rel=1, axis=axes[0]), None, dict(rel=2, axis=axes[1])
+        if len(axes) == 2:
+            axes = dict(rel=1, axis=axes[0]), None, dict(rel=2, axis=axes[1])
         self.amotor.axes = axes
         self.alimit.axes = axes
 
