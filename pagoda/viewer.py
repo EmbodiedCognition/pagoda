@@ -110,7 +110,7 @@ class Viewer(popglove.Window):
             # draw line between anchor1 and anchor2 for marker joints.
             popglove.glColor4f(0.9, 0.1, 0.1, 0.9)
             popglove.glLineWidth(3)
-            for j in self.world.markers.joints:
+            for j in self.world.markers.joints.values():
                 popglove.glBegin(popglove.GL_LINES)
                 popglove.glVertex3f(*j.getAnchor())
                 popglove.glVertex3f(*j.getAnchor2())

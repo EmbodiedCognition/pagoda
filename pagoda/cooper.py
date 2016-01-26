@@ -10,6 +10,8 @@ I hope to integrate these comments into some sort of online documentation for
 the package as a whole.
 '''
 
+from __future__ import division, print_function, absolute_import
+
 import climate
 import numpy as np
 import ode
@@ -31,22 +33,23 @@ class Markers:
     def __init__(self, world):
         self.world = world
         self.jointgroup = ode.JointGroup()
-        self.joints = []
 
-        self.erp = Markers.DEFAULT_ERP
-
-        self.marker_bodies = {}
-        self.attach_bodies = {}
-        self.attach_offsets = {}
+        self.bodies = {}
+        self.joints = {}
+        self.targets = {}
+        self.offsets = {}
         self.channels = {}
 
         self.data = None
         self.cfms = None
+        self.erp = Markers.DEFAULT_ERP
 
         # these arrays are derived from the data array.
         self.visibility = None
         self.positions = None
         self.velocities = None
+
+        self._frame_no = -1
 
     @property
     def num_frames(self):
@@ -58,18 +61,23 @@ class Markers:
         '''Return the number of markers in each frame of data.'''
         return self.data.shape[1]
 
+    @property
+    def labels(self):
+        '''Return the names of our marker labels in canonical order.'''
+        return sorted(self.channels, key=lambda c: self.channels[c])
+
     def __iter__(self):
         return iter(self.data)
 
     def __getitem__(self, idx):
         return self.data[idx]
 
-    def _interpret_channels(self, channels):
-        if isinstance(channels, str):
-            channels = channels.strip().split()
-        if isinstance(channels, (tuple, list)):
-            return dict((c, i) for i, c in enumerate(channels))
-        return channels or {}
+    def _map_labels_to_channels(self, labels):
+        if isinstance(labels, str):
+            labels = labels.strip().split()
+        if isinstance(labels, (tuple, list)):
+            return dict((c, i) for i, c in enumerate(labels))
+        return labels or {}
 
     def load_csv(self, filename, start_frame=10, max_frames=int(1e300)):
         '''Load marker data from a CSV file.
@@ -102,7 +110,7 @@ class Markers:
             m = re.match(r'^marker\d\d-(.*)-c$', c)
             if m:
                 markers.append(m.group(1))
-        self.channels = self._interpret_channels(markers)
+        self.channels = self._map_labels_to_channels(markers)
 
         cols = [c for c in df.columns if re.match(r'^marker\d\d-.*-[xyzc]$', c)]
         self.data = df[cols].values.reshape((len(df), len(markers), 4))[start_frame:]
@@ -132,10 +140,13 @@ class Markers:
         with open(filename, 'rb') as handle:
             reader = c3d.Reader(handle)
 
+            logging.info('world frame rate %s, marker frame rate %s',
+                         1 / self.world.dt, reader.point_rate)
+
             # set up a map from marker label to index in the data stream.
             labels = [s.strip() for s in reader.point_labels]
             logging.info('%s: loaded marker labels %s', filename, labels)
-            self.channels = self._interpret_channels(labels)
+            self.channels = self._map_labels_to_channels(labels)
 
             # read the actual c3d data into a numpy array.
             data = []
@@ -171,13 +182,13 @@ class Markers:
 
     def create_bodies(self):
         '''Create physics bodies corresponding to each marker in our data.'''
-        self.marker_bodies = {}
+        self.bodies = {}
         for label in self.channels:
             body = self.world.create_body(
                 'sphere', name='marker:{}'.format(label), radius=0.02)
             body.is_kinematic = True
             body.color = 0.9, 0.1, 0.1, 0.5
-            self.marker_bodies[label] = body
+            self.bodies[label] = body
 
     def load_attachments(self, source, skeleton):
         '''Load attachment configuration from the given text source.
@@ -207,8 +218,8 @@ class Markers:
         skeleton : :class:`pagoda.skeleton.Skeleton`
             The skeleton to attach our marker data to.
         '''
-        self.attach_bodies = {}
-        self.attach_offsets = {}
+        self.targets = {}
+        self.offsets = {}
 
         filename = source
         if isinstance(source, str):
@@ -232,15 +243,15 @@ class Markers:
                 logging.info('%s:%d: %d skeleton bodies match %s',
                              filename, i, len(bodies), name)
                 continue
-            b = self.attach_bodies[label] = bodies[0]
-            o = self.attach_offsets[label] = \
+            b = self.targets[label] = bodies[0]
+            o = self.offsets[label] = \
                 np.array(list(map(float, tokens))) * b.dimensions / 2
             logging.info('%s <--> %s, offset %s', label, b.name, o)
 
     def detach(self):
         '''Detach all marker bodies from their associated skeleton bodies.'''
         self.jointgroup.empty()
-        self.joints = []
+        self.joints = {}
 
     def attach(self, frame_no):
         '''Attach marker bodies to the corresponding skeleton bodies.
@@ -253,8 +264,9 @@ class Markers:
         frame_no : int
             The frame of data we will use for attaching marker bodies.
         '''
+        assert not self.joints
         for label, j in self.channels.items():
-            target = self.attach_bodies.get(label)
+            target = self.targets.get(label)
             if target is None:
                 continue
             if self.visibility[frame_no, j] < 0:
@@ -262,13 +274,14 @@ class Markers:
             if np.linalg.norm(self.velocities[frame_no, j]) > 10:
                 continue
             joint = ode.BallJoint(self.world.ode_world, self.jointgroup)
-            joint.attach(self.marker_bodies[label].ode_body, target.ode_body)
+            joint.attach(self.bodies[label].ode_body, target.ode_body)
             joint.setAnchor1Rel([0, 0, 0])
-            joint.setAnchor2Rel(self.attach_offsets[label])
+            joint.setAnchor2Rel(self.offsets[label])
             joint.setParam(ode.ParamCFM, self.cfms[frame_no, j])
             joint.setParam(ode.ParamERP, self.erp)
             joint.name = label
-            self.joints.append(joint)
+            self.joints[label] = joint
+        self._frame_no = frame_no
 
     def reposition(self, frame_no):
         '''Reposition markers to a specific frame of data.
@@ -282,7 +295,7 @@ class Markers:
             to the data as long as there are no dropouts in neighboring frames.
         '''
         for label, j in self.channels.items():
-            body = self.marker_bodies[label]
+            body = self.bodies[label]
             body.position = self.positions[frame_no, j]
             body.linear_velocity = self.velocities[frame_no, j]
 
