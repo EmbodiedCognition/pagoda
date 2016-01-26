@@ -487,7 +487,8 @@ class World(physics.World):
         '''
         self.follower = self.follow_markers()
 
-    def settle_to_markers(self, frame_no=0, max_distance=0.05, max_iters=300, states=None):
+    def settle_to_markers(self, frame_no=0, max_distance=0.05, max_iters=300,
+                          states=None):
         '''Settle the skeleton to our marker data at a specific frame.
 
         Parameters
