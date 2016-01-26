@@ -447,7 +447,7 @@ class World(physics.World):
         '''
         self.follower = self.follow_markers()
 
-    def settle_to_markers(self, frame_no=0, max_distance=0.1, max_iters=300, states=None):
+    def settle_to_markers(self, frame_no=0, max_distance=0.05, max_iters=300, states=None):
         '''Settle the skeleton to our marker data at a specific frame.
 
         Parameters
@@ -473,7 +473,7 @@ class World(physics.World):
         for _ in range(max_iters):
             for states in self._step_to_marker_frame(frame_no):
                 pass
-            dist = np.nanmean(self.markers.distances())
+            dist = np.nanmean(abs(self.markers.distances()))
             logging.info('settling to frame %d: marker distance %.3f', frame_no, dist)
             if dist < max_distance:
                 return states
