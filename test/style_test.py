@@ -11,6 +11,7 @@ class TestCodeFormat:
         pep8style = pep8.StyleGuide(config_file='setup.cfg')
         result = pep8style.check_files(
             match('examples') +
+            match('scripts') +
             match('test') +
             match('pagoda'))
         assert result.total_errors == 0
