@@ -48,17 +48,19 @@ class Template:
 
 
 def build_cost(args, skeleton, markers):
+    w = pagoda.cooper.World(1. / args.fps)
     def cost(x):
-        w = pagoda.cooper.World(1. / args.fps)
         w.load_skeleton(skeleton.as_file(x[:len(skeleton)]))
         w.load_markers(args.motion, markers.as_file(x[len(skeleton):]))
-        states = w.settle_to_markers(args.start_frame)
-        distances = [np.nanmean(w.markers.distances())
-                     for _ in w.follow_markers(start=args.start_frame,
-                                               end=args.end_frame,
-                                               states=states)]
-        logging.info('cost %.4f +/- %.4f', np.nanmean(distances), np.nanstd(distances))
-        return np.nanmean(distances) + 2 * np.nanstd(distances)
+        w.markers.erp = 0.3
+        w.markers.cfms[:] = 1e-3
+        F = np.array([np.nanmean(abs(w.markers.forces()))
+                      for _ in w.follow_markers(
+                              args.start_frame,
+                              args.end_frame or args.start_frame + args.fps,
+                              w.settle_to_markers(args.start_frame, 0, 20))])
+        logging.info('cost %s +/- %s', F.mean(), F.std())
+        return F.mean() + F.std()
     return cost
 
 
@@ -95,10 +97,12 @@ def main(args):
 
     res = scipy.optimize.differential_evolution(f, list(zip(lower, upper)))
 
+    values = res.x
+
     with open(args.prefix + 'skeleton.txt', 'w') as handle:
-        handle.write(skeleton.fill(values[:len(skeleton)]))
+        handle.write(skeleton.fill(values[:S]))
     with open(args.prefix + 'markers.txt', 'w') as handle:
-        handle.write(markers.fill(values[len(skeleton):]))
+        handle.write(markers.fill(values[S:]))
 
 
 if __name__ == '__main__':
