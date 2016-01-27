@@ -195,7 +195,8 @@ class Skeleton:
     @property
     def joint_torques(self):
         '''Get a list of all current joint torques in the skeleton.'''
-        return as_flat_array(j.amotor.feedback[-1][:j.ADOF] for j in self.joints)
+        return as_flat_array(getattr(j, 'amotor', j).feedback[-1][:j.ADOF]
+                             for j in self.joints)
 
     @property
     def body_positions(self):
@@ -327,11 +328,12 @@ class Skeleton:
             target velocity.
         '''
         for joint in self.joints:
-            joint.amotor.max_forces = max_force
+            amotor = getattr(joint, 'amotor', joint)
+            amotor.max_forces = max_force
             if max_force > 0:
-                joint.amotor.enable_feedback()
+                amotor.enable_feedback()
             else:
-                joint.amotor.disable_feedback()
+                amotor.disable_feedback()
 
     def disable_motors(self):
         '''Disable joint motors in this skeleton.
