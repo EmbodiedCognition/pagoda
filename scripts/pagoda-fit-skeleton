@@ -24,10 +24,12 @@ climate.add_arg('-s', '--skeleton', metavar='FILE',
 g = climate.add_group('simulation options')
 g.add_argument('-r', '--fps', type=float, default=120, metavar='N',
                help='set world to run at N frames per second')
-g.add_argument('-f', '--start-frame', type=int, default=0, metavar='N',
-               help='optimize on motion starting at frame N')
+g.add_argument('-f', '--start-frame', type=int, metavar='N',
+               help='optimize on motion windows starting at frame N')
 g.add_argument('-F', '--end-frame', type=int, metavar='N',
-               help='optimize on motion ending at frame N')
+               help='optimize on motion windows ending at frame N')
+g.add_argument('-w', '--frames', type=int, metavar='N',
+               help='optimize on motion windows of N frames')
 
 
 class Template:
@@ -54,11 +56,15 @@ def build_cost(args, skeleton, markers):
         w.load_markers(args.motion, markers.as_file(x[len(skeleton):]))
         w.markers.erp = 0.3
         w.markers.cfms[:] = 1e-3
+        window = args.frames or args.fps
+        offset = np.random.randint(
+            args.start_frame or 1,
+            args.end_frame or len(w.markers.data) - 1 - window)
         F = np.array([np.nanmean(abs(w.markers.forces()))
                       for _ in w.follow_markers(
-                              args.start_frame,
-                              args.end_frame or args.start_frame + args.fps,
-                              w.settle_to_markers(args.start_frame, 0, 20))])
+                              offset,
+                              offset + window,
+                              w.settle_to_markers(offset, 0, 20))])
         logging.info('cost %s +/- %s', F.mean(), F.std())
         return F.mean() + F.std()
     return cost
@@ -97,12 +103,10 @@ def main(args):
 
     res = scipy.optimize.differential_evolution(f, list(zip(lower, upper)))
 
-    values = res.x
-
-    with open(args.prefix + 'skeleton.txt', 'w') as handle:
-        handle.write(skeleton.fill(values[:S]))
-    with open(args.prefix + 'markers.txt', 'w') as handle:
-        handle.write(markers.fill(values[S:]))
+    with open(args.output + 'skeleton.txt', 'w') as handle:
+        handle.write(skeleton.fill(res.x[:S]))
+    with open(args.output + 'markers.txt', 'w') as handle:
+        handle.write(markers.fill(res.x[S:]))
 
 
 if __name__ == '__main__':
