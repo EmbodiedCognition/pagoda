@@ -512,12 +512,15 @@ class World(physics.World):
             self.skeleton.set_body_states(states)
         dist = None
         for _ in range(max_iters):
-            for states in self._step_to_marker_frame(frame_no):
+            for _ in self._step_to_marker_frame(frame_no):
                 pass
             dist = np.nanmean(abs(self.markers.distances()))
             logging.info('settling to frame %d: marker distance %.3f', frame_no, dist)
             if dist < max_distance:
-                return states
+                return self.skeleton.get_body_states()
+            for b in self.skeleton.bodies:
+                b.linear_velocity = 0, 0, 0
+                b.angular_velocity = 0, 0, 0
         return states
 
     def follow_markers(self, start=0, end=1e100, states=None):
