@@ -373,12 +373,12 @@ class BodyParser(Parser):
                 axes[int(token.replace('axis', ''))] = self._floats()
             if token == 'lo_stops':
                 if shape.startswith('sli'):
-                    lo_stops = self._next_float()
+                    lo_stops = self._floats(1)
                 else:
                     lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'hi_stops':
                 if shape.startswith('sli'):
-                    hi_stops = self._next_float()
+                    hi_stops = self._floats(1)
                 else:
                     hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'stop_cfm':
