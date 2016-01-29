@@ -372,9 +372,15 @@ class BodyParser(Parser):
             if token.startswith('axis'):
                 axes[int(token.replace('axis', ''))] = self._floats()
             if token == 'lo_stops':
-                lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
+                if shape.startswith('sli'):
+                    lo_stops = self._next_float()
+                else:
+                    lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'hi_stops':
-                hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
+                if shape.startswith('sli'):
+                    hi_stops = self._next_float()
+                else:
+                    hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
             if token == 'stop_cfm':
                 stop_cfm = self._next_float()
             if token == 'stop_erp':
@@ -386,16 +392,16 @@ class BodyParser(Parser):
         joint = self.world.join(
             shape, body1, body2, anchor=anchor, jointgroup=self.jointgroup)
 
-        if joint.ADOF or joint.LDOF:
+        if joint.ADOF + joint.LDOF:
             joint.axes = axes[:max(joint.ADOF, joint.LDOF)]
 
-        if joint.ADOF and lo_stops is not None:
+        if lo_stops is not None:
             joint.lo_stops = lo_stops
-        if joint.ADOF and hi_stops is not None:
+        if hi_stops is not None:
             joint.hi_stops = hi_stops
-        if joint.ADOF and stop_cfm is not None:
+        if stop_cfm is not None:
             joint.stop_cfms = stop_cfm
-        if joint.ADOF and stop_erp is not None:
+        if stop_erp is not None:
             joint.stop_erps = stop_erp
 
         self.joints.append(joint)

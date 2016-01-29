@@ -560,7 +560,7 @@ class Constraints(object):
     @property
     def lo_stops(self):
         '''List of lo stop values for this object's degrees of freedom.'''
-        return _get_params(self.ode_obj, 'LoStop', self.ADOF)
+        return _get_params(self.ode_obj, 'LoStop', self.ADOF + self.LDOF)
 
     @lo_stops.setter
     def lo_stops(self, lo_stops):
@@ -573,12 +573,12 @@ class Constraints(object):
             containing one such value for each degree of freedom. For rotational
             degrees of freedom, these values must be in radians.
         '''
-        _set_params(self.ode_obj, 'LoStop', lo_stops, self.ADOF)
+        _set_params(self.ode_obj, 'LoStop', lo_stops, self.ADOF + self.ADOF)
 
     @property
     def hi_stops(self):
         '''List of hi stop values for this object's degrees of freedom.'''
-        return _get_params(self.ode_obj, 'HiStop', self.ADOF)
+        return _get_params(self.ode_obj, 'HiStop', self.ADOF + self.ADOF)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
@@ -591,12 +591,12 @@ class Constraints(object):
             containing one such value for each degree of freedom. For rotational
             degrees of freedom, these values must be in radians.
         '''
-        _set_params(self.ode_obj, 'HiStop', hi_stops, self.ADOF)
+        _set_params(self.ode_obj, 'HiStop', hi_stops, self.ADOF + self.LDOF)
 
     @property
     def velocities(self):
         '''List of target velocity values for rotational degrees of freedom.'''
-        return _get_params(self.ode_obj, 'Vel', self.ADOF)
+        return _get_params(self.ode_obj, 'Vel', self.ADOF + self.LDOF)
 
     @velocities.setter
     def velocities(self, velocities):
@@ -609,12 +609,12 @@ class Constraints(object):
             containing one such value for each degree of freedom. For rotational
             degrees of freedom, these values must be in radians / second.
         '''
-        _set_params(self.ode_obj, 'Vel', velocities, self.ADOF)
+        _set_params(self.ode_obj, 'Vel', velocities, self.ADOF + self.LDOF)
 
     @property
     def max_forces(self):
         '''List of max force values for rotational degrees of freedom.'''
-        return _get_params(self.ode_obj, 'FMax', self.ADOF)
+        return _get_params(self.ode_obj, 'FMax', self.ADOF + self.LDOF)
 
     @max_forces.setter
     def max_forces(self, max_forces):
@@ -626,12 +626,12 @@ class Constraints(object):
             A maximum force value to set on all degrees of freedom, or a list
             containing one such value for each degree of freedom.
         '''
-        _set_params(self.ode_obj, 'FMax', max_forces, self.ADOF)
+        _set_params(self.ode_obj, 'FMax', max_forces, self.ADOF + self.LDOF)
 
     @property
     def cfms(self):
         '''List of CFM values for this object's degrees of freedom.'''
-        return _get_params(self.ode_obj, 'CFM', self.ADOF)
+        return _get_params(self.ode_obj, 'CFM', self.ADOF + self.LDOF)
 
     @cfms.setter
     def cfms(self, cfms):
@@ -643,12 +643,12 @@ class Constraints(object):
             A CFM value to set on all degrees of freedom, or a list
             containing one such value for each degree of freedom.
         '''
-        _set_params(self.ode_obj, 'CFM', cfms, self.ADOF)
+        _set_params(self.ode_obj, 'CFM', cfms, self.ADOF + self.LDOF)
 
     @property
     def stop_cfms(self):
         '''List of lo/hi stop CFM values.'''
-        return _get_params(self.ode_obj, 'StopCFM', self.ADOF)
+        return _get_params(self.ode_obj, 'StopCFM', self.ADOF + self.LDOF)
 
     @stop_cfms.setter
     def stop_cfms(self, stop_cfms):
@@ -660,12 +660,12 @@ class Constraints(object):
             A CFM value to set on all degrees of freedom limits, or a list
             containing one such value for each degree of freedom limit.
         '''
-        _set_params(self.ode_obj, 'StopCFM', stop_cfms, self.ADOF)
+        _set_params(self.ode_obj, 'StopCFM', stop_cfms, self.ADOF + self.LDOF)
 
     @property
     def stop_erps(self):
         '''List of lo/hi stop ERP values.'''
-        return _get_params(self.ode_obj, 'StopERP', self.ADOF)
+        return _get_params(self.ode_obj, 'StopERP', self.ADOF + self.LDOF)
 
     @stop_erps.setter
     def stop_erps(self, stop_erps):
@@ -677,7 +677,7 @@ class Constraints(object):
             An ERP value to set on all degrees of freedom limits, or a list
             containing one such value for each degree of freedom limit.
         '''
-        _set_params(self.ode_obj, 'StopERP', stop_erps, self.ADOF)
+        _set_params(self.ode_obj, 'StopERP', stop_erps, self.ADOF + self.LDOF)
 
     def enable_feedback(self):
         '''Enable feedback on this ODE object.'''
