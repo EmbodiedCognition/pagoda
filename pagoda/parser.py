@@ -358,7 +358,7 @@ class BodyParser(Parser):
             offset2 = self._floats()
 
         anchor = self.world.move_next_to(body1, body2, offset1, offset2)
-        if shape.startswith('fix'):
+        if shape.startswith('fix') or shape.startswith('sli'):
             anchor = None
 
         token = self._next_token()
