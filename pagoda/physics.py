@@ -19,13 +19,13 @@ class Body(object):
     etc.
     '''
 
-    def __init__(self, name, world, density=1000., **shape):
+    def __init__(self, name, world, density=1000., mass=None, **shape):
         self.name = name
         self.world = world
         self.shape = shape
 
         m = ode.Mass()
-        self.init_mass(m, density)
+        self.init_mass(m, density, mass)
         self.ode_body = ode.Body(world.ode_world)
         self.ode_body.setMass(m)
         self.ode_geom = getattr(ode, 'Geom%s' % self.__class__.__name__)(
@@ -382,7 +382,9 @@ class Box(Body):
     def volume(self):
         return np.prod(self.lengths)
 
-    def init_mass(self, m, density):
+    def init_mass(self, m, density, mass):
+        if mass:
+            density = mass / self.volume
         m.setBox(density, *self.lengths)
 
 
@@ -400,7 +402,9 @@ class Sphere(Body):
     def volume(self):
         return 4 / 3 * np.pi * self.radius ** 3
 
-    def init_mass(self, m, density):
+    def init_mass(self, m, density, mass):
+        if mass:
+            density = mass / self.volume
         m.setSphere(density, self.radius)
 
 
@@ -422,7 +426,9 @@ class Cylinder(Body):
     def volume(self):
         return self.length * np.pi * self.radius ** 2
 
-    def init_mass(self, m, density):
+    def init_mass(self, m, density, mass):
+        if mass:
+            density = mass / self.volume
         m.setCylinder(density, 3, self.radius, self.length)
 
 
@@ -445,7 +451,9 @@ class Capsule(Body):
         return 4 / 3 * np.pi * self.radius ** 3 + \
             self.length * np.pi * self.radius ** 2
 
-    def init_mass(self, m, density):
+    def init_mass(self, m, density, mass):
+        if mass:
+            density = mass / self.volume
         m.setCapsule(density, 3, self.radius, self.length)
 
 

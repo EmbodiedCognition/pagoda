@@ -314,6 +314,8 @@ class BodyParser(Parser):
                 kwargs[token] = self._next_float()
             if token == 'density':
                 kwargs[token] = self._next_float()
+            if token == 'mass':
+                kwargs[token] = self._next_float()
             if token == 'quaternion':
                 theta, x, y, z = self._floats(4)
                 quaternion = physics.make_quaternion(np.deg2rad(theta), x, y, z)
