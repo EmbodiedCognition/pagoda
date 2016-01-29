@@ -365,26 +365,29 @@ class BodyParser(Parser):
 
         token = self._next_token()
         axes = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
-        lo_stops = hi_stops = stop_cfm = stop_erp = None
+        lo_stops = hi_stops = stop_cfms = stop_erps = None
+        cls = physics.JOINTS[shape]
         while token:
             if token in ('body', 'join'):
                 break
             if token.startswith('axis'):
                 axes[int(token.replace('axis', ''))] = self._floats()
             if token == 'lo_stops':
-                if shape.startswith('sli'):
-                    lo_stops = self._floats(1)
-                else:
-                    lo_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
+                lo_stops = []
+                if cls.LDOF:
+                    lo_stops.extend(self._floats(cls.LDOF))
+                if cls.ADOF:
+                    lo_stops.extend(np.deg2rad(self._floats(cls.ADOF)))
             if token == 'hi_stops':
-                if shape.startswith('sli'):
-                    hi_stops = self._floats(1)
-                else:
-                    hi_stops = np.deg2rad(self._floats(physics.JOINTS[shape].ADOF))
+                hi_stops = []
+                if cls.LDOF:
+                    hi_stops.extend(self._floats(cls.LDOF))
+                if cls.ADOF:
+                    hi_stops.extend(np.deg2rad(self._floats(cls.ADOF)))
             if token == 'stop_cfm':
-                stop_cfm = self._next_float()
+                stop_cfms = self._floats(cls.ADOF + cls.LDOF)
             if token == 'stop_erp':
-                stop_erp = self._next_float()
+                stop_erps = self._floats(cls.ADOF + cls.LDOF)
             token = self._next_token()
 
         logging.info('joining %s %s %s', shape, body1, body2)
@@ -399,10 +402,10 @@ class BodyParser(Parser):
             joint.lo_stops = lo_stops
         if hi_stops is not None:
             joint.hi_stops = hi_stops
-        if stop_cfm is not None:
-            joint.stop_cfms = stop_cfm
-        if stop_erp is not None:
-            joint.stop_erps = stop_erp
+        if stop_cfms is not None:
+            joint.stop_cfms = stop_cfms
+        if stop_erps is not None:
+            joint.stop_erps = stop_erps
 
         self.joints.append(joint)
 

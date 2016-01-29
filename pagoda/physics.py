@@ -573,12 +573,12 @@ class Constraints(object):
             containing one such value for each degree of freedom. For rotational
             degrees of freedom, these values must be in radians.
         '''
-        _set_params(self.ode_obj, 'LoStop', lo_stops, self.ADOF + self.ADOF)
+        _set_params(self.ode_obj, 'LoStop', lo_stops, self.ADOF + self.LDOF)
 
     @property
     def hi_stops(self):
         '''List of hi stop values for this object's degrees of freedom.'''
-        return _get_params(self.ode_obj, 'HiStop', self.ADOF + self.ADOF)
+        return _get_params(self.ode_obj, 'HiStop', self.ADOF + self.LDOF)
 
     @hi_stops.setter
     def hi_stops(self, hi_stops):
