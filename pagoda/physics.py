@@ -544,7 +544,7 @@ class Constraints(object):
             (a) None, which has no effect on the corresponding axis, or
             (b) three floats specifying the axis to set.
         '''
-        assert self.ADOF == len(axes)
+        assert self.ADOF == len(axes) or self.LDOF == len(axes)
         for i, axis in enumerate(axes):
             if axis is not None:
                 self.ode_obj.setAxis(i, 0, axis)
