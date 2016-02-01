@@ -6,173 +6,60 @@
 # http://www.emeraldinsight.com/journals.htm?articleid=844037&show=html
 # ... and some guesswork.
 
-body box head      lengths 0.14 0.18 0.17  density 900  position 0 0 2
-body box neck      lengths 0.08 0.10 0.06  density 900
-body box u-torso   lengths 0.26 0.20 0.18  density 900
-body box l-torso   lengths 0.28 0.18 0.18  density 900
-body box pelvis    lengths 0.30 0.20 0.16  density 900  root
+head      box 0.14 0.18 0.17  density 900  position 0 0 2
+neck      box 0.08 0.10 0.06  density 900
+u-torso   box 0.26 0.20 0.18  density 900
+l-torso   box 0.28 0.18 0.18  density 900
+pelvis    box 0.30 0.20 0.16  density 900
 
-body box r-collar  lengths 0.17 0.12 0.05
-body cap ru-arm    length 0.26 radius 0.05
-body cap rl-arm    length 0.19 radius 0.04 density 1100
-body box r-hand    lengths 0.08 0.03 0.12  density 1100
+r-collar  box 0.17 0.12 0.05
+ru-arm    cap 0.26 0.05*
+rl-arm    cap 0.19 0.04*      density 1100
+r-hand    box 0.08 0.03 0.12  density 1100
 
-body cap ru-leg    length 0.35 radius 0.08
-body cap rl-leg    length 0.28 radius 0.06 density 1100
-body box r-foot    lengths 0.08 0.10 0.06  density 1100
-body box r-toes    lengths 0.08 0.10 0.04  density 1100
+ru-leg    cap 0.35 0.08*
+rl-leg    cap 0.28 0.06*      density 1100
+r-foot    box 0.08 0.10 0.06  density 1100
+r-toes    box 0.08 0.10 0.04  density 1100
 
-body box l-collar  lengths 0.17 0.12 0.05
-body cap lu-arm    length 0.26 radius 0.05
-body cap ll-arm    length 0.19 radius 0.04 density 1100
-body box l-hand    lengths 0.08 0.03 0.12  density 1100
+l-collar  box 0.17 0.12 0.05
+lu-arm    cap 0.26 0.05*
+ll-arm    cap 0.19 0.04*      density 1100
+l-hand    box 0.08 0.03 0.12  density 1100
 
-body cap lu-leg    length 0.35 radius 0.08
-body cap ll-leg    length 0.28 radius 0.06 density 1100
-body box l-foot    lengths 0.08 0.10 0.06  density 1100
-body box l-toes    lengths 0.08 0.10 0.04  density 1100
+lu-leg    cap 0.35 0.08*
+ll-leg    cap 0.28 0.06*      density 1100
+l-foot    box 0.08 0.10 0.06  density 1100
+l-toes    box 0.08 0.10 0.04  density 1100
 
 # --- joint attachments ---
 
 # spine
-join ball
-head 0 -0.3 -1
-neck 0  0    1
-lo_stops -30 -30 -85
-hi_stops  60  30  85
-
-join ball
-neck    0 -0.5 -1
-u-torso 0 -0.5  1
-lo_stops -10 -30 -30
-hi_stops  30  30  30
-
-join ball
-u-torso 0 -1 -1
-l-torso 0 -1  1
-lo_stops -20 -30 -10
-hi_stops  20  30  10
-
-join ball
-l-torso 0 0 -1
-pelvis  0 0  1
-lo_stops -20 -30 -10
-hi_stops  20  30  10
+ball head(0 -0.3 -1)  <- neck(0 0 1)       stops -30~60 -30~30 -85~85
+ball neck(0 -0.5 -1)  <- u-torso(0 -0.5 1) stops -10~30 -30~30 -30~30
+ball u-torso(0 -1 -1) <- l-torso(0 -1 1)   stops -20~20 -30~30 -10~10
+ball l-torso(0 0 -1)  <- pelvis(0 0 1)     stops -20~20 -30~30 -10~10
 
 # right arm
-join uni
-u-torso   0.5 0  1
-r-collar -1   0 -1
-axis0 0 1 0
-axis1 0 0 1
-lo_stops -30 -10
-hi_stops  20  30
-
-join ball
-r-collar 0.6 0 -1
-ru-arm   0   0  1
-lo_stops  -80 -80 -80
-hi_stops  170  40 120
-
-join uni
-ru-arm 0 0 -1
-rl-arm 0 0  1
-axis0 1 0 0
-axis1 0 0 1
-lo_stops -150 -70
-hi_stops    1  70
-
-join hinge
-rl-arm 0 -1 -1
-r-hand 0 -1  1
-axis0 1 0 0
-lo_stops -70
-hi_stops  70
+uni   u-torso(0.5 0 1)    <- r-collar(-1 0 -1) stops  -30~30  -30~30  axes <0 1 0> <0 0 1>
+ball  r-collar(0.6 0 -1)  <- ru-arm(0 0 1)     stops -150~150 -70~70 -80~150
+uni   ru-arm(0 0 -1)      <- rl-arm(0 0 1)     stops -150~1   -70~70  axes <1 0 0> <0 0 1>
+hinge rl-arm(0 -1 -1)     <- r-hand(0 -1 1)    stops  -70~70
 
 # left arm
-join uni
-u-torso -0.5 0  1
-l-collar 1   0 -1
-axis0 0 1 0
-axis1 0 0 1
-lo_stops -30 -30
-hi_stops  30  30
-
-join ball
-l-collar -0.6 0 -1
-lu-arm    0   0  1
-lo_stops -150 -70 -150
-hi_stops  150  70   30
-
-join uni
-lu-arm 0 0 -1
-ll-arm 0 0  1
-axis0 1 0 0
-axis1 0 0 1
-lo_stops -150 -70
-hi_stops    1  70
-
-join hinge
-ll-arm 0 -1 -1
-l-hand 0 -1  1
-axis0 1 0 0
-lo_stops -70
-hi_stops  70
+uni   u-torso(-0.5 0 1)   <- l-collar(1 0 -1)  stops  -30~30  -30~30  axes <0 1 0> <0 0 1>
+ball  l-collar(-0.6 0 -1) <- lu-arm(0 0 1)     stops -150~150 -70~70 -150~80
+uni   lu-arm(0 0 -1)      <- ll-arm(0 0 1)     stops -150~1   -70~70  axes <1 0 0> <0 0 1>
+hinge ll-arm(0 -1 -1)     <- l-hand(0 -1 1)    stops  -70~70
 
 # right leg
-join ball
-pelvis 0.6 0 -1
-ru-leg 0   0  0.9
-lo_stops -150 -70 -30
-hi_stops   70  70 150
-
-join hinge
-ru-leg 0 0 -0.9
-rl-leg 0 0  0.9
-axis0 1 0 0
-lo_stops  -1
-hi_stops 150
-
-join uni
-rl-leg 0  0  -1
-r-foot 0 -0.5 1
-axis0 1 0 0
-axis1 0 1 0
-lo_stops -70 -70
-hi_stops  70  70
-
-join hinge
-r-foot 0  1 -1
-r-toes 0 -1 -1
-axis0 1 0 0
-lo_stops -30
-hi_stops  30
+ball  pelvis(0.6 0 -1)  <- ru-leg(0 0 0.9)  stops -150~70 -70~70 -30~150
+hinge ru-leg(0 0 -0.9)  <- rl-leg(0 0 0.9)  stops   -1~150
+uni   rl-leg(0 0 -1)    <- r-foot(0 -0.5 1) stops  -70~70 -70~70
+hinge r-foot(0 1 -1)    <- r-toes(0 -1 -1)  stops  -30~30
 
 # left leg
-join ball
-pelvis -0.6 0 -1
-lu-leg  0   0  0.9
-lo_stops -120 -60 -120
-hi_stops   60  60   30
-
-join hinge
-lu-leg 0 0 -0.9
-ll-leg 0 0  0.9
-axis0 1 0 0
-lo_stops  -1
-hi_stops 150
-
-join uni
-ll-leg 0  0  -1
-l-foot 0 -0.5 1
-axis0 1 0 0
-axis1 0 1 0
-lo_stops -60 -60
-hi_stops  60  60
-
-join hinge
-l-foot 0  1 -1
-l-toes 0 -1 -1
-axis0 1 0 0
-lo_stops -30
-hi_stops  30
+ball  pelvis(-0.6 0 -1) <- lu-leg(0 0 0.9)  stops -150~70 -70~70 -150~30
+hinge lu-leg(0 0 -0.9)  <- ll-leg(0 0 0.9)  stops   -1~150
+uni   ll-leg(0 0 -1)    <- l-foot(0 -0.5 1) stops  -70~70 -70~70
+hinge l-foot(0 1 -1)    <- l-toes(0 -1 -1)  stops  -30~30

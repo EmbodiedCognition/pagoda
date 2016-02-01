@@ -5,6 +5,7 @@ setuptools.setup(
     name='pagoda',
     version='0.1.0',
     packages=setuptools.find_packages(),
+    package_data={'': ['*.peg']},
     author='Leif Johnson',
     author_email='leif@cs.utexas.edu',
     description='yet another OpenGL-with-physics simulation framework',
@@ -16,7 +17,7 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['climate', 'numpy', 'popglove'],
+    install_requires=['climate', 'numpy', 'parsimonious', 'popglove'],
     tests_require=['nose', 'pep8'],
     classifiers=[
         'Development Status :: 3 - Alpha',

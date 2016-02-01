@@ -8,10 +8,6 @@ import pagoda.physics
 import pagoda.viewer
 
 
-def full(name):
-    return os.path.join(os.path.dirname(__file__), name)
-
-
 class Viewer(pagoda.viewer.Viewer):
     def grab_key_press(self, key, modifiers, keymap):
         if key == keymap.B:
@@ -22,8 +18,8 @@ class Viewer(pagoda.viewer.Viewer):
 
 def main():
     w = pagoda.physics.World(dt=0.01)
-    p = pagoda.parser.BodyParser(w, color=(0.9, 0.3, 0.1, 0.8))
-    p.parse(full('hinge-limits.txt'))
+    with open(os.path.join(os.path.dirname(__file__), 'hinge-limits.txt')) as h:
+        pagoda.parser.parse(h, w)
     w.get_body('arm').add_force((0, 0, 100), relative_position=(1, 0, 0))
     Viewer(w).run()
 

@@ -135,15 +135,10 @@ class Skeleton:
             more information about the format of the text file.
         '''
         logging.info('%s: parsing skeleton configuration', source)
-        p = parser.BodyParser(self.world, self.jointgroup, **kwargs)
-        p.parse(source)
+        with open(source) as h:
+            p = parser.parse(h, self.world, self.jointgroup, **kwargs)
         self.bodies = p.bodies
         self.joints = p.joints
-        if p.root:
-            b = self.world.get_body(p.root)
-            j = physics.AMotor('hog', self.world, b, None, mode='euler')
-            j.axes = [dict(rel=1, axis=(1, 0, 0)), None, dict(rel=2, axis=(0, 0, 1))]
-            self.joints.append(j)
         self.set_pid_params(kp=0.999 / self.world.dt)
 
     def load_asf(self, source, **kwargs):

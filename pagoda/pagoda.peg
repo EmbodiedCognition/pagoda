@@ -1,0 +1,63 @@
+# -*- mode: coffee -*-
+
+# PEG grammar for pagoda-style specification of bodies and joints.
+
+top = _ (comment / body / joint) (__ (comment / body / joint))* _
+
+# bodies
+
+body = identifier __ bshape __ (lengths / radlen / radius) (__ attr)*
+
+bshape = ~'(box|sph|sphere|cap|capsule|cyl|cylinder)'
+radius = number _ '*'
+radlen = (number __ radius) / (radius __ number)
+lengths = number __ number __ number
+
+attr = handofgod / density / mass / position / quaternion / color
+handofgod = 'handofgod'
+density = 'density' __ number
+mass = 'mass' __ number
+position = 'position' __ number __ number __ number
+quaternion = 'quaternion' __ number __ number __ number __ number
+color = 'color' __ (hexcolor / tuplecolor)
+tuplecolor = number __ number __ number (__ number)?
+
+# joints
+
+joint = jshape __ attach _ motion _ attach (__ limit)*
+
+jshape = ~'(ball|uni|universal|hinge|fixed|slider|piston|amotor|lmotor)'
+motion = ~'(<-|<>|->)'
+attach = identifier (_ offset)?
+
+limit = axes / erps / cfms / fmax / stops / stop_cfms / stop_erps
+axes = 'axes' (__ axis)+
+cfms = 'cfms' (__ number)+
+erps = 'erps' (__ number)+
+fmax = 'fmax' (__ number)+
+stops = 'stops' (__ range)+
+stop_cfms = 'stop_cfms' (__ number)+
+stop_erps = 'stop_erps' (__ number)+
+
+offset = '(' _ number __ number __ number _ ')'
+axis = '<' _ number __ number __ number _ '>'
+range = number _ '~' _ number
+
+# general patterns
+
+number = (float / int) (exp (float / int))?
+int = sign? digits
+float = sign? digits? decimal
+
+identifier = ~'[-\w]+'
+hexcolor = ~'([0-9a-f]{8}|[0-9a-f]{6}|[0-9a-f]{4}|[0-9a-f]{3})'
+
+digits = ~'\d+'
+decimal = ~'\.\d*'
+exp = ~'[efg]'
+sign = ~'[-+]'
+
+_ = ~'\s*'
+__ = ~'\s+'
+
+comment = ~'#.*'
