@@ -382,11 +382,11 @@ class AsfVisitor(NodeVisitor):
 
     def visit_position(self, node, children):
         _, _, x, _, y, _, z = children
-        self.root['position'] = x, y, z
+        self.root['position'] = np.array([x, y, z])
 
     def visit_orientation(self, node, children):
         _, _, x, _, y, _, z = children
-        self.root['orientation'] = x, y, z
+        self.root['orientation'] = np.array([x, y, z])
 
     def visit_bone(self, node, children):
         self.bones[self.bone.name] = self.bone
@@ -403,11 +403,11 @@ class AsfVisitor(NodeVisitor):
 
     def visit_direction(self, node, children):
         _, _, x, _, y, _, z = children
-        self.bone.direction = x, y, z
+        self.bone.direction = np.array([x, y, z])
 
     def visit_axis(self, node, children):
         _, _, rx, _, ry, _, rz, _, order = children
-        self.bone.axis = rx, ry, rz
+        self.bone.axis = np.array([rx, ry, rz])
         self.bone.order = order
 
     def visit_dofs(self, node, children):
@@ -443,8 +443,9 @@ class AsfVisitor(NodeVisitor):
 
             bone = self.bones[name]
             body = self.world.create_body(
-                'box', name=bone.name, density=density,
+                'box', name=bone.name, density=self.density,
                 lengths=(size, size, bone.length))
+            body.color = self.color
 
             # move the center of the body to the halfway point between
             # the parent (joint) and child (joint).
