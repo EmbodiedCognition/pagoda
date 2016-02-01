@@ -536,7 +536,7 @@ class Constraints(object):
     @property
     def axes(self):
         '''List of axes for this object's degrees of freedom.'''
-        return [self.ode_obj.getAxis(i) for i in range(self.ADOF)]
+        return [self.ode_obj.getAxis(i) for i in range(self.ADOF or self.LDOF)]
 
     @axes.setter
     def axes(self, axes):
@@ -627,6 +627,23 @@ class Constraints(object):
             containing one such value for each degree of freedom.
         '''
         _set_params(self.ode_obj, 'FMax', max_forces, self.ADOF + self.LDOF)
+
+    @property
+    def erps(self):
+        '''List of ERP values for this object's degrees of freedom.'''
+        return _get_params(self.ode_obj, 'ERP', self.ADOF + self.LDOF)
+
+    @erps.setter
+    def erps(self, erps):
+        '''Set the ERP values for this object's degrees of freedom.
+
+        Parameters
+        ----------
+        erps : float or sequence of float
+            An ERP value to set on all degrees of freedom, or a list
+            containing one such value for each degree of freedom.
+        '''
+        _set_params(self.ode_obj, 'ERP', erps, self.ADOF + self.LDOF)
 
     @property
     def cfms(self):
