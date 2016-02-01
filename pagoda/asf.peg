@@ -1,0 +1,69 @@
+# -*- mode: coffee -*-
+
+# PEG grammar for Acclaim Skeleton File Format
+
+top = _ (comment __)* (metadata __)* bonedata __ hierarchy _
+
+# metadata
+
+metadata = version / asf_name / units / root / documentation
+version = ':version' __ string
+asf_name = ':name' __ identifier
+units = ':units' (__ unit)+
+root = ':root' (__ coords)+
+documentation = ':documentation' (__ string)+
+
+unit = mass_unit / length_unit / angle_unit
+mass_unit = 'mass' __ number
+length_unit = 'length' __ number
+angle_unit = 'angle' __ identifier
+
+coords = root_axis / order / position / orientation
+root_axis = 'axis' __ XYZ
+order = 'order' (__ udof)+
+position = 'position' __ number __ number __ number
+orientation = 'orientation' __ number __ number __ number
+
+# bonedata
+
+bonedata = ':bonedata' (__ bone)+
+bone = 'begin' (__ field)+ __ 'end'
+field = id / name / direction / length / axis / dofs / limits
+id = 'id' __ identifier
+name = 'name' __ identifier
+direction = 'direction' __ number __ number __ number
+length = 'length' __ number
+axis = 'axis' __ number __ number __ number __ XYZ
+dofs = 'dof' (__ ldof)+
+limits = 'limits' (__ limit)+
+limit = '(' _ number __ number _ ')'
+
+# hierarchy
+
+hierarchy = ':hierarchy' __ 'begin' __ chain+ 'end'
+chain = identifier (spaces identifier)+ nl
+
+# general patterns
+
+XYZ = 'XYZ' / 'YZX' / 'ZXY' / 'XZY' / 'ZYX' / 'YXZ'
+udof = 'RX' / 'RY' / 'RZ' / 'TX' / 'TY' / 'TZ'
+ldof = 'rx' / 'ry' / 'rz' / 'tx' / 'ty' / 'tz'
+
+number = (float / int) (exp (float / int))?
+int = sign? digits
+float = sign? digits? decimal
+
+nl = ~'[ ]*\n+[ ]*'
+spaces = ~'[ ]+'
+string = ~'[^:]\S*'
+identifier = ~'(?!end)[-\w]+'
+
+digits = ~'\d+'
+decimal = ~'\.\d*'
+exp = ~'[efg]'
+sign = ~'[-+]'
+
+_ = ~'\s*'
+__ = ~'\s+'
+
+comment = ~'#.*'
