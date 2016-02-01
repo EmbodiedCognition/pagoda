@@ -53,7 +53,7 @@ number = (float / int) (exp (float / int))?
 int = sign? digits
 float = sign? digits? decimal
 
-nl = ~'[ ]*\n+[ ]*'
+nl = ~'[ ]*[\r\n]+[ ]*'
 spaces = ~'[ ]+'
 string = ~'[^:]\S*'
 identifier = ~'(?!end)[-\w]+'
