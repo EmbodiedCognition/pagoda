@@ -11,7 +11,23 @@ BodyState = collections.namedtuple(
     'BodyState', 'name position quaternion linear_velocity angular_velocity')
 
 
-class Body(object):
+class Registrar(type):
+    '''A metaclass that builds a registry of its subclasses.'''
+
+    def __init__(cls, name, bases, dct):
+        if not hasattr(cls, '_registry'):
+            cls._registry = {}
+        else:
+            key = name.lower()
+            for i in range(3, len(name) + 1):
+                cls._registry[key[:i]] = cls
+        super(Registrar, cls).__init__(name, bases, dct)
+
+    def build(cls, key, *args, **kwargs):
+        return cls._registry[key.lower()](*args, **kwargs)
+
+
+class Body(Registrar(str('Base'), (), {})):
     '''This class wraps things that participate in the ODE physics simulation.
 
     This class basically provides lots of Python-specific properties that call
@@ -457,14 +473,6 @@ class Capsule(Body):
         m.setCapsule(density, 3, self.radius, self.length)
 
 
-# Create a lookup table for things derived from the Body class.
-BODIES = {}
-for cls in Body.__subclasses__():
-    name = cls.__name__.lower()
-    for i in range(3, len(name) + 1):
-        BODIES[name[:i]] = cls
-
-
 def _get_params(target, param, dof):
     '''Get the given param from each of the DOFs for a joint.'''
     return [target.getParam(getattr(ode, 'Param{}{}'.format(param, s)))
@@ -480,20 +488,20 @@ def _set_params(target, param, values, dof):
         target.setParam(getattr(ode, 'Param{}{}'.format(param, s)), value)
 
 
-class Constraints(object):
-    '''This class wraps an ODE entity that constrains body movement.
+class Joint(Registrar(str('Base'), (), {})):
+    '''Base class for joints connecting two bodies.
 
     In ODE, :class:`Body` objects represent mass/inertia properties, while
     :class:`Joint` and :class:`Motor` objects represent mathematical constraints
     that govern how specific pairs of bodies interact. For example, a
     :class:`BallJoint` that connects two bodies will force the anchor point for
-    those two bodies to remain in the same location in space -- any linear force
-    that displaces one of the bodies will also cause a force to be applied to
-    the second body, because of the constraint imposed by the ball joint. As
-    another example, a :class:`Slider` that connects two bodies allows those two
-    bodies to displace relative to one another along a single axis, but not to
-    rotate with respect to one another -- any torque applied to one body will
-    also cause a torque to be applied to the other body.
+    those two bodies to remain in the same location in world coordinates -- any
+    linear force that displaces one of the bodies will also cause a force to be
+    applied to the second body, because of the constraint imposed by the ball
+    joint. As another example, a :class:`Slider` that connects two bodies allows
+    those two bodies to displace relative to one another along a single axis,
+    but not to rotate with respect to one another -- any torque applied to one
+    body will also cause a torque to be applied to the other body.
 
     Constraints can be applied to angular degrees of freedom (e.g.,
     :class:`AMotor`), linear degrees of freedom (e.g., :class:`BallJoint`,
@@ -705,7 +713,7 @@ class Constraints(object):
         self.ode_obj.setFeedback(False)
 
 
-class Motor(Constraints):
+class Dynamic(Joint):
     '''This class wraps an ODE motor -- either an LMotor or an AMotor.
 
     Parameters
@@ -742,7 +750,7 @@ class Motor(Constraints):
             self.disable_feedback()
 
 
-class AMotor(Motor):
+class AMotor(Dynamic):
     '''An angular motor applies torques to change an angle in the physics world.
 
     AMotors can be created in "user" mode---in which case the user must supply
@@ -807,7 +815,7 @@ class AMotor(Motor):
         self.ode_obj.addTorques(*torques)
 
 
-class LMotor(Motor):
+class LMotor(Dynamic):
     '''An LMotor applies forces to change a position in the physics world.'''
 
     MOTOR_FACTORY = ode.LMotor
@@ -818,8 +826,8 @@ class LMotor(Motor):
         return self.ode_obj.getNumAxes()
 
 
-class Joint(Constraints):
-    '''This class wraps the ODE Joint class with some Python properties.
+class Kinematic(Joint):
+    '''This class wraps kinematic ODE joints with some Python properties.
 
     Parameters
     ----------
@@ -905,12 +913,12 @@ class Joint(Constraints):
         self.amotor.add_torques(*torques)
 
 
-class Fixed(Joint):
+class Fixed(Kinematic):
     ADOF = 0
     LDOF = 0
 
 
-class Slider(Joint):
+class Slider(Kinematic):
     ADOF = 0
     LDOF = 1
 
@@ -944,7 +952,7 @@ class Slider(Joint):
         self.ode_obj.setAxis(axes[0])
 
 
-class Hinge(Joint):
+class Hinge(Kinematic):
     ADOF = 1
     LDOF = 0
 
@@ -978,7 +986,7 @@ class Hinge(Joint):
         self.ode_obj.setAxis(axes[0])
 
 
-class Piston(Joint):
+class Piston(Kinematic):
     ADOF = 1
     LDOF = 1
 
@@ -994,7 +1002,7 @@ class Piston(Joint):
         self.ode_obj.setAxis(axes[0])
 
 
-class Universal(Joint):
+class Universal(Kinematic):
     ADOF = 2
     LDOF = 0
 
@@ -1022,7 +1030,7 @@ class Universal(Joint):
         return [self.ode_obj.getAngle1Rate(), self.ode_obj.getAngle2Rate()]
 
 
-class Ball(Joint):
+class Ball(Kinematic):
     ADOF = 3
     LDOF = 0
 
@@ -1069,14 +1077,6 @@ class Ball(Joint):
     @hi_stops.setter
     def hi_stops(self, hi_stops):
         self.alimit.hi_stops = hi_stops
-
-
-# Create a lookup table for things derived from the Joint class.
-JOINTS = {}
-for cls in Joint.__subclasses__():
-    name = cls.__name__.lower()
-    for i in range(3, len(name) + 1):
-        JOINTS[name[:i]] = cls
 
 
 def make_quaternion(theta, *axis):
@@ -1236,7 +1236,7 @@ class World(object):
                 name = '{}{}'.format(shape, i)
                 if name not in self._bodies:
                     break
-        self._bodies[name] = BODIES[shape](name, self, **kwargs)
+        self._bodies[name] = Body.build(shape, name, self, **kwargs)
         return self._bodies[name]
 
     def join(self, shape, body_a, body_b=None, name=None, **kwargs):
@@ -1269,7 +1269,8 @@ class World(object):
         shape = shape.lower()
         if name is None:
             name = '{}^{}^{}'.format(ba.name, shape, bb.name if bb else '')
-        self._joints[name] = JOINTS[shape](name, self, body_a=ba, body_b=bb, **kwargs)
+        self._joints[name] = Joint.build(
+            shape, name, self, body_a=ba, body_b=bb, **kwargs)
         return self._joints[name]
 
     def move_next_to(self, body_a, body_b, offset_a, offset_b):
