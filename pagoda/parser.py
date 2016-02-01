@@ -34,7 +34,7 @@ def parse(source, world, jointgroup=None, density=1000, color=None):
         not assign a color to parsed bodies.
     '''
     visitor = Visitor(world, jointgroup, density, color)
-    visitor.parse(source.read())
+    visitor.parse(re.sub(r'#.*', ' ', source.read()))
     return visitor
 
 
@@ -283,7 +283,7 @@ def parse_asf(source, world, jointgroup=None, density=1000, color=None):
         not assign a color to parsed bodies.
     '''
     visitor = AsfVisitor(world, jointgroup, density, color)
-    visitor.parse(source.read())
+    visitor.parse(re.sub(r'#.*', ' ', source.read()))
     return visitor
 
 

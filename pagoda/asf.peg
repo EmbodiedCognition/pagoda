@@ -2,13 +2,13 @@
 
 # PEG grammar for Acclaim Skeleton File Format
 
-top = _ (comment __)* (metadata __)* bonedata __ hierarchy _
+top = _ ((metadata / bonedata) __)+ hierarchy _
 
 # metadata
 
 metadata = version / asf_name / units / root / documentation
 version = ':version' __ string
-asf_name = ':name' __ identifier
+asf_name = ':name' __ string
 units = ':units' (__ unit)+
 root = ':root' (__ coords)+
 documentation = ':documentation' (__ string)+
@@ -65,5 +65,3 @@ sign = ~'[-+]'
 
 _ = ~'\s*'
 __ = ~'\s+'
-
-comment = ~'#.*'
