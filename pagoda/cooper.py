@@ -144,9 +144,8 @@ class Markers:
                          1 / self.world.dt, reader.point_rate)
 
             # set up a map from marker label to index in the data stream.
-            labels = [s.strip() for s in reader.point_labels]
-            logging.info('%s: loaded marker labels %s', filename, labels)
-            self.channels = self._map_labels_to_channels(labels)
+            self.channels = self._map_labels_to_channels([
+                s.strip() for s in reader.point_labels])
 
             # read the actual c3d data into a numpy array.
             data = []
