@@ -184,6 +184,10 @@ class TestJoint(Base):
 
     def test_ball(self):
         j = pagoda.physics.Ball('bal', self.world, self.box, anchor=(0, 0, 0))
+        j.axes = [(1, 0, 0), (0, 0, 1)]
+        assert j.axes == [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
+        assert j.angles == [0, 0, 0]
+        assert j.angle_rates == [0, 0, 0]
 
     def test_join_to(self):
         b = pagoda.physics.Box('b', self.world, lengths=(1, 2, 3))

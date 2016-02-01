@@ -852,8 +852,8 @@ class Kinematic(Joint):
         Add the joint to this group. Defaults to the default world joint group.
     '''
 
-    def __init__(self, name, world, body_a, body_b=None, anchor=None, feedback=False,
-                 jointgroup=None, amotor=True, lmotor=True):
+    def __init__(self, name, world, body_a, body_b=None, anchor=None,
+                 feedback=False, jointgroup=None, amotor=True, lmotor=True):
         self.name = name
 
         build = getattr(ode, '{}Joint'.format(self.__class__.__name__))
@@ -1039,9 +1039,9 @@ class Ball(Kinematic):
 
         # we augment ball joints with an additional motor that allows us to set
         # rotation limits.
-        kw = {k: v for k, v in kwargs.items() if k != 'anchor'}
-        self.alimit = AMotor(
-            name + ':alimit', *args, dof=self.ADOF, mode='euler', **kw)
+        keys = 'name world body_a body_b feedback dof jointgroup'.split()
+        self.alimit = AMotor(name + ':alimit', *args, dof=self.ADOF, mode='euler',
+                             **{k: v for k, v in kwargs.items() if k in keys})
 
     @property
     def angles(self):
