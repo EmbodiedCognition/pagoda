@@ -1359,9 +1359,11 @@ class World(object):
         '''Reset the state of the world.'''
         pass
 
-    def on_key_press(self, key, keymap):
+    def on_key_press(self, key, modifiers, keymap):
         '''Handle an otherwise unhandled keypress event (from a GUI).'''
-        pass
+        if key == keymap.ENTER:
+            self.reset()
+            return True
 
     def are_connected(self, body_a, body_b):
         '''Determine whether the given bodies are currently connected.

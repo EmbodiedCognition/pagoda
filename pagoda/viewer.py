@@ -54,8 +54,7 @@ class Viewer(popglove.Window):
         self._frozen = []
 
     def grab_key_press(self, key, modifiers, keymap):
-        if key == keymap.ENTER:
-            self.world.reset()
+        if self.world.on_key_press(key, modifiers, keymap):
             return True
         if key == keymap.F:
             self.freeze_bodies()
@@ -87,11 +86,8 @@ class Viewer(popglove.Window):
                 shape = dict(radius=b.radius, length=b.length)
             if isinstance(b, physics.Capsule):
                 shape = dict(radius=b.radius, length=b.length)
-            bp = b.__class__(b.name,
-                             self.world.ode_world,
-                             self.world.ode_space,
-                             color=tuple(list(b.color[:3]) + [0.5]),
-                             **shape)
+            bp = b.__class__(b.name, self.world, mass=b.mass.mass, **shape)
+            bp.color = list(b.color[:3]) + [0.5]
             bp.position = b.position
             bp.quaternion = b.quaternion
             bp.is_kinematic = True
