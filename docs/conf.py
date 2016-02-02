@@ -4,6 +4,7 @@ import sys
 
 from mock import Mock as MagicMock
 
+
 class Mock(MagicMock):
     @classmethod
     def __getattr__(cls, name):
@@ -14,10 +15,8 @@ sys.modules.update((mod, Mock()) for mod in 'ode'.split())
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.autosummary',
-    #'sphinx.ext.doctest',
     'sphinx.ext.intersphinx',
     'sphinx.ext.mathjax',
-    #'sphinx.ext.pngmath',
     'sphinx.ext.viewcode',
     'numpydoc',
     ]
@@ -55,6 +54,7 @@ html_theme_options = dict(
 )
 html_short_title = 'Home'
 html_static_path = ['_static']
+
 
 def h(xs):
     return ['{}.html'.format(x) for x in xs.split()]
