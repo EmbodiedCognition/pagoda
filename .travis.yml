@@ -20,7 +20,7 @@ before_install:
 install:
   - conda install --yes python=$TRAVIS_PYTHON_VERSION pip numpy pandas cython
   - pip install pytest-pep8 pytest-cov python-coveralls c3d
-  - ( cd ode ; ./build-ode.sh )
+  - ( cd ode ; ./build-ode.sh ; rm -fr opende )
   - pip install .
 script:
   - LD_LIBRARY_PATH=$VIRTUAL_ENV/lib:$LD_LIBRARY_PATH py.test -v --pep8 --cov=pagoda --cov-report=term-missing
