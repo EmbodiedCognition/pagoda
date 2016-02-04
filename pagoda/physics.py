@@ -50,7 +50,7 @@ class Body(Registrar(str('Base'), (), {})):
 
     def __str__(self):
         return '{0.__class__.__name__} {0.name} at {1}'.format(
-            self, np.array(self.position).round(3))
+            self, self.position.round(3))
 
     @property
     def mass(self):
@@ -68,10 +68,10 @@ class Body(Registrar(str('Base'), (), {})):
             - angular velocity (3-tuple)
         '''
         return BodyState(self.name,
-                         self.position,
-                         self.quaternion,
-                         self.linear_velocity,
-                         self.angular_velocity)
+                         tuple(self.position),
+                         tuple(self.quaternion),
+                         tuple(self.linear_velocity),
+                         tuple(self.angular_velocity))
 
     @state.setter
     def state(self, state):
@@ -92,7 +92,7 @@ class Body(Registrar(str('Base'), (), {})):
     @property
     def position(self):
         '''The (x, y, z) coordinates of the center of this body.'''
-        return self.ode_body.getPosition()
+        return np.array(self.ode_body.getPosition())
 
     @position.setter
     def position(self, position):
@@ -103,12 +103,12 @@ class Body(Registrar(str('Base'), (), {})):
         position : 3-tuple of float
             The coordinates of the desired center of this body.
         '''
-        self.ode_body.setPosition(position)
+        self.ode_body.setPosition(tuple(position))
 
     @property
     def rotation(self):
         '''The rotation matrix for this body.'''
-        return self.ode_body.getRotation()
+        return np.array(self.ode_body.getRotation()).reshape((3, 3))
 
     @rotation.setter
     def rotation(self, rotation):
@@ -119,21 +119,23 @@ class Body(Registrar(str('Base'), (), {})):
         rotation : sequence of 9 floats
             The desired rotation matrix for this body.
         '''
-        self.ode_body.setRotation(rotation)
+        if isinstance(rotation, np.ndarray):
+            rotation = rotation.ravel()
+        self.ode_body.setRotation(tuple(rotation))
 
     @property
     def quaternion(self):
         '''The (w, x, y, z) rotation quaternion for this body.'''
-        return self.ode_body.getQuaternion()
+        return np.array(self.ode_body.getQuaternion())
 
     @quaternion.setter
     def quaternion(self, quaternion):
-        self.ode_body.setQuaternion(quaternion)
+        self.ode_body.setQuaternion(tuple(quaternion))
 
     @property
     def linear_velocity(self):
         '''Current linear velocity of this body (in world coordinates).'''
-        return self.ode_body.getLinearVel()
+        return np.array(self.ode_body.getLinearVel())
 
     @linear_velocity.setter
     def linear_velocity(self, velocity):
@@ -144,12 +146,12 @@ class Body(Registrar(str('Base'), (), {})):
         velocity : 3-tuple of float
             The desired velocity for this body, in world coordinates.
         '''
-        self.ode_body.setLinearVel(velocity)
+        self.ode_body.setLinearVel(tuple(velocity))
 
     @property
     def angular_velocity(self):
         '''Current angular velocity of this body (in world coordinates).'''
-        return self.ode_body.getAngularVel()
+        return np.array(self.ode_body.getAngularVel())
 
     @angular_velocity.setter
     def angular_velocity(self, velocity):
@@ -160,12 +162,12 @@ class Body(Registrar(str('Base'), (), {})):
         velocity : 3-tuple of float
             The desired angular velocity for this body, in world coordinates.
         '''
-        self.ode_body.setAngularVel(velocity)
+        self.ode_body.setAngularVel(tuple(velocity))
 
     @property
     def force(self):
         '''Current net force acting on this body (in world coordinates).'''
-        return self.ode_body.getForce()
+        return np.array(self.ode_body.getForce())
 
     @force.setter
     def force(self, force):
@@ -176,12 +178,12 @@ class Body(Registrar(str('Base'), (), {})):
         force : 3-tuple of float
             The desired force acting on this body, in world coordinates.
         '''
-        self.ode_body.setForce(force)
+        self.ode_body.setForce(tuple(force))
 
     @property
     def torque(self):
         '''Current net torque acting on this body (in world coordinates).'''
-        return self.ode_body.getTorque()
+        return np.array(self.ode_body.getTorque())
 
     @torque.setter
     def torque(self, torque):
@@ -192,7 +194,7 @@ class Body(Registrar(str('Base'), (), {})):
         torque : 3-tuple of float
             The desired torque acting on this body, in world coordinates.
         '''
-        self.ode_body.setTorque(torque)
+        self.ode_body.setTorque(tuple(torque))
 
     @property
     def is_kinematic(self):
@@ -246,7 +248,7 @@ class Body(Registrar(str('Base'), (), {})):
         xrot : 3-tuple of float
             The same point after rotation into the orientation of this body.
         '''
-        return np.dot(x, np.array(self.rotation).reshape((3, 3)))
+        return np.dot(x, self.rotation)
 
     def body_to_world(self, position):
         '''Convert a body-relative offset to world coordinates.
@@ -261,7 +263,7 @@ class Body(Registrar(str('Base'), (), {})):
         position : 3-tuple of float
             A tuple giving the world coordinates of the given offset.
         '''
-        return self.ode_body.getRelPointPos(position)
+        return np.array(self.ode_body.getRelPointPos(tuple(position)))
 
     def world_to_body(self, position):
         '''Convert a point in world coordinates to a body-relative offset.
@@ -276,7 +278,7 @@ class Body(Registrar(str('Base'), (), {})):
         offset : 3-tuple of float
             A tuple giving the body-relative offset of the given position.
         '''
-        return self.ode_body.getPosRelPoint(position)
+        return np.array(self.ode_body.getPosRelPoint(tuple(position)))
 
     def relative_offset_to_world(self, offset):
         '''Convert a relative body offset to world coordinates.
@@ -296,7 +298,7 @@ class Body(Registrar(str('Base'), (), {})):
         position : 3-tuple of float
             A position in world coordinates of the given body offset.
         '''
-        return self.body_to_world(offset * self.dimensions / 2)
+        return np.array(self.body_to_world(offset * self.dimensions / 2))
 
     def add_force(self, force, relative=False, position=None, relative_position=None):
         '''Add a force to this body.
@@ -544,7 +546,8 @@ class Joint(Registrar(str('Base'), (), {})):
     @property
     def axes(self):
         '''List of axes for this object's degrees of freedom.'''
-        return [self.ode_obj.getAxis(i) for i in range(self.ADOF or self.LDOF)]
+        return [np.array(self.ode_obj.getAxis(i))
+                for i in range(self.ADOF or self.LDOF)]
 
     @axes.setter
     def axes(self, axes):
@@ -776,8 +779,7 @@ class AMotor(Dynamic):
     @property
     def axes(self):
         '''List of axes for this object's degrees of freedom.'''
-        print(self.ode_obj, self.name)
-        return [self.ode_obj.getAxis(i) for i in range(self.ADOF)]
+        return [np.array(self.ode_obj.getAxis(i)) for i in range(self.ADOF)]
 
     @axes.setter
     def axes(self, axes):
@@ -860,7 +862,7 @@ class Kinematic(Joint):
         self.ode_obj = build(world.ode_world, jointgroup=jointgroup)
         self.ode_obj.attach(body_a.ode_body, body_b.ode_body if body_b else None)
         if anchor is not None:
-            self.ode_obj.setAnchor(anchor)
+            self.ode_obj.setAnchor(tuple(anchor))
             self.ode_obj.setParam(ode.ParamCFM, 0)
 
         self.amotor = None
@@ -895,12 +897,12 @@ class Kinematic(Joint):
     @property
     def anchor(self):
         '''3-tuple specifying location of this joint's anchor.'''
-        return self.ode_obj.getAnchor()
+        return np.array(self.ode_obj.getAnchor())
 
     @property
     def anchor2(self):
         '''3-tuple specifying location of the anchor on the second body.'''
-        return self.ode_obj.getAnchor2()
+        return np.array(self.ode_obj.getAnchor2())
 
     def add_torques(self, *torques):
         '''Add the given torques along this joint's axes.
@@ -935,7 +937,7 @@ class Slider(Kinematic):
     @property
     def axes(self):
         '''Axis of displacement for this joint.'''
-        return [self.ode_obj.getAxis()]
+        return [np.array(self.ode_obj.getAxis())]
 
     @axes.setter
     def axes(self, axes):
@@ -949,7 +951,7 @@ class Slider(Kinematic):
             Y, and Z axis for the joint.
         '''
         self.lmotor.axes = [axes[0]]
-        self.ode_obj.setAxis(axes[0])
+        self.ode_obj.setAxis(tuple(axes[0]))
 
 
 class Hinge(Kinematic):
@@ -969,7 +971,7 @@ class Hinge(Kinematic):
     @property
     def axes(self):
         '''Axis of rotation for this joint.'''
-        return [self.ode_obj.getAxis()]
+        return [np.array(self.ode_obj.getAxis())]
 
     @axes.setter
     def axes(self, axes):
@@ -983,7 +985,7 @@ class Hinge(Kinematic):
             Y, and Z axis for the joint.
         '''
         self.amotor.axes = [axes[0]]
-        self.ode_obj.setAxis(axes[0])
+        self.ode_obj.setAxis(tuple(axes[0]))
 
 
 class Piston(Kinematic):
@@ -993,7 +995,7 @@ class Piston(Kinematic):
     @property
     def axes(self):
         '''Axis of rotation and displacement for this joint.'''
-        return [self.ode_obj.getAxis()]
+        return [np.array(self.ode_obj.getAxis())]
 
     @axes.setter
     def axes(self, axes):
@@ -1009,7 +1011,8 @@ class Universal(Kinematic):
     @property
     def axes(self):
         '''A list of axes of rotation for this joint.'''
-        return [self.ode_obj.getAxis1(), self.ode_obj.getAxis2()]
+        return [np.array(self.ode_obj.getAxis1()),
+                np.array(self.ode_obj.getAxis2())]
 
     @axes.setter
     def axes(self, axes):
@@ -1017,7 +1020,7 @@ class Universal(Kinematic):
         setters = [self.ode_obj.setAxis1, self.ode_obj.setAxis2]
         for axis, setter in zip(axes, setters):
             if axis is not None:
-                setter(axis)
+                setter(tuple(axis))
 
     @property
     def angles(self):
@@ -1095,7 +1098,7 @@ def center_of_mass(bodies):
     t = 0.
     for b in bodies:
         m = b.mass
-        x += np.asarray(b.body_to_world(m.c)) * m.mass
+        x += b.body_to_world(m.c) * m.mass
         t += m.mass
     return x / t
 
@@ -1309,7 +1312,7 @@ class World(object):
             return ba.relative_offset_to_world(offset_a)
         anchor = ba.relative_offset_to_world(offset_a)
         offset = bb.relative_offset_to_world(offset_b)
-        bb.position = np.asarray(bb.position) + anchor - offset
+        bb.position = bb.position + anchor - offset
         return anchor
 
     def get_body_states(self):

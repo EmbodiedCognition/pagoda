@@ -226,7 +226,7 @@ class Visitor(NodeVisitor):
             anchor = None
 
         logging.info('joining %s <-%s-> %s at %s', body1, shape, body2,
-                     [round(a, 3) for a in anchor or []])
+                     anchor.round(3) if anchor is not None else 'None')
 
         joint = self.world.join(shape, body1, body2, anchor=anchor,
                                 jointgroup=self.jointgroup)
