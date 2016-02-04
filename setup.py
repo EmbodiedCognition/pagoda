@@ -10,7 +10,7 @@ setuptools.setup(
     package_data={'': ['*.peg']},
     author='Leif Johnson',
     author_email='leif@lmjohns3.com',
-    description='yet another OpenGL-with-physics simulation framework',
+    description='pyglet + ode + numpy: a simulation framework',
     long_description=open(README).read(),
     license='MIT',
     url='http://github.com/EmbodiedCognition/pagoda/',
