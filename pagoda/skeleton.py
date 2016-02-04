@@ -121,8 +121,9 @@ class Skeleton:
             information about the format of the text file.
         '''
         if hasattr(source, 'endswith') and source.lower().endswith('.asf'):
-            return self.load_asf(source, **kwargs)
-        self.load_skel(source, **kwargs)
+            self.load_asf(source, **kwargs)
+        else:
+            self.load_skel(source, **kwargs)
 
     def load_skel(self, source, **kwargs):
         '''Load a skeleton definition from a text file.
@@ -135,8 +136,11 @@ class Skeleton:
             more information about the format of the text file.
         '''
         logging.info('%s: parsing skeleton configuration', source)
-        with open(source) as h:
-            p = parser.parse(h, self.world, self.jointgroup, **kwargs)
+        if hasattr(source, 'read'):
+            p = parser.parse(source, self.world, self.jointgroup, **kwargs)
+        else:
+            with open(source) as handle:
+                p = parser.parse(handle, self.world, self.jointgroup, **kwargs)
         self.bodies = p.bodies
         self.joints = p.joints
         self.set_pid_params(kp=0.999 / self.world.dt)
@@ -144,15 +148,20 @@ class Skeleton:
     def load_asf(self, source, **kwargs):
         '''Load a skeleton definition from an ASF text file.
 
-        NOT IMPLEMENTED!
-
         Parameters
         ----------
         source : str or file
             A filename or file-like object that contains text information
             describing a skeleton, in ASF format.
         '''
-        raise NotImplementedError
+        if hasattr(source, 'read'):
+            p = parser.parse_asf(source, self.world, self.jointgroup, **kwargs)
+        else:
+            with open(source) as handle:
+                p = parser.parse_asf(handle, self.world, self.jointgroup, **kwargs)
+        self.bodies = p.bodies
+        self.joints = p.joints
+        self.set_pid_params(kp=0.999 / self.world.dt)
 
     def set_pid_params(self, *args, **kwargs):
         '''Set PID parameters for all joints in the skeleton.
