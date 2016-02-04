@@ -9,19 +9,17 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={'': ['*.peg']},
     author='Leif Johnson',
-    author_email='leif@cs.utexas.edu',
+    author_email='leif@lmjohns3.com',
     description='yet another OpenGL-with-physics simulation framework',
     long_description=open(README).read(),
     license='MIT',
-    url='http://github.com/EmbodiedCognition/py-sim/',
+    url='http://github.com/EmbodiedCognition/pagoda/',
     keywords=('simulation '
               'physics '
               'ode '
               'visualization '
               ),
     install_requires=['climate', 'numpy', 'parsimonious', 'popglove'],
-    tests_require=['pytest', 'pytest-pep8', 'pytest-cov'],
-    setup_requires=['pytest-runner'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

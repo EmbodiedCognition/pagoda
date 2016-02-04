@@ -12,8 +12,7 @@ def world():
 
 
 @pytest.fixture
-def box():
-    world = pagoda.physics.World()
+def box(world):
     return world.create_body('box', lengths=(1, 2, 3))
 
 
