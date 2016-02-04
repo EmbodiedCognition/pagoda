@@ -75,7 +75,7 @@ class Viewer(popglove.Window):
     def freeze_bodies(self):
         bodies = []
         for b in self.world.bodies:
-            if b.name.startswith('table'):
+            if getattr(b, 'can_freeze', None) is False:
                 continue
             shape = {}
             if isinstance(b, physics.Sphere):
