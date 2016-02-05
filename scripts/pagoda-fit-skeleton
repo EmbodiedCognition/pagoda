@@ -44,7 +44,7 @@ class Template:
         with open(filename) as handle:
             self.content = handle.read()
         self.fields = sorted(set(re.findall(r'\{([^\}]+)\}', self.content)))
-        logging.info('%s: loaded %d fields to optimize', filename, len(self))
+        logging.warn('%s: loaded %d fields to optimize', filename, len(self))
 
     def __len__(self):
         return len(self.fields)
@@ -72,16 +72,26 @@ def build_cost(args, skeleton, markers):
                               offset,
                               offset + window,
                               w.settle_to_markers(offset, 0, 20))])
-        logging.info('cost %s +/- %s', F.mean(), F.std())
+        logging.warn('cost %s +/- %s', F.mean(), F.std())
         return F.mean() + F.std()
     return cost
+
+
+def saver(output, skeleton, markers):
+    S = len(skeleton)
+    def save(x, *args, **kwargs):
+        with open(output + 'skeleton.txt', 'w') as handle:
+            handle.write(skeleton.fill(x[:S]))
+        logging.warn('saved %s', output + 'skeleton.txt')
+        with open(output + 'markers.txt', 'w') as handle:
+            handle.write(markers.fill(x[S:]))
+        logging.warn('saved %s', output + 'markers.txt')
+    return save
 
 
 def main(args):
     skeleton = Template(args.skeleton)
     markers = Template(args.markers)
-
-    f = build_cost(args, skeleton, markers)
 
     S = len(skeleton)
     upper = np.zeros((S + len(markers), ), 'f')
@@ -93,7 +103,7 @@ def main(args):
 
     if args.bounds:
         with open(args.bounds) as h:
-            logging.info('%s: loading parameter bounds', args.bounds)
+            logging.warn('%s: loading parameter bounds', args.bounds)
             for l in h:
                 l = l.split('#')[0].strip()
                 if not l:
@@ -103,19 +113,20 @@ def main(args):
                     i = skeleton.fields.index(name)
                     lower[i] = float(lo)
                     upper[i] = float(hi)
-                    logging.info('set bound for %s (%d) to (%.4f, %.4f)',
+                    logging.warn('set bound for %s (%d) to (%.4f, %.4f)',
                                  name, i, lower[i], upper[i])
                 except Exception as e:
                     logging.exception('error')
 
+    save = saver(args.output, skeleton, markers)
     res = scipy.optimize.differential_evolution(
-        f, list(zip(lower, upper)), popsize=args.popsize, maxiter=args.maxiter)
-
-    with open(args.output + 'skeleton.txt', 'w') as handle:
-        handle.write(skeleton.fill(res.x[:S]))
-    with open(args.output + 'markers.txt', 'w') as handle:
-        handle.write(markers.fill(res.x[S:]))
+        build_cost(args, skeleton, markers),
+        list(zip(lower, upper)),
+        popsize=args.popsize,
+        maxiter=args.maxiter,
+        callback=save)
+    save(res.x)
 
 
 if __name__ == '__main__':
-    climate.call(main)
+    climate.call(main, default_level='WARN')

@@ -1,0 +1,65 @@
+# --- body segments ---
+
+# anthropometry from
+# http://en.wikipedia.org/wiki/File:HeadAnthropometry.JPG
+# http://msis.jsc.nasa.gov/sections/section03.htm
+# http://www.emeraldinsight.com/journals.htm?articleid=844037&show=html
+# ... and some guesswork.
+
+head     box {headx} {heady} {headz}  density 900  position 0 0 2
+neck     box {neckx} {necky} {neckz}  density 900
+u-torso  box {torsox} {torsoy} {utz}  density 900
+l-torso  box {torsox} {torsoy} {ltz}  density 900
+pelvis   box {torsox} {torsoy} {pz}   density 900  handofgod
+
+r-collar box {colx} {coly} {colz}
+ru-arm   cap {uar}* {ual}
+rl-arm   cap {lar}* {lal}             density 1100
+r-hand   box {handx} {handy} {handz}  density 1100
+
+ru-leg   cap {ulr}* {ull}
+rl-leg   cap {llr}* {lll}
+r-foot   box {footx} {footy} {footz}  density 1100
+r-toes   box {footx} {toey} {footz}   density 1100
+
+l-collar box {colx} {coly} {colz}
+lu-arm   cap {uar}* {ual}
+ll-arm   cap {lar}* {lal}             density 1100
+l-hand   box {handx} {handy} {handz}  density 1100
+
+lu-leg   cap {ulr}* {ull}
+ll-leg   cap {llr}* {lll}
+l-foot   box {footx} {footy} {footz}  density 1100
+l-toes   box {footx} {toey} {footz}   density 1100
+
+# --- joint attachments ---
+
+# spine
+ball head(0 -0.3 -1)  <- neck(0 0 1)       stops -30~60 -30~30 -85~85
+ball neck(0 -0.5 -1)  <- u-torso(0 -0.5 1) stops -10~30 -30~30 -30~30
+ball u-torso(0 -1 -1) <- l-torso(0 -1 1)   stops -20~20 -30~30 -10~10
+ball l-torso(0 0 -1)  <- pelvis(0 0 1)     stops -20~20 -30~30 -10~10
+
+# right arm
+uni   u-torso(0.5 0 1)    <- r-collar(-1 0 -1) stops  -30~30  -30~30  axes <0 1 0> <0 0 1>
+ball  r-collar(0.6 0 -1)  <- ru-arm(0 0 1)     stops -150~150 -70~70 -80~150
+uni   ru-arm(0 0 -1)      <- rl-arm(0 0 1)     stops -150~1   -70~70  axes <1 0 0> <0 0 1>
+hinge rl-arm(0 -1 -1)     <- r-hand(0 -1 1)    stops  -70~70
+
+# left arm
+uni   u-torso(-0.5 0 1)   <- l-collar(1 0 -1)  stops  -30~30  -30~30  axes <0 1 0> <0 0 1>
+ball  l-collar(-0.6 0 -1) <- lu-arm(0 0 1)     stops -150~150 -70~70 -150~80
+uni   lu-arm(0 0 -1)      <- ll-arm(0 0 1)     stops -150~1   -70~70  axes <1 0 0> <0 0 1>
+hinge ll-arm(0 -1 -1)     <- l-hand(0 -1 1)    stops  -70~70
+
+# right leg
+ball  pelvis(0.6 0 -1)  <- ru-leg(0 0 0.9)  stops -150~70 -70~70 -30~150
+hinge ru-leg(0 0 -0.9)  <- rl-leg(0 0 0.9)  stops   -1~150
+uni   rl-leg(0 0 -1)    <- r-foot(0 -0.5 1) stops  -70~70 -70~70
+hinge r-foot(0 1 -1)    <- r-toes(0 -1 -1)  stops  -30~30
+
+# left leg
+ball  pelvis(-0.6 0 -1) <- lu-leg(0 0 0.9)  stops -150~70 -70~70 -150~30
+hinge lu-leg(0 0 -0.9)  <- ll-leg(0 0 0.9)  stops   -1~150
+uni   ll-leg(0 0 -1)    <- l-foot(0 -0.5 1) stops  -70~70 -70~70
+hinge l-foot(0 1 -1)    <- l-toes(0 -1 -1)  stops  -30~30
