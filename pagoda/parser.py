@@ -463,7 +463,7 @@ class AsfVisitor(NodeVisitor):
                 v /= l
                 rot = np.vstack([np.cross(u, v), v, u]).T
                 swizzle = [[1, 0, 0], [0, 0, 1], [0, -1, 0]]
-                body.rotation = np.dot(swizzle, rot).flatten()
+                body.rotation = np.dot(swizzle, rot)
 
             self.bodies.append(body)
 

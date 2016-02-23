@@ -117,9 +117,9 @@ class Viewer(popglove.Window):
         '''
         x, y, z = body.position
         r = body.rotation
-        with popglove.gl_context(mat=(r[0], r[3], r[6], 0.,
-                                      r[1], r[4], r[7], 0.,
-                                      r[2], r[5], r[8], 0.,
+        with popglove.gl_context(mat=(r[0, 0], r[1, 0], r[2, 0], 0.,
+                                      r[0, 1], r[1, 1], r[2, 1], 0.,
+                                      r[0, 2], r[1, 2], r[2, 2], 0.,
                                       x, y, z, 1.),
                                  color=body.color):
             if isinstance(body, physics.Box):
