@@ -8,7 +8,7 @@ setuptools.setup(
     version='0.1.0',
     packages=setuptools.find_packages(),
     package_data={'': ['*.peg']},
-    author='Leif Johnson',
+    author='UT Vision, Cognition, and Action Lab',
     author_email='leif@cs.utexas.edu',
     description='pyglet + ode + numpy: a simulation framework',
     long_description=open(README).read(),
