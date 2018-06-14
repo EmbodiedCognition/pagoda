@@ -12,15 +12,13 @@ the package as a whole.
 
 from __future__ import division, print_function, absolute_import
 
-import climate
+import logging
 import numpy as np
 import ode
 import re
 
 from . import physics
 from . import skeleton
-
-logging = climate.get_logger(__name__)
 
 
 class Markers:

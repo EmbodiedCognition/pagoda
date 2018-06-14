@@ -1,13 +1,11 @@
 '''Articulated "skeleton" class and associated helper functions.'''
 
-import climate
+import logging
 import numpy as np
 import ode
 
 from . import parser
 from . import physics
-
-logging = climate.get_logger(__name__)
 
 
 def pid(kp=0., ki=0., kd=0., smooth=0.1):

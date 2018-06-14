@@ -9,7 +9,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     package_data={'': ['*.peg']},
     author='Leif Johnson',
-    author_email='leif@lmjohns3.com',
+    author_email='leif@cs.utexas.edu',
     description='pyglet + ode + numpy: a simulation framework',
     long_description=open(README).read(),
     license='MIT',
@@ -19,7 +19,7 @@ setuptools.setup(
               'ode '
               'visualization '
               ),
-    install_requires=['climate', 'numpy', 'parsimonious', 'popglove'],
+    install_requires=['click', 'numpy', 'parsimonious', 'pyglet'],
     classifiers=[
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Science/Research',

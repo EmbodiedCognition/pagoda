@@ -6,11 +6,10 @@ then
     exit 1
 fi
 
-svn checkout -r 1939 https://svn.code.sf.net/p/opende/code/trunk opende
-patch -dopende -p0 < ode-r1939.patch
+curl -L https://bitbucket.org/odedevs/ode/downloads/ode-0.14.tar.gz | tar xz
 
 (
-    cd opende
+    cd ode-0.14
     ./bootstrap
     ./configure --enable-double-precision --enable-shared --prefix=$VIRTUAL_ENV
     make -j

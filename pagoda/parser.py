@@ -2,15 +2,13 @@
 
 from __future__ import division, absolute_import, unicode_literals
 
-import climate
+import logging
 import numpy as np
 import os
 import parsimonious
 import re
 
 from . import physics
-
-logging = climate.get_logger(__name__)
 
 
 def parse(source, world, jointgroup=None, density=1000, color=None):

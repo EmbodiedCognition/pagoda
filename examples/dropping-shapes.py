@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import climate
+import click
 import pagoda
 import pagoda.viewer
 import numpy as np
@@ -15,9 +15,8 @@ class World(pagoda.physics.World):
                 np.pi * rng.rand(), 0, 1, 1)
 
 
-@climate.annotate(
-    n=('number of bodies in the simulation', 'option', None, int),
-    )
+@click.command()
+@click.option('n', default=20, help='number of bodies in the simulation')
 def main(n=20):
     w = World()
     # set the cfm parameter below for a trampoline-like floor !
@@ -42,4 +41,4 @@ def main(n=20):
 
 
 if __name__ == '__main__':
-    climate.call(main)
+    main()

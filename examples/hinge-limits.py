@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
-import climate
+import click
+import logging
 import os
 import pagoda
 import pagoda.parser
@@ -16,7 +17,9 @@ class Viewer(pagoda.viewer.Viewer):
             return True
 
 
+@click.command()
 def main():
+    logging.basicConfig()
     w = pagoda.physics.World(dt=0.01)
     with open(os.path.join(os.path.dirname(__file__), 'hinge-limits.txt')) as h:
         pagoda.parser.parse(h, w)
@@ -25,4 +28,4 @@ def main():
 
 
 if __name__ == '__main__':
-    climate.call(main)
+    main()

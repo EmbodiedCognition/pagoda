@@ -2,14 +2,11 @@
 
 from __future__ import division
 
-import climate
 import numpy as np
 import os
-import popglove
 
 from . import physics
-
-logging = climate.get_logger(__name__)
+from . import window
 
 
 class Null(object):
@@ -29,7 +26,7 @@ class Null(object):
                 self.world.reset()
 
 
-class Viewer(popglove.Window):
+class Viewer(window.Window):
     '''A viewer window for pagoda worlds.
 
     This viewer adds the following default keybindings:
@@ -104,51 +101,51 @@ class Viewer(popglove.Window):
 
         if hasattr(self.world, 'markers'):
             # draw line between anchor1 and anchor2 for marker joints.
-            popglove.glColor4f(0.9, 0.1, 0.1, 0.9)
-            popglove.glLineWidth(3)
+            window.glColor4f(0.9, 0.1, 0.1, 0.9)
+            window.glLineWidth(3)
             for j in self.world.markers.joints.values():
-                popglove.glBegin(popglove.GL_LINES)
-                popglove.glVertex3f(*j.getAnchor())
-                popglove.glVertex3f(*j.getAnchor2())
-                popglove.glEnd()
+                window.glBegin(window.GL_LINES)
+                window.glVertex3f(*j.getAnchor())
+                window.glVertex3f(*j.getAnchor2())
+                window.glEnd()
 
     def draw_body(self, body):
         '''
         '''
         x, y, z = body.position
         r = body.rotation
-        with popglove.gl_context(mat=(r[0, 0], r[1, 0], r[2, 0], 0.,
+        with window.gl_context(mat=(r[0, 0], r[1, 0], r[2, 0], 0.,
                                       r[0, 1], r[1, 1], r[2, 1], 0.,
                                       r[0, 2], r[1, 2], r[2, 2], 0.,
                                       x, y, z, 1.),
                                  color=body.color):
             if isinstance(body, physics.Box):
                 x, y, z = body.lengths
-                popglove.glScalef(x / 2., y / 2., z / 2.)
-                self.box.draw(popglove.GL_TRIANGLES)
+                window.glScalef(x / 2., y / 2., z / 2.)
+                self.box.draw(window.GL_TRIANGLES)
             elif isinstance(body, physics.Sphere):
                 r = body.radius
-                popglove.glScalef(r, r, r)
-                self.sphere.draw(popglove.GL_TRIANGLES)
+                window.glScalef(r, r, r)
+                self.sphere.draw(window.GL_TRIANGLES)
             elif isinstance(body, physics.Cylinder):
                 l = body.length
                 r = body.radius
-                popglove.glScalef(r, r, l / 2)
-                self.cylinder.draw(popglove.GL_TRIANGLES)
+                window.glScalef(r, r, l / 2)
+                self.cylinder.draw(window.GL_TRIANGLES)
             elif isinstance(body, physics.Capsule):
                 r = body.radius
                 l = body.length
-                with popglove.gl_context(scale=(r, r, l / 2)):
-                    self.cylinder.draw(popglove.GL_TRIANGLES)
-                with popglove.gl_context(mat=(r, 0, 0, 0,
+                with window.gl_context(scale=(r, r, l / 2)):
+                    self.cylinder.draw(window.GL_TRIANGLES)
+                with window.gl_context(mat=(r, 0, 0, 0,
                                               0, r, 0, 0,
                                               0, 0, r, 0,
                                               0, 0, -l / 2, 1),
                                          color=body.color):
-                    self.sphere.draw(popglove.GL_TRIANGLES)
-                with popglove.gl_context(mat=(r, 0, 0, 0,
+                    self.sphere.draw(window.GL_TRIANGLES)
+                with window.gl_context(mat=(r, 0, 0, 0,
                                               0, r, 0, 0,
                                               0, 0, r, 0,
                                               0, 0, l / 2, 1),
                                          color=body.color):
-                    self.sphere.draw(popglove.GL_TRIANGLES)
+                    self.sphere.draw(window.GL_TRIANGLES)
